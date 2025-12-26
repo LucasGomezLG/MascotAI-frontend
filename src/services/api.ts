@@ -18,20 +18,19 @@ export const api = {
   borrarMascota: (id: string) => axios.delete(`${API_BASE}/perfiles/${id}`),
 
   // --- IA Y ANÁLISIS (GEMINI) ---
-  analizarAlimento: (image: string, mascotaId: string) => 
+  analizarAlimento: (image: string, mascotaId: string) =>
     axios.post(`${API_BASE}/analizar-personalizado`, { image, mascotaId }),
-  analizarVet: (image: string, tipo: string, mascotaId: string) => 
+  analizarVet: (image: string, tipo: string, mascotaId: string) =>
     axios.post(`${API_BASE}/analizar-veterinario`, { image, tipo, mascotaId }),
-  analizarSalud: (image: string, mascotaId: string) => 
+  analizarSalud: (image: string, mascotaId: string) =>
     axios.post(`${API_BASE}/analizar-salud`, { image, mascotaId }),
-  analizarReceta: (image: string, mascotaId: string) => 
+  analizarReceta: (image: string, mascotaId: string) =>
     axios.post(`${API_BASE}/analizar-receta`, { image, mascotaId }),
 
   // --- HISTORIALES ---
   getHistorial: () => axios.get(`${API_BASE}/historial`),
   getHistorialVet: () => axios.get(`${API_BASE}/historial-vet`),
   getHistorialSalud: (mascotaId: string) => axios.get(`${API_BASE}/historial-salud/${mascotaId}`),
-  borrarAlimento: (id: string) => axios.delete(`${API_BASE}/historial/${id}`),
   borrarConsultaVet: (id: string) => axios.delete(`${API_BASE}/consulta-vet/${id}`),
 
   // --- STOCK E INTELIGENCIA ---
@@ -60,4 +59,6 @@ export const api = {
   // --- AUTENTICACIÓN Y PERFIL ---
   getUserProfile: () => axios.get(`${API_BASE}/user/me`),
   logout: () => axios.post(`${API_BASE}/logout`),
+  // En api.ts
+  borrarAlimento: (id: string) => axios.delete(`${API_BASE}/historial/${id}`),
 };
