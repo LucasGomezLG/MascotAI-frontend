@@ -3,16 +3,18 @@ import { api } from '../services/api';
 
 const AuthContext = createContext<any>(null);
 
+// ... resto del código igual
+
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  // En src/context/AuthContext.tsx
+  // Obtenemos la URL base de tu .env (Railway en este caso)
+  const API_BASE = import.meta.env.VITE_API_BASE_URL;
 
   useEffect(() => {
     api.getUserProfile()
       .then(res => {
-        // Si la respuesta tiene datos, cargamos al usuario
         if (res.data && res.data.id) {
           setUser(res.data);
         } else {
@@ -24,21 +26,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const login = () => {
-    // Redirigimos al flujo OAuth2 de Google usando tu IP local
-    window.location.href = "http://localhost:8080/oauth2/authorization/google";
+    // CAMBIO CLAVE: Usamos la URL de Railway dinámicamente
+    window.location.href = `${API_BASE}/oauth2/authorization/google`;
   };
-
-  // En src/context/AuthContext.tsx
 
   const logout = async () => {
     try {
-      await api.logout(); // Llamamos al backend
+      await api.logout();
     } catch (error) {
       console.log("Error al desloguear, limpiando localmente...");
     } finally {
-      // Pase lo que pase, limpiamos el estado y volvemos al inicio
       setUser(null);
-      window.location.href = "http://localhost:5173";
+      // CAMBIO CLAVE: Redirigimos al origen actual (localhost o Vercel)
+      window.location.href = window.location.origin;
     }
   };
 
@@ -48,6 +48,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     </AuthContext.Provider>
   );
 };
+
 
 // Hook mejorado con validación de seguridad
 export const useAuth = () => {
