@@ -3,7 +3,7 @@ import {
   Camera, Loader2, Utensils, User, Wallet, Search,
   CheckCircle, MessageCircle, Sparkles, ThumbsUp, ThumbsDown,
   ShoppingBag, X, AlertTriangle, Package,
-  AlertCircle // Nuevo icono para alertas urgentes
+  AlertCircle
 } from 'lucide-react';
 import { api } from '../../services/api';
 import Swal from 'sweetalert2';
@@ -18,20 +18,18 @@ const FoodScanner = ({ mascotas, onScanComplete, initialData, onReset }: any) =>
 
   const [precioInput, setPrecioInput] = useState("");
   const [pesoBolsaInput, setPesoBolsaInput] = useState("");
-  const [busquedaResult, setBusquedaResult] = useState<string | null>(null);
+
+  // ✅ ACTUALIZADO: Ahora el estado inicial es un Array vacío para evitar errores de split
+  const [busquedaResult, setBusquedaResult] = useState<any[]>([]);
   const [resenas, setResenas] = useState<string[]>([]);
 
   const [showPriceModal, setShowPriceModal] = useState(false);
   const [showBrandWarning, setShowBrandWarning] = useState(false);
 
-  // Agregalo debajo de los otros useState
   const fileInputRef = React.useRef<HTMLInputElement>(null);
-
-  // NUEVO: Estado para alertas de salud próximas
   const [alertasSalud, setAlertasSalud] = useState<any[]>([]);
 
   useEffect(() => {
-    // Cargamos alertas urgentes al montar el componente
     api.getAlertasSalud().then(res => setAlertasSalud(res.data || []));
 
     if (initialData) {
@@ -39,7 +37,8 @@ const FoodScanner = ({ mascotas, onScanComplete, initialData, onReset }: any) =>
       setPorcion(initialData.porcionRecomendada);
       setPrecioInput(initialData.precioComprado?.toString() || "");
       setPesoBolsaInput(initialData.pesoBolsaKg?.toString() || "");
-      setBusquedaResult(initialData.preciosOnlineIA || null);
+      // Verificamos si los datos iniciales ya son un array o texto
+      setBusquedaResult(Array.isArray(initialData.preciosOnlineIA) ? initialData.preciosOnlineIA : []);
     }
   }, [initialData]);
 
@@ -74,21 +73,17 @@ const FoodScanner = ({ mascotas, onScanComplete, initialData, onReset }: any) =>
       await api.activarStock(result.id);
       setResult({ ...result, stockActivo: true });
 
-      // ✅ REEMPLAZO DEL ALERT
       Swal.fire({
         title: '¡Bolsa activada!',
         text: 'MascotAI empezó a contar el stock desde hoy.',
         icon: 'success',
         confirmButtonText: 'Genial',
-        confirmButtonColor: '#f27121', // El naranja de tu marca
-        customClass: {
-          popup: 'rounded-2xl', // Para que sea redondeado como tu diseño
-        }
+        confirmButtonColor: '#f27121', // Naranja MascotAI
+        customClass: { popup: 'rounded-2xl' }
       });
 
       onScanComplete();
     } catch (e) {
-      // ❌ MANEJO DE ERROR
       Swal.fire({
         title: 'Error',
         text: 'No se pudo activar el stock en este momento.',
@@ -103,11 +98,11 @@ const FoodScanner = ({ mascotas, onScanComplete, initialData, onReset }: any) =>
     if (!file) return;
     const reader = new FileReader();
     reader.onloadend = async () => {
-      setLoading(true); setResenas([]); setPrecioInput(""); setPesoBolsaInput(""); setBusquedaResult(null);
+      setLoading(true); setResenas([]); setPrecioInput(""); setPesoBolsaInput(""); setBusquedaResult([]);
       try {
         const res = await api.analizarAlimento(reader.result as string, selectedPet);
         if (res.data.alimento === "ERROR: NO_ES_ALIMENTO") {
-          alert("La imagen no parece ser alimento de mascotas.");
+          Swal.fire({ title: 'Error', text: 'La imagen no parece ser alimento.', icon: 'warning' });
         } else {
           setResult(res.data.alimento);
           setPorcion(res.data.porcionSugerida);
@@ -123,9 +118,12 @@ const FoodScanner = ({ mascotas, onScanComplete, initialData, onReset }: any) =>
     setLoadingBusqueda(true);
     try {
       const res = await api.buscarPrecios(result.marca);
-      setBusquedaResult(res.data);
+      // ✅ GUARDAMOS EL ARRAY DIRECTAMENTE: Ya no es un String
+      setBusquedaResult(res.data || []);
       setShowPriceModal(true);
-    } catch (e) { alert("Error"); } finally { setLoadingBusqueda(false); }
+    } catch (e) {
+      Swal.fire({ title: 'Error', text: 'No se pudieron obtener precios.', icon: 'error' });
+    } finally { setLoadingBusqueda(false); }
   };
 
   const handleBuscarResenas = async () => {
@@ -155,14 +153,10 @@ const FoodScanner = ({ mascotas, onScanComplete, initialData, onReset }: any) =>
         <div className="mb-6 space-y-2">
           {alertasSalud.map((alerta, idx) => (
             <div key={idx} className="bg-red-600 text-white p-4 rounded-2xl shadow-lg flex items-center gap-3 border-2 border-red-400 animate-in slide-in-from-top-2">
-              <div className="bg-white/20 p-2 rounded-lg">
-                <AlertCircle size={20} />
-              </div>
+              <div className="bg-white/20 p-2 rounded-lg"><AlertCircle size={20} /></div>
               <div className="flex-1 text-left">
                 <p className="text-[10px] font-black uppercase opacity-80 leading-none mb-1 tracking-widest">Alerta de Salud</p>
-                <p className="text-xs font-black">
-                  {alerta.tipo}: {alerta.nombre} vence el {alerta.proximaFecha}
-                </p>
+                <p className="text-xs font-black">{alerta.tipo}: {alerta.nombre} vence el {alerta.proximaFecha}</p>
               </div>
             </div>
           ))}
@@ -171,7 +165,6 @@ const FoodScanner = ({ mascotas, onScanComplete, initialData, onReset }: any) =>
 
       {!result ? (
         <div className="space-y-6">
-          {/* Selector de Mascota */}
           <div className="bg-white p-6 rounded-[2.5rem] shadow-xl border border-orange-100 text-left">
             <label className="text-[10px] font-black text-orange-900 uppercase tracking-widest flex items-center gap-2 mb-3">
               <User size={14} /> Mascota
@@ -188,32 +181,21 @@ const FoodScanner = ({ mascotas, onScanComplete, initialData, onReset }: any) =>
             </select>
           </div>
 
-          {/* Área Visual de Captura */}
           <div className="bg-white p-12 border-4 border-dashed border-orange-100 rounded-[2.5rem] flex flex-col items-center">
             <Camera size={60} className="text-orange-200 mb-4" />
             <p className="text-orange-900/40 font-bold text-center leading-tight">Capturá la etiqueta</p>
           </div>
 
-          {/* BOTÓN ACTUALIZADO CON DISPARADOR DE CÁMARA/GALERÍA */}
           <div className="w-full">
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={loading}
-              className={`w-full flex items-center justify-center gap-3 py-6 rounded-2xl font-black text-xl shadow-xl transition-all active:scale-95 ${loading ? 'bg-orange-200' : 'bg-orange-600 text-white shadow-orange-200'
-                }`}
+              className={`w-full flex items-center justify-center gap-3 py-6 rounded-2xl font-black text-xl shadow-xl transition-all active:scale-95 ${loading ? 'bg-orange-200' : 'bg-orange-600 text-white shadow-orange-200'}`}
             >
               {loading ? <Loader2 className="animate-spin" /> : "ESCANEAR ALIMENTO"}
             </button>
-
-            {/* Input oculto que detecta el dispositivo móvil */}
-            <input
-              type="file"
-              ref={fileInputRef}
-              className="hidden"
-              accept="image/jpeg, image/png, image/jpg" // Forzamos formatos de imagen
-              onChange={handleFile}
-            />
+            <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFile} />
           </div>
         </div>
       ) : (
@@ -244,18 +226,11 @@ const FoodScanner = ({ mascotas, onScanComplete, initialData, onReset }: any) =>
               )}
 
               {!result.stockActivo && pesoBolsaInput && (
-                <button
-                  onClick={handleActivarBolsa}
-                  className="w-full py-3 bg-orange-600 text-white rounded-xl font-black text-[10px] uppercase flex items-center justify-center gap-2 shadow-lg shadow-orange-100 animate-in fade-in"
-                >
-                  <Package size={14} /> ¡Empecé esta bolsa hoy!
-                </button>
+                <button onClick={handleActivarBolsa} className="w-full py-3 bg-orange-600 text-white rounded-xl font-black text-[10px] uppercase flex items-center justify-center gap-2 shadow-lg shadow-orange-100"><Package size={14} /> ¡Empecé esta bolsa hoy!</button>
               )}
 
               {result.stockActivo && (
-                <div className="bg-green-100 text-green-700 p-3 rounded-xl flex items-center justify-center gap-2 font-black text-[10px] uppercase">
-                  <CheckCircle size={14} /> Bolsa en seguimiento
-                </div>
+                <div className="bg-green-100 text-green-700 p-3 rounded-xl flex items-center justify-center gap-2 font-black text-[10px] uppercase"><CheckCircle size={14} /> Bolsa en seguimiento</div>
               )}
 
               <button onClick={handleBuscarPrecios} disabled={loadingBusqueda} className={`w-full py-3 rounded-xl font-black text-xs flex items-center justify-center gap-2 shadow-md ${loadingBusqueda ? 'bg-blue-200' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
@@ -275,9 +250,7 @@ const FoodScanner = ({ mascotas, onScanComplete, initialData, onReset }: any) =>
           <div className="space-y-4 mb-8">
             <div className="flex items-center justify-between">
               <h3 className="font-black text-slate-800 flex items-center gap-2 uppercase text-[10px] tracking-wider"><MessageCircle size={14} className="text-blue-500" /> Opiniones</h3>
-              <button onClick={handleBuscarResenas} disabled={loadingResenas} className="text-[9px] font-black text-blue-600 uppercase flex items-center gap-1">
-                {loadingResenas ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />} {resenas.length > 0 ? "Actualizar" : "Ver reseñas"}
-              </button>
+              <button onClick={handleBuscarResenas} disabled={loadingResenas} className="text-[9px] font-black text-blue-600 uppercase flex items-center gap-1">{loadingResenas ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />} Ver reseñas</button>
             </div>
             {resenas.length > 0 && (
               <div className="grid gap-3">
@@ -294,12 +267,11 @@ const FoodScanner = ({ mascotas, onScanComplete, initialData, onReset }: any) =>
               </div>
             )}
           </div>
-
           <button onClick={() => { setResult(null); onReset(); }} className="w-full py-5 bg-slate-900 text-white rounded-2xl font-black shadow-lg">FINALIZAR</button>
         </div>
       )}
 
-      {/* MODALES DE PRECIOS Y MARCA (Sin cambios) */}
+      {/* ✅ MODAL DE PRECIOS ACTUALIZADO: Maneja el Array de objetos sin split */}
       {showPriceModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-6 animate-in fade-in">
           <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl relative text-left animate-in zoom-in-95">
@@ -308,32 +280,25 @@ const FoodScanner = ({ mascotas, onScanComplete, initialData, onReset }: any) =>
               <div className="bg-blue-100 p-3 rounded-2xl text-blue-600"><ShoppingBag size={24} /></div>
               <div><h3 className="text-xl font-black text-slate-800 tracking-tight leading-none">Ofertas Hoy</h3><p className="text-blue-500 font-bold text-[10px] uppercase mt-1">Precios en Argentina</p></div>
             </div>
+
             <div className="space-y-3 mb-8 max-h-[350px] overflow-y-auto pr-2">
-              {busquedaResult?.split('\n')
-                .filter(line => line.includes('|'))
-                .map((line, index) => {
-                  const fragmentos = line.split('|');
-                  const partes = fragmentos.map(p => {
-                    const valor = p.split(':')[1];
-                    return valor ? valor.trim() : "---";
-                  });
-                  const tienda = cleanMarkdown(partes[0]);
-                  const bolsa = cleanMarkdown(partes[1]);
-                  const precio = cleanMarkdown(partes[2]);
-                  const nota = cleanMarkdown(partes[3]);
-                  return (
-                    <div key={index} className="bg-slate-50 p-4 rounded-2xl border border-slate-100 shadow-sm animate-in slide-in-from-bottom-2">
-                      <div className="flex justify-between items-center mb-1">
-                        <span className="font-black text-slate-800 text-[11px] uppercase tracking-tighter">{tienda}</span>
-                        <span className="bg-blue-100 text-blue-700 text-[9px] font-black px-2 py-0.5 rounded-lg uppercase">{bolsa}</span>
-                      </div>
-                      <div className="flex justify-between items-end">
-                        <span className="text-xl font-black text-blue-600 leading-none">{precio}</span>
-                        <span className="text-[10px] text-slate-400 font-bold italic max-w-[50%] text-right">{nota}</span>
-                      </div>
+              {busquedaResult.length > 0 ? (
+                busquedaResult.map((oferta, index) => (
+                  <div key={index} className="bg-slate-50 p-4 rounded-2xl border border-slate-100 shadow-sm animate-in slide-in-from-bottom-2">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="font-black text-slate-800 text-[11px] uppercase tracking-tighter">{oferta.tienda || "---"}</span>
+                      <span className="bg-blue-100 text-blue-700 text-[9px] font-black px-2 py-0.5 rounded-lg uppercase">{oferta.peso || "---"}</span>
                     </div>
-                  );
-                })}
+                    <div className="flex justify-between items-end">
+                      {/* El precio ahora se resalta en naranja MascotAI */}
+                      <span className="text-xl font-black text-orange-600 leading-none">{oferta.precio || "---"}</span>
+                      <span className="text-[10px] text-slate-400 font-bold italic max-w-[50%] text-right">{oferta.nota || ""}</span>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-center text-slate-400 font-bold py-10">Buscando ofertas...</p>
+              )}
             </div>
             <button onClick={() => setShowPriceModal(false)} className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black shadow-lg">ENTENDIDO</button>
           </div>
