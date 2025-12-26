@@ -9,7 +9,7 @@ const LoginView = () => {
       <div className="bg-white p-10 rounded-[3rem] shadow-2xl text-center border-4 border-orange-100">
         <PawPrint size={80} className="text-orange-500 mx-auto mb-6" />
         <h1 className="text-4xl font-black text-slate-800 mb-2 tracking-tighter">MascotAI</h1>
-        <p className="text-slate-500 font-bold mb-8">Cuidá a Simba y Adelina como un experto</p>
+        <p className="text-slate-500 font-bold mb-8">Cuidá a tus mascotas como un experto</p>
         
         <button 
           onClick={login}
