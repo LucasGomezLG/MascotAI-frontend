@@ -6,6 +6,7 @@ import {
   AlertCircle // Nuevo icono para alertas urgentes
 } from 'lucide-react';
 import { api } from '../../services/api';
+import Swal from 'sweetalert2';
 
 const FoodScanner = ({ mascotas, onScanComplete, initialData, onReset }: any) => {
   const [selectedPet, setSelectedPet] = useState("");
@@ -72,10 +73,28 @@ const FoodScanner = ({ mascotas, onScanComplete, initialData, onReset }: any) =>
     try {
       await api.activarStock(result.id);
       setResult({ ...result, stockActivo: true });
-      alert("¡Bolsa activada! MascotAI empezó a contar el stock desde hoy.");
+
+      // ✅ REEMPLAZO DEL ALERT
+      Swal.fire({
+        title: '¡Bolsa activada!',
+        text: 'MascotAI empezó a contar el stock desde hoy.',
+        icon: 'success',
+        confirmButtonText: 'Genial',
+        confirmButtonColor: '#f27121', // El naranja de tu marca
+        customClass: {
+          popup: 'rounded-2xl', // Para que sea redondeado como tu diseño
+        }
+      });
+
       onScanComplete();
     } catch (e) {
-      alert("Error al activar el stock.");
+      // ❌ MANEJO DE ERROR
+      Swal.fire({
+        title: 'Error',
+        text: 'No se pudo activar el stock en este momento.',
+        icon: 'error',
+        confirmButtonColor: '#f27121'
+      });
     }
   };
 
