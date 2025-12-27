@@ -1,76 +1,64 @@
 import axios from 'axios';
 
-// 1. URL del servidor (la raíz para el login de Google)
 export const SERVER_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
-
-// 2. Base de tus endpoints (con el prefijo de tu app)
 export const API_BASE = `${SERVER_URL}/api/mascotas`;
 
-// CONFIGURACIÓN GLOBAL DE AXIOS
 axios.defaults.withCredentials = true;
 
+const apiClient = axios.create({
+  baseURL: API_BASE,
+  withCredentials: true
+});
+
 export const api = {
-  // --- PERFILES Y MASCOTAS ---
-  getPerfiles: () => axios.get(`${API_BASE}/perfiles`),
-  getMascotas: () => axios.get(`${API_BASE}/perfiles`),
-  guardarPerfil: (data: any) => axios.post(`${API_BASE}/guardar-perfil`, data),
-  borrarMascota: (id: string) => axios.delete(`${API_BASE}/perfiles/${id}`),
+  // --- USAMOS apiClient EN TODAS PARA QUE EL TOKEN VIAJE ---
+  getPerfiles: () => apiClient.get('/perfiles'),
+  getMascotas: () => apiClient.get('/perfiles'),
+  guardarPerfil: (data: any) => apiClient.post('/guardar-perfil', data),
+  borrarMascota: (id: string) => apiClient.delete(`/perfiles/${id}`),
 
-  // --- IA Y ANÁLISIS (GEMINI) ---
-  analizarAlimento: (image: string, mascotaId: string) =>
-    axios.post(`${API_BASE}/analizar-personalizado`, { image, mascotaId }),
-  analizarVet: (image: string, tipo: string, mascotaId: string) =>
-    axios.post(`${API_BASE}/analizar-veterinario`, { image, tipo, mascotaId }),
-  analizarTriaje: (image: string, tipo: string, mascotaId: string) =>
-    axios.post(`${API_BASE}/triaje/analizar`, { image, tipo, mascotaId }),
-  analizarSalud: (image: string, mascotaId: string) =>
-    axios.post(`${API_BASE}/analizar-salud`, { image, mascotaId }),
-  analizarReceta: (image: string, mascotaId: string) =>
-    axios.post(`${API_BASE}/analizar-receta`, { image, mascotaId }),
+  analizarAlimento: (image: string, mascotaId: string) => apiClient.post('/analizar-personalizado', { image, mascotaId }),
+  analizarVet: (image: string, tipo: string, mascotaId: string) => apiClient.post('/analizar-veterinario', { image, tipo, mascotaId }),
+  analizarTriaje: (image: string, tipo: string, mascotaId: string) => apiClient.post('/triaje/analizar', { image, tipo, mascotaId }),
+  analizarSalud: (image: string, mascotaId: string) => apiClient.post('/analizar-salud', { image, mascotaId }),
+  analizarReceta: (image: string, mascotaId: string) => apiClient.post('/analizar-receta', { image, mascotaId }),
 
-  // --- HISTORIALES ---
-  getHistorial: () => axios.get(`${API_BASE}/historial`),
-  getHistorialVet: () => axios.get(`${API_BASE}/historial-vet`),
-  getHistorialSalud: (mascotaId: string) => axios.get(`${API_BASE}/historial-salud/${mascotaId}`),
-  borrarConsultaVet: (id: string) => axios.delete(`${API_BASE}/consulta-vet/${id}`),
-  borrarAlimento: (id: string) => axios.delete(`${API_BASE}/historial/${id}`),
+  getHistorial: () => apiClient.get('/historial'),
+  getHistorialVet: () => apiClient.get('/historial-vet'),
+  getHistorialSalud: (mascotaId: string) => apiClient.get(`/historial-salud/${mascotaId}`),
+  borrarConsultaVet: (id: string) => apiClient.delete(`/consulta-vet/${id}`),
+  borrarAlimento: (id: string) => apiClient.delete(`/historial/${id}`),
 
-  // --- STOCK E INTELIGENCIA ---
-  getStockStatus: (mascotaId: string) => axios.get(`${API_BASE}/stock-status/${mascotaId}`),
-  activarStock: (id: string, data: any) => axios.post(`${API_BASE}/activar-stock/${id}`, data),
-  buscarPrecios: (marca: string) => axios.get(`${API_BASE}/buscar-precios/${marca}`),
-  buscarResenas: (marca: string) => axios.get(`${API_BASE}/buscar-resenas/${encodeURIComponent(marca)}`),
+  getStockStatus: (mascotaId: string) => apiClient.get(`/stock-status/${mascotaId}`),
+  activarStock: (id: string, data: any) => apiClient.post(`/activar-stock/${id}`, data),
+  buscarPrecios: (marca: string) => apiClient.get(`/buscar-precios/${marca}`),
+  buscarResenas: (marca: string) => apiClient.get(`/buscar-resenas/${encodeURIComponent(marca)}`),
 
-  // --- SALUD PREVENTIVA Y ALERTAS ---
-  getAlertasSalud: () => axios.get(`${API_BASE}/alertas-salud`),
-  getAlertasSistema: () => axios.get(`${API_BASE}/alertas-sistema`),
-  marcarAlertaLeida: (id: string) => axios.put(`${API_BASE}/alertas-sistema/${id}/leer`),
-  guardarEventoSalud: (data: any) => axios.post(`${API_BASE}/guardar-salud`, data),
-  borrarEventoSalud: (id: string) => axios.delete(`${API_BASE}/salud/${id}`),
-  actualizarEventoSalud: (id: string, data: any) => axios.put(`${API_BASE}/salud/${id}`, data),
+  getAlertasSalud: () => apiClient.get('/alertas-salud'),
+  getAlertasSistema: () => apiClient.get('/alertas-sistema'),
+  marcarAlertaLeida: (id: string) => apiClient.put(`/alertas-sistema/${id}/leer`),
+  guardarEventoSalud: (data: any) => apiClient.post('/guardar-salud', data),
+  borrarEventoSalud: (id: string) => apiClient.delete(`/salud/${id}`),
+  actualizarEventoSalud: (id: string, data: any) => apiClient.put(`/salud/${id}`, data),
 
-  // --- FINANZAS ---
-  guardarFinanzas: (data: any) => axios.post(`${API_BASE}/guardar-finanzas`, data),
-  getPresupuestoMensual: () => axios.get(`${API_BASE}/presupuesto-mensual`),
-  comparar: (ids: string[]) => axios.post(`${API_BASE}/comparar`, { ids }),
+  guardarFinanzas: (data: any) => apiClient.post('/guardar-finanzas', data),
+  getPresupuestoMensual: () => apiClient.get('/presupuesto-mensual'),
+  comparar: (ids: string[]) => apiClient.post('/comparar', { ids }),
 
-  // --- VETERINARIO Y RECETAS ---
-  guardarConsultaVet: (data: any) => axios.post(`${API_BASE}/analizar-veterinario`, data),
-  guardarReceta: (data: any) => axios.post(`${API_BASE}/guardar-receta`, data),
+  guardarConsultaVet: (data: any) => apiClient.post('/analizar-veterinario', data),
+  guardarReceta: (data: any) => apiClient.post('/guardar-receta', data),
 
-  // --- AUTENTICACIÓN Y PERFIL ---
-  // ✅ Versión unificada que maneja el 401 sin romper el AuthContext
   getUserProfile: async () => {
     try {
-      return await axios.get(`${API_BASE}/user/me`);
+      // ✅ IMPORTANTE: Retornamos la respuesta completa para tu AuthContext
+      return await apiClient.get('/user/me');
     } catch (error: any) {
       if (error.response?.status === 401) {
-        console.warn("Sesión no iniciada aún");
-        return { data: null }; // Devolvemos estructura vacía para no romper el .then()
+        return { data: null };
       }
       throw error;
     }
   },
 
-  logout: () => axios.post(`${API_BASE}/logout`),
+  logout: () => apiClient.post('/logout'),
 };
