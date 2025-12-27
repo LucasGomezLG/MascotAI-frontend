@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { 
   Loader2, User, Syringe, ShieldPlus, ClipboardPlus, 
-  CheckCircle2, AlertCircle, Wallet, RefreshCw, Sparkles 
+  X, Wallet, RefreshCw, Sparkles, Image as ImageIcon 
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { Toast } from '../../utils/alerts';
@@ -12,22 +12,39 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
   const [loading, setLoading] = useState(false);
   const [editData, setEditData] = useState<any>(null);
   
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    setEditData(null);
     const reader = new FileReader();
-    reader.onloadend = () => setSelectedImage(reader.result as string);
+    reader.onloadend = () => {
+      setSelectedImage(reader.result as string);
+      e.target.value = ""; 
+    };
     reader.readAsDataURL(file);
   };
 
+  const handleBorrarFoto = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedImage(null);
+    setEditData(null);
+  };
+
   const handleAnalizarSalud = async () => {
-    // ✅ Validación elegante con Toast
+    // ✅ VALIDACIÓN OBLIGATORIA: En Salud NO permitimos escaneo genérico
     if (!selectedPet) {
-      Toast.fire({ icon: 'warning', title: '¡Falta un paso!', text: 'Seleccioná una mascota antes de escanear.' });
+      Toast.fire({ 
+        icon: 'warning', 
+        title: '¡Falta la Mascota!', 
+        text: 'Para registrar salud, primero decime a quién le toca.' 
+      });
       return;
     }
+
     if (!selectedImage) return;
 
     setLoading(true);
@@ -35,9 +52,8 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
       const res = await api.analizarSalud(selectedImage, selectedPet);
       const data = res.data;
 
-      // ✅ Blindaje contra valores nulos de la IA
       setEditData({
-        nombre: data.nombre || "Evento de Salud",
+        nombre: data.nombre || "",
         fechaAplicacion: data.fechaAplicacion || new Date().toISOString().split('T')[0],
         proximaFecha: data.proximaFecha || "",
         precio: data.precio || 0,
@@ -64,7 +80,7 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
       });
       setEditData(null);
       setSelectedImage(null);
-      onScanComplete();
+      if (onScanComplete) onScanComplete();
     } catch (e) {
       Toast.fire({ icon: 'error', title: 'No se pudo guardar el registro' });
     } finally {
@@ -76,7 +92,7 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
       {!editData ? (
         <div className="space-y-6 text-left">
-          {/* 1. Selector de Mascota */}
+          {/* 1. Selector de Mascota (Obligatorio) */}
           <div className="bg-white p-6 rounded-[2.5rem] shadow-xl border border-emerald-100">
             <label className="text-[10px] font-black text-emerald-900 uppercase tracking-widest flex items-center gap-2 mb-3">
               <User size={14} /> Mascota
@@ -91,42 +107,54 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
             </select>
           </div>
 
-          {/* 2. Recuadro de Captura con Previsualización */}
+          {/* 2. Recuadro de Captura */}
           <div 
-            onClick={() => fileInputRef.current?.click()} 
+            onClick={() => cameraInputRef.current?.click()} 
             className="bg-white h-64 border-4 border-dashed border-emerald-100 rounded-[2.5rem] flex flex-col items-center justify-center cursor-pointer hover:border-emerald-300 transition-all active:scale-[0.98] group relative overflow-hidden shadow-inner"
           >
             {selectedImage ? (
               <>
                 <img src={selectedImage} alt="Preview" className="w-full h-full object-cover" />
+                <button onClick={handleBorrarFoto} className="absolute top-4 right-4 bg-white/90 p-2 rounded-full shadow-lg text-emerald-600 z-10"><X size={20} /></button>
                 <div className="absolute inset-0 bg-emerald-900/20 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-[2px]">
                   <RefreshCw className="text-white mb-2" />
                   <span className="text-white font-black text-[10px] uppercase">Cambiar Foto</span>
                 </div>
               </>
             ) : (
-              <div className="text-center group-hover:scale-105 transition-transform">
-                <div className="bg-emerald-50 p-5 rounded-full mb-4 inline-block">
-                  <ShieldPlus size={40} className="text-emerald-200" />
+              <div className="text-center group-hover:scale-105 transition-transform px-6">
+                <div className="bg-emerald-50 p-5 rounded-full mb-4 inline-block shadow-sm text-emerald-200">
+                  <ShieldPlus size={40} />
                 </div>
-                <p className="text-emerald-900/40 font-black uppercase text-[10px] tracking-[0.2em] px-6 leading-tight">
+                <p className="text-emerald-900/40 font-black uppercase text-[10px] tracking-[0.2em] leading-tight text-center">
                   Escaneá la libreta o <br/> caja del medicamento
                 </p>
               </div>
             )}
           </div>
 
-          {/* 3. Botón Registrar (Corregido: Icono centrado) */}
+          {/* 3. Cargar desde Galería */}
+          <button 
+            type="button"
+            onClick={() => galleryInputRef.current?.click()}
+            className="w-full py-3 rounded-2xl font-black text-xs uppercase bg-slate-100 text-slate-500 border-2 border-slate-200 hover:bg-slate-200 transition-all flex items-center justify-center gap-2"
+          >
+            <ImageIcon size={16} /> O cargar imagen de galería
+          </button>
+
+          {/* 4. Botón Registrar Salud */}
           <button 
             onClick={handleAnalizarSalud} 
             disabled={loading || !selectedImage} 
             className={`w-full flex items-center justify-center gap-3 py-6 rounded-[2rem] font-black text-xl shadow-xl transition-all active:scale-95 ${
-              loading || !selectedImage ? 'bg-emerald-100 text-emerald-300' : 'bg-emerald-600 text-white shadow-emerald-200 hover:bg-emerald-700'
+              loading || !selectedImage ? 'bg-emerald-50 text-emerald-200' : 'bg-emerald-600 text-white shadow-emerald-200 hover:bg-emerald-700'
             }`}
           >
-            {loading ? <Loader2 className="animate-spin" /> : <><Sparkles size={22} className="text-emerald-200" /> REGISTRAR SALUD</>}
+            {loading ? <Loader2 className="animate-spin" /> : <><Sparkles size={22} /> REGISTRAR SALUD</>}
           </button>
-          <input type="file" ref={fileInputRef} className="hidden" accept="image/*" capture="environment" onChange={handleFile} />
+          
+          <input type="file" ref={cameraInputRef} className="hidden" accept="image/*" capture="environment" onChange={handleFile} />
+          <input type="file" ref={galleryInputRef} className="hidden" accept="image/*" onChange={handleFile} />
         </div>
       ) : (
         /* VISTA DE CONFIRMACIÓN */
@@ -154,32 +182,17 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
           <div className="space-y-4 mb-8">
             <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100">
               <p className="text-[10px] font-black text-slate-400 uppercase mb-2">Producto / Vacuna</p>
-              <input 
-                type="text"
-                className="w-full bg-transparent font-black text-lg text-slate-800 border-b-2 border-slate-100 focus:border-emerald-500 outline-none transition-all pb-1"
-                value={editData.nombre || ""} 
-                onChange={(e) => setEditData({...editData, nombre: e.target.value})}
-              />
+              <input type="text" className="w-full bg-transparent font-black text-lg text-slate-800 border-b-2 border-slate-100 focus:border-emerald-500 outline-none" value={editData.nombre || ""} onChange={(e) => setEditData({...editData, nombre: e.target.value})} />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3 text-center">
               <div className="bg-emerald-50/50 p-4 rounded-3xl border border-emerald-100">
                 <p className="text-[9px] font-black text-emerald-600 uppercase mb-2">Fecha Aplicación</p>
-                <input 
-                  type="date"
-                  className="w-full bg-transparent text-xs font-black text-slate-700 outline-none"
-                  value={editData.fechaAplicacion || ""} 
-                  onChange={(e) => setEditData({...editData, fechaAplicacion: e.target.value})}
-                />
+                <input type="date" className="w-full bg-transparent text-xs font-black text-slate-700 outline-none" value={editData.fechaAplicacion || ""} onChange={(e) => setEditData({...editData, fechaAplicacion: e.target.value})} />
               </div>
               <div className="bg-orange-50/50 p-4 rounded-3xl border border-orange-100">
                 <p className="text-[9px] font-black text-orange-600 uppercase mb-2">Próximo Refuerzo</p>
-                <input 
-                  type="date"
-                  className="w-full bg-transparent text-xs font-black text-slate-700 outline-none"
-                  value={editData.proximaFecha || ""} 
-                  onChange={(e) => setEditData({...editData, proximaFecha: e.target.value})}
-                />
+                <input type="date" className="w-full bg-transparent text-xs font-black text-slate-700 outline-none" value={editData.proximaFecha || ""} onChange={(e) => setEditData({...editData, proximaFecha: e.target.value})} />
               </div>
             </div>
 
@@ -187,40 +200,20 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
               <p className="text-[10px] font-black text-blue-500 uppercase mb-2 flex items-center gap-2"><Wallet size={12} /> Inversión / Precio</p>
               <div className="relative">
                 <span className="absolute left-0 top-1/2 -translate-y-1/2 font-black text-slate-400">$</span>
-                <input 
-                  type="number"
-                  className="w-full bg-transparent pl-4 font-black text-lg text-slate-800 border-b-2 border-slate-100 focus:border-blue-500 outline-none transition-all pb-1"
-                  value={editData.precio ?? ""} 
-                  onChange={(e) => setEditData({...editData, precio: parseFloat(e.target.value) || 0})}
-                />
+                <input type="number" className="w-full bg-transparent pl-4 font-black text-lg text-slate-800 border-b-2 border-slate-100 focus:border-blue-500 outline-none" value={editData.precio ?? ""} onChange={(e) => setEditData({...editData, precio: parseFloat(e.target.value) || 0})} />
               </div>
             </div>
 
             <div className="space-y-3">
-              <div className="bg-emerald-50/30 p-4 rounded-2xl border border-emerald-100/50">
+              <div className="bg-emerald-50/30 p-4 rounded-2xl border border-emerald-100/50 text-left">
                 <p className="text-[9px] font-black text-emerald-600 uppercase mb-2 flex items-center gap-1"><Syringe size={12} /> Dosis e Instrucciones</p>
-                <input 
-                  type="text"
-                  className="w-full bg-transparent text-xs font-bold text-slate-700 outline-none border-b border-dashed border-emerald-200 pb-1"
-                  value={editData.dosis || ""} 
-                  onChange={(e) => setEditData({...editData, dosis: e.target.value})}
-                />
-              </div>
-
-              <div className="bg-slate-50 p-5 rounded-[2rem] border border-slate-100">
-                <p className="text-[10px] font-black text-slate-400 uppercase mb-2 flex items-center gap-1"><AlertCircle size={12} /> Observaciones</p>
-                <textarea 
-                  className="w-full bg-transparent text-xs font-medium text-slate-600 italic leading-relaxed outline-none resize-none"
-                  rows={3}
-                  value={editData.notas || ""} 
-                  onChange={(e) => setEditData({...editData, notas: e.target.value})}
-                />
+                <input type="text" className="w-full bg-transparent text-xs font-bold text-slate-700 outline-none border-b border-dashed border-emerald-200" value={editData.dosis || ""} onChange={(e) => setEditData({...editData, dosis: e.target.value})} />
               </div>
             </div>
           </div>
 
           <div className="flex gap-2">
-            <button onClick={() => setEditData(null)} className="flex-1 py-4 bg-slate-100 text-slate-400 rounded-2xl font-black uppercase text-[10px]">Descartar</button>
+            <button onClick={() => {setEditData(null); setSelectedImage(null)}} className="flex-1 py-4 bg-slate-100 text-slate-400 rounded-2xl font-black uppercase text-[10px]">Descartar</button>
             <button onClick={handleGuardar} className="flex-[2] py-4 bg-emerald-600 text-white rounded-2xl font-black shadow-lg uppercase text-[10px]">Guardar en Cartilla</button>
           </div>
         </div>
