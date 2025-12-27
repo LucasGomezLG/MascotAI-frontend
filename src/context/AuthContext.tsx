@@ -11,37 +11,46 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const SERVER_URL = import.meta.env.VITE_API_BASE_URL;
 
   useEffect(() => {
-    api.getUserProfile()
-      .then(res => {
-        if (res.data && res.data.id) {
+    const initAuth = async () => {
+      // ✅ Solo intentamos el fetch si existe el rastro de un login previo
+      const wasLoggedIn = localStorage.getItem('mascotai_logged_in') === 'true';
+
+      if (!wasLoggedIn) {
+        setLoading(false);
+        return; // Ni siquiera llamamos a la API, evitamos el 401 en consola
+      }
+
+      try {
+        const res = await api.getUserProfile();
+        if (res && res.data && res.data.id) {
           setUser(res.data);
-        } else {
-          setUser(null);
         }
-      })
-      .catch(() => setUser(null))
-      .finally(() => setLoading(false));
+      } catch (error) {
+        // Si el servidor dice 401 aunque pensábamos que estábamos logueados (sesión expirada)
+        localStorage.removeItem('mascotai_logged_in');
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initAuth();
   }, []);
 
   const login = () => {
-    // Redirigimos a la raíz del backend para iniciar OAuth2
+    // ✅ Marcamos que el usuario intentó loguearse
+    localStorage.setItem('mascotai_logged_in', 'true');
     window.location.href = `${SERVER_URL}/oauth2/authorization/google`;
   };
 
   const logout = async () => {
     try {
-      // 1. LIMPIEZA TOTAL DE MEMORIA LOCAL
-      localStorage.clear();
-      sessionStorage.clear();
-
-      // 2. Notificamos al servidor en Railway para invalidar la sesión
+      localStorage.clear(); // Limpia el flag mascota_logged_in
       await api.logout();
     } catch (error) {
-      console.error("Error al desloguear en el servidor, limpiando localmente...");
+      console.warn("Error al desloguear");
     } finally {
-      // 3. Limpiamos el estado de React
       setUser(null);
-      // 4. Redirigimos al origen (localhost o Vercel) y forzamos recarga
       window.location.href = window.location.origin;
     }
   };

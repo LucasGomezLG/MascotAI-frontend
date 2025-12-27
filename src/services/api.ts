@@ -7,7 +7,6 @@ export const SERVER_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost
 export const API_BASE = `${SERVER_URL}/api/mascotas`;
 
 // CONFIGURACIÓN GLOBAL DE AXIOS
-// Esto permite que el JSESSIONID se guarde en el navegador aunque uses dominios distintos
 axios.defaults.withCredentials = true;
 
 export const api = {
@@ -34,11 +33,11 @@ export const api = {
   getHistorialVet: () => axios.get(`${API_BASE}/historial-vet`),
   getHistorialSalud: (mascotaId: string) => axios.get(`${API_BASE}/historial-salud/${mascotaId}`),
   borrarConsultaVet: (id: string) => axios.delete(`${API_BASE}/consulta-vet/${id}`),
+  borrarAlimento: (id: string) => axios.delete(`${API_BASE}/historial/${id}`),
 
   // --- STOCK E INTELIGENCIA ---
   getStockStatus: (mascotaId: string) => axios.get(`${API_BASE}/stock-status/${mascotaId}`),
-  // Agregamos 'data' para que viaje el JSON al backend
-  activarStock: (id: string, data: any) => axios.post(`/api/mascotas/activar-stock/${id}`, data),
+  activarStock: (id: string, data: any) => axios.post(`${API_BASE}/activar-stock/${id}`, data),
   buscarPrecios: (marca: string) => axios.get(`${API_BASE}/buscar-precios/${marca}`),
   buscarResenas: (marca: string) => axios.get(`${API_BASE}/buscar-resenas/${encodeURIComponent(marca)}`),
 
@@ -60,9 +59,18 @@ export const api = {
   guardarReceta: (data: any) => axios.post(`${API_BASE}/guardar-receta`, data),
 
   // --- AUTENTICACIÓN Y PERFIL ---
-  getUserProfile: () => axios.get(`${API_BASE}/user/me`),
-  logout: () => axios.post(`${API_BASE}/logout`),
-  // En api.ts
-  borrarAlimento: (id: string) => axios.delete(`${API_BASE}/historial/${id}`),
+  // ✅ Versión unificada que maneja el 401 sin romper el AuthContext
+  getUserProfile: async () => {
+    try {
+      return await axios.get(`${API_BASE}/user/me`);
+    } catch (error: any) {
+      if (error.response?.status === 401) {
+        console.warn("Sesión no iniciada aún");
+        return { data: null }; // Devolvemos estructura vacía para no romper el .then()
+      }
+      throw error;
+    }
+  },
 
+  logout: () => axios.post(`${API_BASE}/logout`),
 };
