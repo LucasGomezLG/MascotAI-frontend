@@ -22,6 +22,8 @@ export const api = {
     axios.post(`${API_BASE}/analizar-personalizado`, { image, mascotaId }),
   analizarVet: (image: string, tipo: string, mascotaId: string) =>
     axios.post(`${API_BASE}/analizar-veterinario`, { image, tipo, mascotaId }),
+  analizarTriaje: (image: string, tipo: string, mascotaId: string) =>
+    axios.post(`${API_BASE}/triaje/analizar`, { image, tipo, mascotaId }),
   analizarSalud: (image: string, mascotaId: string) =>
     axios.post(`${API_BASE}/analizar-salud`, { image, mascotaId }),
   analizarReceta: (image: string, mascotaId: string) =>
@@ -35,7 +37,8 @@ export const api = {
 
   // --- STOCK E INTELIGENCIA ---
   getStockStatus: (mascotaId: string) => axios.get(`${API_BASE}/stock-status/${mascotaId}`),
-  activarStock: (id: string) => axios.post(`${API_BASE}/activar-stock/${id}`),
+  // Agregamos 'data' para que viaje el JSON al backend
+  activarStock: (id: string, data: any) => axios.post(`/api/mascotas/activar-stock/${id}`, data),
   buscarPrecios: (marca: string) => axios.get(`${API_BASE}/buscar-precios/${marca}`),
   buscarResenas: (marca: string) => axios.get(`${API_BASE}/buscar-resenas/${encodeURIComponent(marca)}`),
 
@@ -61,4 +64,5 @@ export const api = {
   logout: () => axios.post(`${API_BASE}/logout`),
   // En api.ts
   borrarAlimento: (id: string) => axios.delete(`${API_BASE}/historial/${id}`),
+
 };

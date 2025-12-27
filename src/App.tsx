@@ -6,7 +6,7 @@ import { api } from './services/api';
 import { useAuth } from './context/AuthContext';
 import LoginView from './components/login/LoginView';
 import FoodScanner from './components/scanner/FoodScanner';
-import VetScanner from './components/scanner/VetScanner';
+import VetScanner from './components/scanner/vet/VetScanner';
 import SaludScanner from './components/scanner/SaludScanner';
 import ReportsManager from './components/reports/ReportsManager';
 import PetModal from './components/ui/PetModal';
