@@ -8,7 +8,7 @@ import {
 import { api } from '../../services/api';
 import Swal from 'sweetalert2';
 
-const FoodScanner = ({ mascotas, onScanComplete, initialData, onReset }: any) => {
+const FoodScanner = ({ mascotas, initialData, onReset }: any) => {
   const [selectedPet, setSelectedPet] = useState("");
   const [loading, setLoading] = useState(false);
   const [loadingBusqueda, setLoadingBusqueda] = useState(false);
