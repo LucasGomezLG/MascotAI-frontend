@@ -9,6 +9,8 @@ import { api } from '../../services/api';
 import { Toast } from '../../utils/alerts';
 import Swal from 'sweetalert2';
 
+// Reemplaza tu componente FoodScanner con esta versión corregida:
+
 const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) => {
   const [selectedPet, setSelectedPet] = useState("");
   const [loading, setLoading] = useState(false);
@@ -16,21 +18,15 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
   const [loadingResenas, setLoadingResenas] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [porcion, setPorcion] = useState<number | null>(null);
-
   const [precioInput, setPrecioInput] = useState("");
   const [pesoBolsaInput, setPesoBolsaInput] = useState("");
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
-
   const [busquedaResult, setBusquedaResult] = useState<any[]>([]);
   const [resenas, setResenas] = useState<string[]>([]);
-
   const [showPriceModal, setShowPriceModal] = useState(false);
   const [showBrandWarning, setShowBrandWarning] = useState(false);
-
-  // Refs para los dos tipos de carga
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
-
   const [alertasSalud, setAlertasSalud] = useState<any[]>([]);
 
   const petData = useMemo(() =>
@@ -53,35 +49,34 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
     api.getAlertasSalud().then(res => setAlertasSalud(res.data || []));
 
     if (initialData) {
-      setResult(initialData);
-      setPorcion(initialData.porcionRecomendada || null);
-      setPrecioInput(initialData.precioComprado?.toString() || "");
-      setPesoBolsaInput(initialData.pesoBolsaKg?.toString() || "");
-      setBusquedaResult(Array.isArray(initialData.preciosOnlineIA) ? initialData.preciosOnlineIA : []);
+      // ✅ NORMALIZACIÓN CLAVE: Si viene del historial, "envolvemos" el objeto 
+      // para que el resto del código (que busca result.alimento) no rompa.
+      const normalized = initialData.alimento ? initialData : { alimento: initialData, ...initialData };
+      
+      setResult(normalized);
+      setPorcion(normalized.alimento?.porcionRecomendada || null);
+      setPrecioInput(normalized.alimento?.precioComprado?.toString() || "");
+      setPesoBolsaInput(normalized.alimento?.pesoBolsaKg?.toString() || "");
+      setBusquedaResult(Array.isArray(normalized.alimento?.preciosOnlineIA) ? normalized.alimento.preciosOnlineIA : []);
 
-      if (initialData.mascotaId) {
-        setSelectedPet(initialData.mascotaId);
+      if (normalized.alimento?.mascotaId) {
+        setSelectedPet(normalized.alimento.mascotaId);
       }
     }
   }, [initialData]);
 
-  // ✅ CORRECCIÓN BUG CARGA: Limpia estados al elegir nueva imagen
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    // Limpieza de seguridad
     setResult(null);
     setPorcion(null);
     setPrecioInput("");
     setPesoBolsaInput("");
     setResenas([]);
     setBusquedaResult([]);
-
     const reader = new FileReader();
     reader.onloadend = () => {
       setSelectedImage(reader.result as string);
-      // Permitir re-selección del mismo archivo
       e.target.value = "";
     };
     reader.readAsDataURL(file);
@@ -94,24 +89,22 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
 
   const handleScan = async () => {
     if (!selectedImage) return;
-
     setLoading(true);
     try {
       const res = await api.analizarAlimento(selectedImage, selectedPet || "");
+      // El escaneo nuevo ya viene con la estructura { alimento: {...} }
       setResult(res.data);
 
-      if (res.data.error === "NO_ES_ALIMENTO") {
-        return;
-      }
+      if (res.data.error === "NO_ES_ALIMENTO") return;
+
       if (res.data.alimento) {
         setPorcion(res.data.porcionSugerida || res.data.alimento.porcionRecomendada);
-        if (res.data.alimento.precio) setPrecioInput(res.data.alimento.precio);
+        if (res.data.alimento.precioComprado) setPrecioInput(res.data.alimento.precioComprado.toString());
         if (onScanComplete) onScanComplete();
       }
-
     } catch (e) {
-      console.error("Error crítico en escaneo:", e);
-      Toast.fire({ icon: 'error', title: 'Error de conexión con el servidor' });
+      console.error("Error en escaneo:", e);
+      Toast.fire({ icon: 'error', title: 'Error de conexión' });
     } finally {
       setLoading(false);
     }
@@ -119,9 +112,8 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
 
   const getGamaColor = (calidad: string) => {
     if (!calidad) return "border-slate-200 bg-slate-50 text-slate-400";
-
     const c = calidad.toLowerCase();
-    if (c.includes('súper premium') || c.includes('super premium')) return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    if (c.includes('súper premium') || c.includes('super premium') || c.includes('ultra')) return "border-emerald-200 bg-emerald-50 text-emerald-700";
     if (c.includes('premium')) return "border-blue-200 bg-blue-50 text-blue-700";
     if (c.includes('media')) return "border-orange-200 bg-orange-50 text-orange-700";
     return "border-slate-200 bg-slate-50 text-slate-600";
@@ -135,10 +127,10 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
   };
 
   const sincronizarFinanzas = async () => {
-    if (!result?.alimento?.id) return; // ✅ Cambiado de result.id a result.alimento.id
+    if (!result?.alimento?.id) return;
     try {
       await api.guardarFinanzas({
-        id: result.alimento.id, // ✅ ID corregido
+        id: result.alimento.id,
         precio: precioInput,
         peso: pesoBolsaInput,
         costoDiario: calcularCostoDiario(),
@@ -149,32 +141,23 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
   };
 
   const handleActivarBolsa = async () => {
-    if (!result?.alimento?.id) return; // ✅ ID corregido
+    if (!result?.alimento?.id) return;
     try {
-      await api.activarStock(result.alimento.id, { // ✅ ID corregido
+      await api.activarStock(result.alimento.id, {
         precio: precioInput,
         peso: pesoBolsaInput,
         costoDiario: calcularCostoDiario()
       });
-
-      // ✅ Actualizamos el estado manteniendo la estructura anidada
       setResult({
         ...result,
         alimento: { ...result.alimento, stockActivo: true }
       });
-
-      Swal.fire({
-        title: '¡Bolsa activada!',
-        text: 'MascotAI empezó a contar el stock desde hoy.',
-        icon: 'success',
-        confirmButtonColor: '#f27121',
-        customClass: { popup: 'rounded-2xl' }
-      });
+      Swal.fire({ title: '¡Bolsa activada!', icon: 'success', confirmButtonColor: '#f27121' });
     } catch (e) { console.error(e); }
   };
 
   const handleBuscarPrecios = async () => {
-    const marca = result?.alimento?.marca; // ✅ Marca corregida
+    const marca = result?.alimento?.marca;
     if (!marca || marca.toLowerCase().includes("desconocida")) {
       setShowBrandWarning(true);
       return;
@@ -188,7 +171,7 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
   };
 
   const handleBuscarResenas = async () => {
-    const marca = result?.alimento?.marca; // ✅ Marca corregida
+    const marca = result?.alimento?.marca;
     if (!marca || marca.toLowerCase().includes("desconocida")) {
       setShowBrandWarning(true);
       return;
@@ -208,7 +191,7 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* Alertas de Salud */}
+      {/* ... Alertas de Salud (Mantenido igual) ... */}
       {alertasSalud.length > 0 && (
         <div className="mb-6 space-y-2">
           {alertasSalud.map((alerta, idx) => (
@@ -279,7 +262,6 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
             >
               {loading ? <Loader2 className="animate-spin" /> : selectedImage ? <><Sparkles size={22} className="text-orange-200" /> ESCANEAR AHORA</> : "ESCANEAR ETIQUETA"}
             </button>
-
             <input type="file" ref={cameraInputRef} className="hidden" accept="image/*" capture="environment" onChange={handleFile} />
             <input type="file" ref={galleryInputRef} className="hidden" accept="image/*" onChange={handleFile} />
           </div>
@@ -287,24 +269,17 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
       ) : (
         /* VISTA DE RESULTADOS */
         <div className="bg-white rounded-[2.5rem] shadow-2xl p-8 border-2 border-orange-50 text-left animate-in zoom-in-95">
-
-          {/* ✅ ESCUDO: Ahora busca 'error' en la raíz del resultado enviado por Java */}
           {result.error === "NO_ES_ALIMENTO" ? (
             <div className="bg-red-50 border-2 border-red-100 p-8 rounded-3xl text-center">
-              <div className="bg-red-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-red-600">
-                <Camera size={32} />
-              </div>
+              <div className="bg-red-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-red-600"><Camera size={32} /></div>
               <h3 className="text-red-900 font-black uppercase text-xs tracking-widest mb-2">Imagen no reconocida</h3>
-              <p className="text-red-700 text-[11px] font-bold italic leading-relaxed">
-                MascotAI no detectó alimento en la foto. Intentá capturar la tabla nutricional o el frente del paquete más de cerca.
-              </p>
+              <p className="text-red-700 text-[11px] font-bold italic leading-relaxed">MascotAI no detectó alimento. Intentá capturar la tabla nutricional más de cerca.</p>
             </div>
           ) : (
-            /* CONTENIDO NORMAL SI ES ALIMENTO */
             <>
               <div className="mb-6">
                 <label className="text-[10px] font-black text-slate-400 uppercase mb-1 block tracking-tighter">Marca Detectada</label>
-                <input className="text-3xl font-black bg-transparent border-b-2 outline-none w-full border-slate-100 focus:border-orange-500" value={result.alimento?.marca || ""} onChange={(e) => setResult({ ...result, marca: e.target.value })} />
+                <input className="text-3xl font-black bg-transparent border-b-2 outline-none w-full border-slate-100 focus:border-orange-500" value={result.alimento?.marca || ""} onChange={(e) => setResult({ ...result, alimento: {...result.alimento, marca: e.target.value} })} />
               </div>
 
               <div className="space-y-4 mb-8">
@@ -326,7 +301,6 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
                       <div className="py-4">
                         <p className="text-[10px] font-black uppercase opacity-70 tracking-widest leading-none mb-1">Ración diaria</p>
                         <p className="text-lg font-black italic opacity-80">Análisis Genérico</p>
-                        <p className="text-[9px] mt-2 font-bold opacity-60 italic">* Seleccioná una mascota para ver la ración exacta.</p>
                       </div>
                     )}
                   </div>
@@ -345,10 +319,10 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
                       <p className="text-xl font-black text-blue-700">${calcularCostoDiario()}</p>
                     </div>
                   )}
-                  {!result.stockActivo && pesoBolsaInput && (
+                  {!result.alimento?.stockActivo && pesoBolsaInput && (
                     <button onClick={handleActivarBolsa} className="w-full py-3 bg-orange-600 text-white rounded-xl font-black text-[10px] uppercase flex items-center justify-center gap-2 shadow-lg shadow-orange-100"><Package size={14} /> ¡Empecé esta bolsa hoy!</button>
                   )}
-                  {result.stockActivo && (
+                  {result.alimento?.stockActivo && (
                     <div className="bg-green-100 text-green-700 p-3 rounded-xl flex items-center justify-center gap-2 font-black text-[10px] uppercase"><CheckCircle size={14} /> Bolsa en seguimiento</div>
                   )}
                   <button onClick={handleBuscarPrecios} disabled={loadingBusqueda} className={`w-full py-3 rounded-xl font-black text-xs flex items-center justify-center gap-2 shadow-md ${loadingBusqueda ? 'bg-blue-200' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
@@ -357,15 +331,24 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
                 </div>
               </div>
 
-              {/* ✅ CORRECCIÓN: getGamaColor ahora es seguro contra nulls */}
-              <div className={`inline-block px-5 py-2 rounded-xl text-xs font-black mb-4 uppercase border ${getGamaColor(result?.alimento?.calidad)}`}>GAMA: {result?.alimento?.calidad || "---"}</div>
-              <p className="bg-orange-50 p-6 rounded-2xl mb-6 italic text-slate-800 text-center text-lg">"{result.alimento?.veredicto || "No hay veredicto disponible."}"</p>
+              <div className={`inline-block px-5 py-2 rounded-xl text-xs font-black mb-4 uppercase border ${getGamaColor(result.alimento?.calidad || result.alimento?.gama)}`}>
+                GAMA: {result.alimento?.calidad || result.alimento?.gama || "---"}
+              </div>
+              <p className="bg-orange-50 p-6 rounded-2xl mb-6 italic text-slate-800 text-center text-lg">
+                "{result.alimento?.veredicto || result.alimento?.analisis || "No hay veredicto disponible."}"
+              </p>
 
               <div className="mb-8">
                 <h3 className="font-black text-slate-800 flex items-center gap-2 mb-4 uppercase text-[10px] tracking-wider"><CheckCircle size={14} className="text-green-500" /> Ingredientes</h3>
-                <div className="flex flex-wrap gap-2">{result?.alimento?.ingredientes?.map((ing: string, i: number) => (<span key={i} className="bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-xl text-[11px] font-bold text-slate-600">{ing}</span>))}</div>
+                <div className="flex flex-wrap gap-2">
+                  {/* Manejo de ingredientes tanto si es Array como String */}
+                  {(Array.isArray(result.alimento?.ingredientes) ? result.alimento.ingredientes : result.alimento?.ingredientes?.split(',') || []).map((ing: string, i: number) => (
+                    <span key={i} className="bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-xl text-[11px] font-bold text-slate-600">{ing.trim()}</span>
+                  ))}
+                </div>
               </div>
-
+              
+              {/* ... El resto de Opiniones se mantiene igual ... */}
               <div className="space-y-4 mb-8">
                 <div className="flex items-center justify-between">
                   <h3 className="font-black text-slate-800 flex items-center gap-2 uppercase text-[10px] tracking-wider"><MessageCircle size={14} className="text-blue-500" /> Opiniones</h3>
@@ -391,7 +374,7 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
           <button onClick={() => { setResult(null); setSelectedImage(null); onReset(); }} className="w-full py-4 bg-slate-900 text-white font-black text-xs uppercase tracking-widest rounded-2xl mt-6">FINALIZAR</button>
         </div>
       )}
-
+      {/* ... Modal de Precios (Mantenido igual) ... */}
       {showPriceModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-6">
           <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 relative animate-in zoom-in-95 text-left">

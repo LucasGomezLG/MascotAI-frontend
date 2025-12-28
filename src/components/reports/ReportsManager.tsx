@@ -10,12 +10,14 @@ import HealthHistory from './HealthHistory';
 import PetBudget from './PetBudget';
 
 // --- SUB-COMPONENTE DE STOCK OPTIMIZADO ---
-const StockCard = ({ mascota }: { mascota: any }) => {
+// ✅ Agregamos refreshKey para que se entere cuando borrás algo en el historial
+const StockCard = ({ mascota, refreshKey }: { mascota: any, refreshKey: number }) => {
   const [stock, setStock] = useState<any>(null);
 
   useEffect(() => {
     api.getStockStatus(mascota.id).then(res => setStock(res.data));
-  }, [mascota.id]);
+    // ✅ Escucha el cambio de la clave para volver a pedir el stock
+  }, [mascota.id, refreshKey]);
 
   if (!stock || stock.status === "NO_DATA") return null;
 
@@ -66,7 +68,9 @@ const ReportsManager = ({ onVerDetalle }: { onVerDetalle: (item: any, tipo: 'foo
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [dueloResult, setDueloResult] = useState<any>(null);
 
-  // ✅ Lógica de edad reutilizable basada en fechaNacimiento
+  // ✅ Nueva clave para forzar la actualización de los componentes hijos (Stock)
+  const [refreshKey, setRefreshKey] = useState(0);
+
   const calcularEdad = useCallback((fecha: string) => {
     if (!fecha) return "---";
     const hoy = new Date();
@@ -78,7 +82,6 @@ const ReportsManager = ({ onVerDetalle }: { onVerDetalle: (item: any, tipo: 'foo
     return edad;
   }, []);
 
-  // ✅ OPTIMIZACIÓN: Pre-procesamos el historial para vincular la mascota UNA SOLA VEZ
   const historialConMascotas = useMemo(() => {
     return historial.map(item => ({
       ...item,
@@ -98,6 +101,9 @@ const ReportsManager = ({ onVerDetalle }: { onVerDetalle: (item: any, tipo: 'foo
       const pets = resP.data || [];
       setMascotas(pets);
       if (pets.length > 0 && !selectedPetId) setSelectedPetId(pets[0].id);
+
+      // ✅ Incrementamos la clave para que las tarjetas de stock se refresquen solas
+      setRefreshKey(prev => prev + 1);
     } catch (e) {
       console.error("Error cargando datos", e);
     }
@@ -115,13 +121,30 @@ const ReportsManager = ({ onVerDetalle }: { onVerDetalle: (item: any, tipo: 'foo
   const handleDuelo = async () => {
     try {
       const res = await api.comparar(selectedIds);
-      const dataLine = res.data.split('\n').find((l: string) => l.includes('|')) || "";
-      const parts = dataLine.split('|').map((s: string) => s.split(':')[1]?.trim() || "---");
+      const rawText = res.data.resultado || "";
+
+      if (!rawText.includes('|')) {
+        throw new Error("Formato de respuesta inválido");
+      }
+
+      const parts = rawText.split('|').map((s: string) => {
+        const splitPart = s.split(':');
+        return splitPart.length > 1 ? splitPart[1].trim() : s.trim();
+      });
+
       setDueloResult({
         foods: historial.filter(h => selectedIds.includes(h.id)),
-        veredicto: { ganador: parts[0], diferencia: parts[1], conclusion: parts[2] }
+        veredicto: {
+          ganador: parts[0] || "No determinado",
+          diferencia: parts[1] || "Diferencia no especificada",
+          conclusion: parts[2] || "Sin conclusión adicional"
+        }
       });
-    } catch (e) { alert("Error en el duelo"); }
+
+    } catch (e) {
+      console.error("Error en el duelo:", e);
+      alert("No se pudo procesar el duelo.");
+    }
   };
 
   return (
@@ -155,7 +178,7 @@ const ReportsManager = ({ onVerDetalle }: { onVerDetalle: (item: any, tipo: 'foo
         </div>
       )}
 
-      {/* TABS DE ALIMENTOS (Historial con Pet Info) */}
+      {/* TABS DE ALIMENTOS */}
       {subTab === 'food' && (
         <>
           <div className="animate-in slide-in-from-top-4">
@@ -163,7 +186,8 @@ const ReportsManager = ({ onVerDetalle }: { onVerDetalle: (item: any, tipo: 'foo
               <Sparkles size={12} className="text-orange-500" /> Proyecciones de Stock
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              {mascotas.map(m => <StockCard key={m.id} mascota={m} />)}
+              {/* ✅ Pasamos refreshKey para que se actualicen al borrar */}
+              {mascotas.map(m => <StockCard key={m.id} mascota={m} refreshKey={refreshKey} />)}
             </div>
           </div>
 
@@ -182,8 +206,34 @@ const ReportsManager = ({ onVerDetalle }: { onVerDetalle: (item: any, tipo: 'foo
                 className={`bg-white p-5 rounded-[2.5rem] border flex flex-col transition-all active:scale-[0.98] cursor-pointer shadow-sm relative overflow-hidden ${selectedIds.includes(i.id) ? 'border-orange-500 ring-2 ring-orange-500/20 bg-orange-50/30' : 'border-slate-100'}`}
                 onClick={() => {
                   if (comparisonMode) {
-                    selectedIds.includes(i.id) ? setSelectedIds(selectedIds.filter(id => id !== i.id)) : selectedIds.length < 2 && setSelectedIds([...selectedIds, i.id]);
-                  } else { onVerDetalle(i, 'food'); }
+                    selectedIds.includes(i.id)
+                      ? setSelectedIds(selectedIds.filter(id => id !== i.id))
+                      : selectedIds.length < 2 && setSelectedIds([...selectedIds, i.id]);
+                  } else {
+                    // ✅ MAPEO TOTAL PARA COMPATIBILIDAD ENTRE TABS
+                    const dataParaDetalle = {
+                      ...i,
+                      // Duplicamos campos para que el receptor los encuentre sí o sí
+                      gama: i.calidad || i.gama || "---",
+                      calidad: i.calidad || i.gama || "---",
+
+                      // Sincronizamos con el texto largo de la IA (veredicto en Atlas)
+                      analisis: i.veredicto || i.analisis || "No hay veredicto disponible.",
+                      veredicto: i.veredicto || i.analisis || "No hay veredicto disponible.",
+
+                      // Convertimos el Array de Atlas a un String para la UI
+                      ingredientes: Array.isArray(i.ingredientes)
+                        ? i.ingredientes.join(", ")
+                        : (i.ingredientes || "No especificados"),
+
+                      // Aseguramos las reseñas
+                      opiniones: i.resenas || i.opiniones || [],
+                      resenas: i.resenas || i.opiniones || []
+                    };
+
+                    // ✅ onVerDetalle debe cambiar el tab a 'food' y pasar este objeto al estado global/padre
+                    onVerDetalle(dataParaDetalle, 'food');
+                  }
                 }}>
 
                 <div className="flex justify-between items-start mb-4">
@@ -197,7 +247,6 @@ const ReportsManager = ({ onVerDetalle }: { onVerDetalle: (item: any, tipo: 'foo
                   {!comparisonMode && <button onClick={(e) => { e.stopPropagation(); api.borrarAlimento(i.id).then(cargar); }} className="p-2 text-slate-200 hover:text-red-500 transition-colors"><Trash2 size={16} /></button>}
                 </div>
 
-                {/* ✅ FICHA DE MASCOTA DENTRO DEL REPORTE - CORREGIDA */}
                 <div className={`p-4 rounded-3xl flex flex-col gap-2 ${i.pet ? 'bg-orange-50/50 border border-orange-100' : 'bg-slate-50 border border-slate-100 italic text-slate-400'}`}>
                   {i.pet ? (
                     <div className="grid grid-cols-2 gap-y-2">
@@ -211,7 +260,6 @@ const ReportsManager = ({ onVerDetalle }: { onVerDetalle: (item: any, tipo: 'foo
                       <div className="col-span-2 flex items-center justify-between border-t border-orange-100/50 pt-2 mt-1">
                         <div className="flex items-center gap-2">
                           <Utensils size={12} className="text-orange-400" />
-                          {/* ✅ CORRECCIÓN: Usamos porcionRecomendada (exacto como en DB) */}
                           <span className="text-[10px] font-medium text-slate-600">Ración: {i.porcionRecomendada || "---"}g</span>
                         </div>
                         <span className="text-[8px] font-black px-2 py-0.5 bg-white text-slate-400 rounded-md border border-slate-100 uppercase">{i.pet.condicion}</span>
@@ -228,7 +276,6 @@ const ReportsManager = ({ onVerDetalle }: { onVerDetalle: (item: any, tipo: 'foo
             ))}
           </div>
 
-          {/* BOTÓN FLOTANTE DEL DUELO */}
           {comparisonMode && (
             <div className="fixed bottom-24 left-0 right-0 p-6 flex justify-center z-30 animate-in slide-in-from-bottom-4">
               <button onClick={handleDuelo} disabled={selectedIds.length !== 2} className={`px-8 py-4 rounded-2xl font-black uppercase shadow-2xl transition-all ${selectedIds.length === 2 ? 'bg-orange-600 text-white scale-105 hover:bg-orange-700' : 'bg-slate-300 text-slate-500 cursor-not-allowed'}`}>
@@ -271,15 +318,15 @@ const ReportsManager = ({ onVerDetalle }: { onVerDetalle: (item: any, tipo: 'foo
 
           <div className="grid gap-4">
             {historialVet
-              .filter(v => (vetSubTab === 'consultas' ? (v.tipo === 'Receta' || v.tipo === 'Consulta') : (v.tipo !== 'Receta' && v.tipo !== 'Consulta')))
+              .filter(v => (vetSubTab === 'consultas' ? (v.tipo === 'Receta' || v.tipo === 'Consulta' || v.tipo === 'RECETA_IA') : (v.tipo !== 'Receta' && v.tipo !== 'Consulta' && v.tipo !== 'RECETA_IA')))
               .map(v => (
                 <div key={v.id}
-                  className={`bg-white p-6 rounded-[2.5rem] border-l-8 shadow-sm border border-slate-100 text-left transition-all active:scale-[0.98] ${v.tipo === 'Receta' || v.tipo === 'Consulta' ? 'border-l-slate-900' : 'border-l-red-500'}`}
+                  className={`bg-white p-6 rounded-[2.5rem] border-l-8 shadow-sm border border-slate-100 text-left transition-all active:scale-[0.98] ${(v.tipo === 'Receta' || v.tipo === 'Consulta' || v.tipo === 'RECETA_IA') ? 'border-l-slate-900' : 'border-l-red-500'}`}
                   onClick={() => onVerDetalle({ ...v, analisis: v.nombre ? `MOTIVO: ${v.nombre.toUpperCase()}\n\n${v.analisis || v.notas || "Sin detalles"}` : (v.analisis || v.notas) }, 'vet')}>
 
                   <div className="flex justify-between items-start mb-3">
                     <div className="flex items-center gap-2">
-                      <span className={`${v.tipo === 'Receta' || v.tipo === 'Consulta' ? 'bg-slate-900 text-white' : 'bg-red-500 text-white'} text-[8px] font-black px-2 py-1 rounded-md uppercase`}>{v.tipo}</span>
+                      <span className={`${(v.tipo === 'Receta' || v.tipo === 'Consulta' || v.tipo === 'RECETA_IA') ? 'bg-slate-900 text-white' : 'bg-red-500 text-white'} text-[8px] font-black px-2 py-1 rounded-md uppercase`}>{v.tipo}</span>
                       {v.precio > 0 && <span className="bg-emerald-100 text-emerald-700 text-[9px] font-black px-2 py-1 rounded-md tracking-tighter">${v.precio.toLocaleString()}</span>}
                     </div>
                     <div className="flex items-center gap-3">
