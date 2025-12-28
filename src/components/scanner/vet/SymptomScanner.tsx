@@ -1,11 +1,12 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react'; // ✅ Importamos useEffect
 import { Camera, Loader2, User, RefreshCw, Sparkles, X, Image as ImageIcon, Activity } from 'lucide-react';
 import { api } from '../../../services/api';
 import { Toast } from '../../../utils/alerts';
-import MedicalReport from './MedicalReport'; // ✅ Importación vital
+import MedicalReport from './MedicalReport'; 
 import Swal from 'sweetalert2';
 
-const SymptomScanner = ({ mascotas, onScanComplete }: any) => {
+// ✅ 1. Agregamos initialData a las props
+const SymptomScanner = ({ mascotas, initialData, onScanComplete }: any) => {
   const [selectedPet, setSelectedPet] = useState("");
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -15,10 +16,21 @@ const SymptomScanner = ({ mascotas, onScanComplete }: any) => {
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
 
+  // ✅ 2. EFECTO DE CARGA AUTOMÁTICA DESDE HISTORIAL
+  useEffect(() => {
+    if (initialData) {
+      console.log("Cargando datos desde historial en Vete:", initialData);
+      setResult(initialData); // Esto hace que se muestre el MedicalReport directamente
+      if (initialData.mascotaId) {
+        setSelectedPet(initialData.mascotaId);
+      }
+    }
+  }, [initialData]);
+
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setResult(null); // ✅ Limpia resultado viejo al elegir foto nueva
+    setResult(null); 
     const reader = new FileReader();
     reader.onloadend = () => {
       setSelectedImage(reader.result as string);
@@ -34,19 +46,17 @@ const SymptomScanner = ({ mascotas, onScanComplete }: any) => {
     try {
       const res = await api.analizarTriaje(selectedImage, activeTab, selectedPet || "");
 
-      // ✅ DETECCIÓN DEL ESCUDO DE SEGURIDAD
       if (res.data.error === "NO_DETECTADO") {
         Swal.fire({
           title: 'Imagen no reconocida',
-          text: `MascotAI no detectó evidencia de "${activeTab}" en la foto. Asegurate de que la imagen sea clara o que la categoría seleccionada sea la correcta.`,
+          text: `MascotAI no detectó evidencia de "${activeTab}"...`,
           icon: 'warning',
-          confirmButtonColor: '#ef4444', // Rojo
+          confirmButtonColor: '#ef4444',
           confirmButtonText: 'Reintentar'
         });
-        return; // Cortamos la ejecución para no mostrar resultados vacíos
+        return;
       }
 
-      // Si todo está ok, mostramos el resultado
       setResult(res.data);
       if (onScanComplete) onScanComplete();
 
@@ -62,6 +72,7 @@ const SymptomScanner = ({ mascotas, onScanComplete }: any) => {
     <div className="animate-in fade-in duration-500 w-full">
       {!result ? (
         <div className="space-y-6 text-left w-full">
+          {/* SECCIÓN DE ENTRADA (Mantenida igual) */}
           <div className="bg-white p-6 rounded-[2.5rem] shadow-xl border border-slate-100">
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-3"><User size={14} /> Paciente</label>
             <select value={selectedPet} onChange={(e) => setSelectedPet(e.target.value)} className="w-full p-4 rounded-2xl border-2 border-slate-50 bg-slate-50/50 font-bold outline-none text-slate-700 focus:border-red-500">
@@ -96,7 +107,7 @@ const SymptomScanner = ({ mascotas, onScanComplete }: any) => {
         </div>
       ) : (
         <div className="space-y-6 w-full">
-          {/* ✅ Restauramos el componente visual premium */}
+          {/* ✅ VISTA DE RESULTADO: Se activa si 'result' tiene datos */}
           <MedicalReport data={result} />
 
           <button

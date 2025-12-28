@@ -41,6 +41,8 @@ export const api = {
   borrarEventoSalud: (id: string) => apiClient.delete(`/salud/${id}`),
   actualizarEventoSalud: (id: string, data: any) => apiClient.put(`/salud/${id}`, data),
 
+  getHistorialTriaje: () => apiClient.get('/historial-triaje'),
+  borrarTriaje: (id: string) => apiClient.delete(`/triaje/${id}`),
   guardarFinanzas: (data: any) => apiClient.post('/guardar-finanzas', data),
   getPresupuestoMensual: () => apiClient.get('/presupuesto-mensual'),
   comparar: (ids: string[]) => apiClient.post('/comparar', { ids }),

@@ -67,6 +67,7 @@ const ReportsManager = ({ onVerDetalle }: { onVerDetalle: (item: any, tipo: 'foo
   const [comparisonMode, setComparisonMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [dueloResult, setDueloResult] = useState<any>(null);
+  const [historialTriaje, setHistorialTriaje] = useState<any[]>([]);
 
   // ✅ Nueva clave para forzar la actualización de los componentes hijos (Stock)
   const [refreshKey, setRefreshKey] = useState(0);
@@ -91,22 +92,20 @@ const ReportsManager = ({ onVerDetalle }: { onVerDetalle: (item: any, tipo: 'foo
 
   const cargar = async () => {
     try {
-      const [resF, resV, resP] = await Promise.all([
+      const [resF, resV, resP, resT] = await Promise.all([
         api.getHistorial(),
-        api.getHistorialVet(),
-        api.getMascotas()
+        api.getHistorialVet(), // Trae Consultas/Recetas
+        api.getMascotas(),
+        api.getHistorialTriaje() // ✅ Nueva llamada a la API para el modelo TriajeIA
       ]);
+
       setHistorial(resF.data || []);
       setHistorialVet(resV.data || []);
-      const pets = resP.data || [];
-      setMascotas(pets);
-      if (pets.length > 0 && !selectedPetId) setSelectedPetId(pets[0].id);
+      setMascotas(resP.data || []);
+      setHistorialTriaje(resT.data || []); // Guardamos los triajes aparte
 
-      // ✅ Incrementamos la clave para que las tarjetas de stock se refresquen solas
       setRefreshKey(prev => prev + 1);
-    } catch (e) {
-      console.error("Error cargando datos", e);
-    }
+    } catch (e) { console.error("Error cargando", e); }
   };
 
   useEffect(() => { cargar(); }, []);
@@ -308,8 +307,18 @@ const ReportsManager = ({ onVerDetalle }: { onVerDetalle: (item: any, tipo: 'foo
       {subTab === 'vet' && (
         <div className="space-y-6 animate-in fade-in">
           <div className="flex gap-2 p-1.5 bg-slate-50 rounded-2xl border border-slate-100">
-            <button onClick={() => setVetSubTab('triaje')} className={`flex-1 py-3 rounded-xl font-black text-[9px] uppercase transition-all flex items-center justify-center gap-2 ${vetSubTab === 'triaje' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-400'}`}><Activity size={14} /> Historial Triaje</button>
-            <button onClick={() => setVetSubTab('consultas')} className={`flex-1 py-3 rounded-xl font-black text-[9px] uppercase transition-all flex items-center justify-center gap-2 ${vetSubTab === 'consultas' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'}`}><Receipt size={14} /> Recetas y Gastos</button>
+            <button
+              onClick={() => setVetSubTab('triaje')}
+              className={`flex-1 py-3 rounded-xl font-black text-[9px] uppercase transition-all flex items-center justify-center gap-2 ${vetSubTab === 'triaje' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-400'}`}
+            >
+              <Activity size={14} /> Historial Triaje
+            </button>
+            <button
+              onClick={() => setVetSubTab('consultas')}
+              className={`flex-1 py-3 rounded-xl font-black text-[9px] uppercase transition-all flex items-center justify-center gap-2 ${vetSubTab === 'consultas' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'}`}
+            >
+              <Receipt size={14} /> Recetas y Gastos
+            </button>
           </div>
 
           <h3 className="text-lg font-black text-red-900 uppercase flex items-center gap-2 mb-2">
@@ -317,32 +326,78 @@ const ReportsManager = ({ onVerDetalle }: { onVerDetalle: (item: any, tipo: 'foo
           </h3>
 
           <div className="grid gap-4">
-            {historialVet
-              .filter(v => (vetSubTab === 'consultas' ? (v.tipo === 'Receta' || v.tipo === 'Consulta' || v.tipo === 'RECETA_IA') : (v.tipo !== 'Receta' && v.tipo !== 'Consulta' && v.tipo !== 'RECETA_IA')))
-              .map(v => (
-                <div key={v.id}
-                  className={`bg-white p-6 rounded-[2.5rem] border-l-8 shadow-sm border border-slate-100 text-left transition-all active:scale-[0.98] ${(v.tipo === 'Receta' || v.tipo === 'Consulta' || v.tipo === 'RECETA_IA') ? 'border-l-slate-900' : 'border-l-red-500'}`}
-                  onClick={() => onVerDetalle({ ...v, analisis: v.nombre ? `MOTIVO: ${v.nombre.toUpperCase()}\n\n${v.analisis || v.notas || "Sin detalles"}` : (v.analisis || v.notas) }, 'vet')}>
-
+            {/* 🟢 SECCIÓN 1: HISTORIAL DE TRIAJE (Modelo TriajeIA) */}
+            {vetSubTab === 'triaje' ? (
+              historialTriaje.map(t => (
+                <div key={t.id}
+                  className="bg-white p-6 rounded-[2.5rem] border-l-8 border-l-red-500 shadow-sm border border-slate-100 text-left transition-all active:scale-[0.98] cursor-pointer"
+                  onClick={() => {
+                    // Mapeo para que el SymptomScanner muestre los datos de urgencia
+                    onVerDetalle({
+                      ...t,
+                      analisis_detalle: t.analisisDetalle,
+                      nivel_urgencia: t.nivelUrgencia,
+                      // Aseguramos que la explicación técnica se vea en el banner naranja
+                      urgencia_explicacion: t.urgenciaExplicacion || "Análisis recuperado del historial.",
+                      pasos_a_seguir: t.pasosASeguir || [],
+                      resumen_final: t.resumenFinal
+                    }, 'vet');
+                  }}>
                   <div className="flex justify-between items-start mb-3">
-                    <div className="flex items-center gap-2">
-                      <span className={`${(v.tipo === 'Receta' || v.tipo === 'Consulta' || v.tipo === 'RECETA_IA') ? 'bg-slate-900 text-white' : 'bg-red-500 text-white'} text-[8px] font-black px-2 py-1 rounded-md uppercase`}>{v.tipo}</span>
-                      {v.precio > 0 && <span className="bg-emerald-100 text-emerald-700 text-[9px] font-black px-2 py-1 rounded-md tracking-tighter">${v.precio.toLocaleString()}</span>}
-                    </div>
+                    <span className="bg-red-500 text-white text-[8px] font-black px-2 py-1 rounded-md uppercase">{t.categoria || "TRIAJE"}</span>
                     <div className="flex items-center gap-3">
-                      <span className="text-[9px] text-slate-400 font-bold uppercase">{new Date(v.fecha).toLocaleDateString()}</span>
-                      <button onClick={(e) => { e.stopPropagation(); api.borrarConsultaVet(v.id).then(cargar); }} className="text-slate-200 hover:text-red-500"><Trash2 size={16} /></button>
+                      <span className="text-[9px] text-slate-400 font-bold uppercase">{new Date(t.fecha).toLocaleDateString()}</span>
+                      <button onClick={(e) => { e.stopPropagation(); api.borrarTriaje(t.id).then(cargar); }} className="text-slate-200 hover:text-red-500">
+                        <Trash2 size={16} />
+                      </button>
                     </div>
                   </div>
-
-                  {v.nombre && <h4 className="font-black text-slate-800 text-sm mb-1 uppercase tracking-tight">{v.nombre}</h4>}
-                  <p className="text-xs text-slate-500 leading-relaxed italic line-clamp-2">"{(v.analisis || v.notas || "Ver detalles")}"</p>
-
-                  <div className="mt-4 flex justify-end">
-                    <span className="text-[9px] font-black text-slate-300 flex items-center gap-1 uppercase">Ver más <ChevronRight size={10} /></span>
-                  </div>
+                  <h4 className="font-black text-slate-800 text-sm mb-1 uppercase tracking-tight">ANÁLISIS: {t.categoria}</h4>
+                  <p className="text-xs text-slate-500 leading-relaxed italic line-clamp-2">"{t.analisisDetalle}"</p>
                 </div>
-              ))}
+              ))
+            ) : (
+              /* 🔵 SECCIÓN 2: RECETAS Y GASTOS (Modelo ConsultaVet) */
+              historialVet
+                .filter(v => {
+                  const tipo = (v.tipo || "").toUpperCase();
+                  // ✅ CORRECCIÓN: Si no tiene tipo pero tiene diagnóstico, es un documento
+                  const esDocumento = tipo === 'RECETA' || tipo === 'CONSULTA' || tipo === 'RECETA_IA' || tipo === 'GASTO' || v.diagnostico;
+                  return esDocumento;
+                })
+                .map(v => (
+                  <div key={v.id}
+                    className="bg-white p-6 rounded-[2.5rem] border-l-8 border-l-slate-900 shadow-sm border border-slate-100 text-left transition-all active:scale-[0.98] cursor-pointer"
+                    onClick={() => {
+                      // Sincronizamos con los campos de la DB
+                      onVerDetalle({
+                        ...v,
+                        analisis_detalle: v.diagnostico || v.analisis || v.notas || "Sin detalles",
+                        nivel_urgencia: "BAJA",
+                        resumen_final: v.nombre || "Consulta Médica"
+                      }, 'vet');
+                    }}>
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="flex items-center gap-2">
+                        {/* Si el tipo es null, mostramos 'CONSULTA' por defecto */}
+                        <span className="bg-slate-900 text-white text-[8px] font-black px-2 py-1 rounded-md uppercase">{v.tipo || "CONSULTA"}</span>
+                        {v.precio > 0 && <span className="bg-emerald-100 text-emerald-700 text-[9px] font-black px-2 py-1 rounded-md tracking-tighter">${v.precio.toLocaleString()}</span>}
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-[9px] text-slate-400 font-bold uppercase">{new Date(v.fecha).toLocaleDateString()}</span>
+                        <button onClick={(e) => { e.stopPropagation(); api.borrarConsultaVet(v.id).then(cargar); }} className="text-slate-200 hover:text-red-500">
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                    {/* Usamos 'nombre' o 'diagnostico' de la DB */}
+                    <h4 className="font-black text-slate-800 text-sm mb-1 uppercase tracking-tight">{v.nombre || v.diagnostico}</h4>
+                    <p className="text-xs text-slate-500 leading-relaxed italic line-clamp-2">
+                      "{(v.diagnostico || v.analisis || v.notas || "Ver detalles")}"
+                    </p>
+                  </div>
+                ))
+            )}
           </div>
         </div>
       )}
