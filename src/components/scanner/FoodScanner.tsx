@@ -2,8 +2,8 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Camera, Loader2, Utensils, User, Wallet, Search,
   CheckCircle, MessageCircle, Sparkles, ThumbsUp, ThumbsDown,
-  ShoppingBag, X, Package, AlertCircle, RefreshCw, 
-  Image as ImageIcon 
+  ShoppingBag, X, Package, AlertCircle, RefreshCw,
+  Image as ImageIcon
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { Toast } from '../../utils/alerts';
@@ -30,7 +30,7 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
   // Refs para los dos tipos de carga
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
-  
+
   const [alertasSalud, setAlertasSalud] = useState<any[]>([]);
 
   const petData = useMemo(() =>
@@ -58,7 +58,7 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
       setPrecioInput(initialData.precioComprado?.toString() || "");
       setPesoBolsaInput(initialData.pesoBolsaKg?.toString() || "");
       setBusquedaResult(Array.isArray(initialData.preciosOnlineIA) ? initialData.preciosOnlineIA : []);
-      
+
       if (initialData.mascotaId) {
         setSelectedPet(initialData.mascotaId);
       }
@@ -82,7 +82,7 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
     reader.onloadend = () => {
       setSelectedImage(reader.result as string);
       // Permitir re-selección del mismo archivo
-      e.target.value = ""; 
+      e.target.value = "";
     };
     reader.readAsDataURL(file);
   };
@@ -92,38 +92,39 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
     setSelectedImage(null);
   };
 
-  // ✅ CORRECCIÓN VERCEL: Uso de onScanComplete para evitar error TS6133
   const handleScan = async () => {
     if (!selectedImage) return;
 
     setLoading(true);
     try {
-      // ✅ ANÁLISIS GENÉRICO: Permite selectedPet vacío
       const res = await api.analizarAlimento(selectedImage, selectedPet || "");
-      
-      if (res.data.alimento === "ERROR: NO_ES_ALIMENTO") {
-        Swal.fire({ title: 'Error', text: 'La imagen no parece ser alimento.', icon: 'warning' });
-        setSelectedImage(null);
-      } else {
-        setResult(res.data.alimento);
-        setPorcion(res.data.alimento.porcionRecomendada);
-        // Avisamos que el escaneo fue exitoso para limpiar advertencias de TS
+      setResult(res.data);
+
+      if (res.data.error === "NO_ES_ALIMENTO") {
+        return;
+      }
+      if (res.data.alimento) {
+        setPorcion(res.data.porcionSugerida || res.data.alimento.porcionRecomendada);
+        if (res.data.alimento.precio) setPrecioInput(res.data.alimento.precio);
         if (onScanComplete) onScanComplete();
       }
-    } catch (e) { 
-        console.error(e); 
-        Toast.fire({ icon: 'error', title: 'Error en el escaneo' });
-    } finally { 
-        setLoading(false); 
+
+    } catch (e) {
+      console.error("Error crítico en escaneo:", e);
+      Toast.fire({ icon: 'error', title: 'Error de conexión con el servidor' });
+    } finally {
+      setLoading(false);
     }
   };
 
-  // --- Lógica de Finanzas (Sin cambios) ---
-  const getGamaColor = (c: string = "") => {
-    const q = c.toLowerCase();
-    if (q.includes('ultra')) return 'bg-indigo-600 text-white border-indigo-200';
-    if (q.includes('premium')) return 'bg-green-500 text-white border-green-200';
-    return 'bg-orange-500 text-white border-orange-200';
+  const getGamaColor = (calidad: string) => {
+    if (!calidad) return "border-slate-200 bg-slate-50 text-slate-400";
+
+    const c = calidad.toLowerCase();
+    if (c.includes('súper premium') || c.includes('super premium')) return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    if (c.includes('premium')) return "border-blue-200 bg-blue-50 text-blue-700";
+    if (c.includes('media')) return "border-orange-200 bg-orange-50 text-orange-700";
+    return "border-slate-200 bg-slate-50 text-slate-600";
   };
 
   const calcularCostoDiario = () => {
@@ -134,23 +135,34 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
   };
 
   const sincronizarFinanzas = async () => {
-    if (!result?.id) return;
+    if (!result?.alimento?.id) return; // ✅ Cambiado de result.id a result.alimento.id
     try {
       await api.guardarFinanzas({
-        id: result.id, precio: precioInput, peso: pesoBolsaInput,
-        costoDiario: calcularCostoDiario(), busquedaIA: busquedaResult,
+        id: result.alimento.id, // ✅ ID corregido
+        precio: precioInput,
+        peso: pesoBolsaInput,
+        costoDiario: calcularCostoDiario(),
+        busquedaIA: busquedaResult,
         porcionRecomendada: porcion
       });
     } catch (e) { console.error(e); }
   };
 
   const handleActivarBolsa = async () => {
-    if (!result?.id) return;
+    if (!result?.alimento?.id) return; // ✅ ID corregido
     try {
-      await api.activarStock(result.id, {
-        precio: precioInput, peso: pesoBolsaInput, costoDiario: calcularCostoDiario()
+      await api.activarStock(result.alimento.id, { // ✅ ID corregido
+        precio: precioInput,
+        peso: pesoBolsaInput,
+        costoDiario: calcularCostoDiario()
       });
-      setResult({ ...result, stockActivo: true });
+
+      // ✅ Actualizamos el estado manteniendo la estructura anidada
+      setResult({
+        ...result,
+        alimento: { ...result.alimento, stockActivo: true }
+      });
+
       Swal.fire({
         title: '¡Bolsa activada!',
         text: 'MascotAI empezó a contar el stock desde hoy.',
@@ -162,20 +174,28 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
   };
 
   const handleBuscarPrecios = async () => {
-    if (!result?.marca || result.marca.toLowerCase().includes("desconocida")) { setShowBrandWarning(true); return; }
+    const marca = result?.alimento?.marca; // ✅ Marca corregida
+    if (!marca || marca.toLowerCase().includes("desconocida")) {
+      setShowBrandWarning(true);
+      return;
+    }
     setLoadingBusqueda(true);
     try {
-      const res = await api.buscarPrecios(result.marca);
+      const res = await api.buscarPrecios(marca);
       setBusquedaResult(res.data || []);
       setShowPriceModal(true);
     } catch (e) { console.error(e); } finally { setLoadingBusqueda(false); }
   };
 
   const handleBuscarResenas = async () => {
-    if (!result?.marca || result.marca.toLowerCase().includes("desconocida")) { setShowBrandWarning(true); return; }
+    const marca = result?.alimento?.marca; // ✅ Marca corregida
+    if (!marca || marca.toLowerCase().includes("desconocida")) {
+      setShowBrandWarning(true);
+      return;
+    }
     setLoadingResenas(true);
     try {
-      const res = await api.buscarResenas(result.marca);
+      const res = await api.buscarResenas(marca);
       const lineas = res.data.split('\n');
       const lista = lineas.find((l: string) => l.includes('|'))?.split('|')
         .map((s: string) => s.trim())
@@ -228,7 +248,6 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
             {selectedImage ? (
               <>
                 <img src={selectedImage} alt="Preview" className="w-full h-full object-cover" />
-                {/* ✅ Botón X para borrar foto */}
                 <button onClick={handleBorrarFoto} className="absolute top-4 right-4 bg-white/90 p-2 rounded-full shadow-lg text-orange-600 z-10"><X size={20} /></button>
                 <div className="absolute inset-0 bg-black/20 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                   <RefreshCw className="text-white mb-2" />
@@ -243,7 +262,6 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
             )}
           </div>
 
-          {/* ✅ Botón Galería */}
           <button
             type="button"
             onClick={() => galleryInputRef.current?.click()}
@@ -259,9 +277,9 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
               disabled={loading}
               className={`w-full flex items-center justify-center gap-3 py-6 rounded-2xl font-black text-xl shadow-xl transition-all active:scale-95 ${loading ? 'bg-orange-200' : 'bg-orange-600 text-white shadow-orange-200 hover:bg-orange-700'}`}
             >
-              {loading ? <Loader2 className="animate-spin" /> : selectedImage ? <><Sparkles size={22} className="text-orange-200" /> ESCANEAR AHORA</> : "CAPTURAR FOTO"}
+              {loading ? <Loader2 className="animate-spin" /> : selectedImage ? <><Sparkles size={22} className="text-orange-200" /> ESCANEAR AHORA</> : "ESCANEAR ETIQUETA"}
             </button>
-            
+
             <input type="file" ref={cameraInputRef} className="hidden" accept="image/*" capture="environment" onChange={handleFile} />
             <input type="file" ref={galleryInputRef} className="hidden" accept="image/*" onChange={handleFile} />
           </div>
@@ -269,89 +287,108 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
       ) : (
         /* VISTA DE RESULTADOS */
         <div className="bg-white rounded-[2.5rem] shadow-2xl p-8 border-2 border-orange-50 text-left animate-in zoom-in-95">
-          <div className="mb-6">
-            <label className="text-[10px] font-black text-slate-400 uppercase mb-1 block tracking-tighter">Marca Detectada</label>
-            <input className="text-3xl font-black bg-transparent border-b-2 outline-none w-full border-slate-100 focus:border-orange-500" value={result.marca} onChange={(e) => setResult({ ...result, marca: e.target.value })} />
-          </div>
 
-          <div className="space-y-4 mb-8">
-            <div className="bg-green-600 text-white p-6 rounded-3xl flex items-center justify-between shadow-lg relative overflow-hidden">
-              <div className="relative z-10 w-full">
-                {petData ? (
-                  <>
-                    <div className="flex flex-col mb-3">
-                      <p className="text-[10px] font-black uppercase opacity-70 tracking-widest">Ración diaria</p>
-                      <p className="text-4xl font-black">{porcion || "---"}g</p>
+          {/* ✅ ESCUDO: Ahora busca 'error' en la raíz del resultado enviado por Java */}
+          {result.error === "NO_ES_ALIMENTO" ? (
+            <div className="bg-red-50 border-2 border-red-100 p-8 rounded-3xl text-center">
+              <div className="bg-red-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-red-600">
+                <Camera size={32} />
+              </div>
+              <h3 className="text-red-900 font-black uppercase text-xs tracking-widest mb-2">Imagen no reconocida</h3>
+              <p className="text-red-700 text-[11px] font-bold italic leading-relaxed">
+                MascotAI no detectó alimento en la foto. Intentá capturar la tabla nutricional o el frente del paquete más de cerca.
+              </p>
+            </div>
+          ) : (
+            /* CONTENIDO NORMAL SI ES ALIMENTO */
+            <>
+              <div className="mb-6">
+                <label className="text-[10px] font-black text-slate-400 uppercase mb-1 block tracking-tighter">Marca Detectada</label>
+                <input className="text-3xl font-black bg-transparent border-b-2 outline-none w-full border-slate-100 focus:border-orange-500" value={result.alimento?.marca || ""} onChange={(e) => setResult({ ...result, marca: e.target.value })} />
+              </div>
+
+              <div className="space-y-4 mb-8">
+                <div className="bg-green-600 text-white p-6 rounded-3xl flex items-center justify-between shadow-lg relative overflow-hidden">
+                  <div className="relative z-10 w-full">
+                    {petData ? (
+                      <>
+                        <div className="flex flex-col mb-3">
+                          <p className="text-[10px] font-black uppercase opacity-70 tracking-widest">Ración diaria</p>
+                          <p className="text-4xl font-black">{porcion || "---"}g</p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-y-3 pt-3 border-t border-white/20">
+                          <div><p className="text-[8px] font-black uppercase opacity-60">Mascota</p><p className="text-sm font-bold">{petData.nombre}</p></div>
+                          <div><p className="text-[8px] font-black uppercase opacity-60">Edad</p><p className="text-sm font-bold">{calcularEdad(petData.fechaNacimiento)} años</p></div>
+                          <div className="col-span-2"><p className="text-[8px] font-black uppercase opacity-60">Estado de salud</p><p className="text-sm font-bold">{petData.condicion}</p></div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="py-4">
+                        <p className="text-[10px] font-black uppercase opacity-70 tracking-widest leading-none mb-1">Ración diaria</p>
+                        <p className="text-lg font-black italic opacity-80">Análisis Genérico</p>
+                        <p className="text-[9px] mt-2 font-bold opacity-60 italic">* Seleccioná una mascota para ver la ración exacta.</p>
+                      </div>
+                    )}
+                  </div>
+                  <Utensils size={64} className="opacity-10 absolute -right-4 -bottom-4 rotate-12" />
+                </div>
+
+                <div className="bg-blue-50 p-6 rounded-3xl border border-blue-100 space-y-4">
+                  <div className="flex items-center gap-2 text-blue-900 font-black text-xs uppercase tracking-widest"><Wallet size={16} /> Pet Finance</div>
+                  <div className="flex gap-2">
+                    <input type="number" placeholder="Precio ($)" className="w-1/2 p-3 rounded-xl border border-blue-200 font-bold" value={precioInput} onChange={e => setPrecioInput(e.target.value)} onBlur={sincronizarFinanzas} />
+                    <input type="number" placeholder="Bolsa (kg)" className="w-1/2 p-3 rounded-xl border border-blue-200 font-bold" value={pesoBolsaInput} onChange={e => setPesoBolsaInput(e.target.value)} onBlur={sincronizarFinanzas} />
+                  </div>
+                  {calcularCostoDiario() && (
+                    <div className="bg-white p-3 rounded-xl border-2 border-blue-100 text-center">
+                      <p className="text-[10px] font-black text-blue-400 uppercase leading-none mb-1 tracking-tighter">Costo Diario Estimado</p>
+                      <p className="text-xl font-black text-blue-700">${calcularCostoDiario()}</p>
                     </div>
-                    <div className="grid grid-cols-2 gap-y-3 pt-3 border-t border-white/20">
-                      <div><p className="text-[8px] font-black uppercase opacity-60">Mascota</p><p className="text-sm font-bold">{petData.nombre}</p></div>
-                      <div><p className="text-[8px] font-black uppercase opacity-60">Edad</p><p className="text-sm font-bold">{calcularEdad(petData.fechaNacimiento)} años</p></div>
-                      <div className="col-span-2"><p className="text-[8px] font-black uppercase opacity-60">Estado de salud</p><p className="text-sm font-bold">{petData.condicion}</p></div>
-                    </div>
-                  </>
-                ) : (
-                  <div className="py-4">
-                    <p className="text-[10px] font-black uppercase opacity-70 tracking-widest leading-none mb-1">Ración diaria</p>
-                    <p className="text-lg font-black italic opacity-80">Análisis Genérico</p>
-                    <p className="text-[9px] mt-2 font-bold opacity-60 italic">* Seleccioná una mascota para ver la ración exacta.</p>
+                  )}
+                  {!result.stockActivo && pesoBolsaInput && (
+                    <button onClick={handleActivarBolsa} className="w-full py-3 bg-orange-600 text-white rounded-xl font-black text-[10px] uppercase flex items-center justify-center gap-2 shadow-lg shadow-orange-100"><Package size={14} /> ¡Empecé esta bolsa hoy!</button>
+                  )}
+                  {result.stockActivo && (
+                    <div className="bg-green-100 text-green-700 p-3 rounded-xl flex items-center justify-center gap-2 font-black text-[10px] uppercase"><CheckCircle size={14} /> Bolsa en seguimiento</div>
+                  )}
+                  <button onClick={handleBuscarPrecios} disabled={loadingBusqueda} className={`w-full py-3 rounded-xl font-black text-xs flex items-center justify-center gap-2 shadow-md ${loadingBusqueda ? 'bg-blue-200' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
+                    {loadingBusqueda ? <Loader2 className="animate-spin" size={14} /> : <Search size={14} />} BUSCAR PRECIOS ONLINE
+                  </button>
+                </div>
+              </div>
+
+              {/* ✅ CORRECCIÓN: getGamaColor ahora es seguro contra nulls */}
+              <div className={`inline-block px-5 py-2 rounded-xl text-xs font-black mb-4 uppercase border ${getGamaColor(result?.alimento?.calidad)}`}>GAMA: {result?.alimento?.calidad || "---"}</div>
+              <p className="bg-orange-50 p-6 rounded-2xl mb-6 italic text-slate-800 text-center text-lg">"{result.alimento?.veredicto || "No hay veredicto disponible."}"</p>
+
+              <div className="mb-8">
+                <h3 className="font-black text-slate-800 flex items-center gap-2 mb-4 uppercase text-[10px] tracking-wider"><CheckCircle size={14} className="text-green-500" /> Ingredientes</h3>
+                <div className="flex flex-wrap gap-2">{result?.alimento?.ingredientes?.map((ing: string, i: number) => (<span key={i} className="bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-xl text-[11px] font-bold text-slate-600">{ing}</span>))}</div>
+              </div>
+
+              <div className="space-y-4 mb-8">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-black text-slate-800 flex items-center gap-2 uppercase text-[10px] tracking-wider"><MessageCircle size={14} className="text-blue-500" /> Opiniones</h3>
+                  <button onClick={handleBuscarResenas} disabled={loadingResenas} className="text-[9px] font-black text-blue-600 uppercase flex items-center gap-1">{loadingResenas ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />} Ver reseñas</button>
+                </div>
+                {resenas.length > 0 && (
+                  <div className="grid gap-3">
+                    {resenas.map((r, i) => {
+                      const isGood = r.toUpperCase().includes("BUENO:");
+                      return (
+                        <div key={i} className={`p-4 rounded-2xl border-2 flex gap-3 items-start ${isGood ? 'bg-green-50/50 border-green-100' : 'bg-red-50/50 border-red-100'}`}>
+                          <div className={`p-2 rounded-lg mt-1 ${isGood ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>{isGood ? <ThumbsUp size={12} /> : <ThumbsDown size={12} />}</div>
+                          <p className="text-xs font-bold text-slate-700 leading-relaxed">{cleanMarkdown(r.split(':')[1]?.trim() || r)}</p>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
-              <Utensils size={64} className="opacity-10 absolute -right-4 -bottom-4 rotate-12" />
-            </div>
+            </>
+          )}
 
-            <div className="bg-blue-50 p-6 rounded-3xl border border-blue-100 space-y-4">
-              <div className="flex items-center gap-2 text-blue-900 font-black text-xs uppercase tracking-widest"><Wallet size={16} /> Pet Finance</div>
-              <div className="flex gap-2">
-                <input type="number" placeholder="Precio ($)" className="w-1/2 p-3 rounded-xl border border-blue-200 font-bold" value={precioInput} onChange={e => setPrecioInput(e.target.value)} onBlur={sincronizarFinanzas} />
-                <input type="number" placeholder="Bolsa (kg)" className="w-1/2 p-3 rounded-xl border border-blue-200 font-bold" value={pesoBolsaInput} onChange={e => setPesoBolsaInput(e.target.value)} onBlur={sincronizarFinanzas} />
-              </div>
-              {calcularCostoDiario() && (
-                <div className="bg-white p-3 rounded-xl border-2 border-blue-100 text-center">
-                  <p className="text-[10px] font-black text-blue-400 uppercase leading-none mb-1 tracking-tighter">Costo Diario Estimado</p>
-                  <p className="text-xl font-black text-blue-700">${calcularCostoDiario()}</p>
-                </div>
-              )}
-              {!result.stockActivo && pesoBolsaInput && (
-                <button onClick={handleActivarBolsa} className="w-full py-3 bg-orange-600 text-white rounded-xl font-black text-[10px] uppercase flex items-center justify-center gap-2 shadow-lg shadow-orange-100"><Package size={14} /> ¡Empecé esta bolsa hoy!</button>
-              )}
-              {result.stockActivo && (
-                <div className="bg-green-100 text-green-700 p-3 rounded-xl flex items-center justify-center gap-2 font-black text-[10px] uppercase"><CheckCircle size={14} /> Bolsa en seguimiento</div>
-              )}
-              <button onClick={handleBuscarPrecios} disabled={loadingBusqueda} className={`w-full py-3 rounded-xl font-black text-xs flex items-center justify-center gap-2 shadow-md ${loadingBusqueda ? 'bg-blue-200' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
-                {loadingBusqueda ? <Loader2 className="animate-spin" size={14} /> : <Search size={14} />} BUSCAR PRECIOS ONLINE
-              </button>
-            </div>
-          </div>
-
-          <div className={`inline-block px-5 py-2 rounded-xl text-xs font-black mb-4 uppercase border ${getGamaColor(result?.calidad)}`}>GAMA: {result?.calidad}</div>
-          <p className="bg-orange-50 p-6 rounded-2xl mb-6 italic text-slate-800 text-center text-lg">"{result.veredicto}"</p>
-
-          <div className="mb-8">
-            <h3 className="font-black text-slate-800 flex items-center gap-2 mb-4 uppercase text-[10px] tracking-wider"><CheckCircle size={14} className="text-green-500" /> Ingredientes</h3>
-            <div className="flex flex-wrap gap-2">{result?.ingredientes?.map((ing: string, i: number) => (<span key={i} className="bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-xl text-[11px] font-bold text-slate-600">{ing}</span>))}</div>
-          </div>
-
-          <div className="space-y-4 mb-8">
-            <div className="flex items-center justify-between">
-              <h3 className="font-black text-slate-800 flex items-center gap-2 uppercase text-[10px] tracking-wider"><MessageCircle size={14} className="text-blue-500" /> Opiniones</h3>
-              <button onClick={handleBuscarResenas} disabled={loadingResenas} className="text-[9px] font-black text-blue-600 uppercase flex items-center gap-1">{loadingResenas ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />} Ver reseñas</button>
-            </div>
-            {resenas.length > 0 && (
-              <div className="grid gap-3">
-                {resenas.map((r, i) => {
-                  const isGood = r.toUpperCase().includes("BUENO:");
-                  return (
-                    <div key={i} className={`p-4 rounded-2xl border-2 flex gap-3 items-start ${isGood ? 'bg-green-50/50 border-green-100' : 'bg-red-50/50 border-red-100'}`}>
-                      <div className={`p-2 rounded-lg mt-1 ${isGood ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>{isGood ? <ThumbsUp size={12} /> : <ThumbsDown size={12} />}</div>
-                      <p className="text-xs font-bold text-slate-700 leading-relaxed">{cleanMarkdown(r.split(':')[1]?.trim() || r)}</p>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-          <button onClick={() => { setResult(null); setSelectedImage(null); onReset(); }} className="w-full py-5 bg-slate-900 text-white rounded-2xl font-black shadow-lg">FINALIZAR</button>
+          <button onClick={() => { setResult(null); setSelectedImage(null); onReset(); }} className="w-full py-4 bg-slate-900 text-white font-black text-xs uppercase tracking-widest rounded-2xl mt-6">FINALIZAR</button>
         </div>
       )}
 
