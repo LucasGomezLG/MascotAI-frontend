@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { api } from '../../../services/api';
 import { Toast } from '../../../utils/alerts';
+import Swal from 'sweetalert2';
 
 const ConsultationScanner = ({ mascotas, onScanComplete }: any) => {
   const [selectedPet, setSelectedPet] = useState("");
@@ -31,11 +32,7 @@ const ConsultationScanner = ({ mascotas, onScanComplete }: any) => {
 
   const handleScanDoc = async () => {
     if (!selectedPet) {
-      Toast.fire({
-        icon: 'warning',
-        title: '¡Identificá al Paciente!',
-        text: 'La receta debe estar vinculada a una mascota para guardarla.'
-      });
+      Toast.fire({ icon: 'warning', title: '¡Identificá al Paciente!' });
       return;
     }
 
@@ -45,16 +42,29 @@ const ConsultationScanner = ({ mascotas, onScanComplete }: any) => {
     try {
       const res = await api.analizarVet(selectedImage, "CONSULTA", selectedPet);
 
-      // ✅ Inicializamos el estado de edición con lo que encontró la IA
+      // ✅ VALIDACIÓN: Si el servidor mandó error, mostramos alerta y reseteamos
+      if (res.data.error === "NO_ES_RECETA") {
+        Swal.fire({
+          title: 'Documento no reconocido',
+          text: 'MascotAI no detectó una receta o informe válido. Intentá que en la imagen se vea el sello o la firma del veterinario, con más luz.',
+          icon: 'error',
+          confirmButtonColor: '#2563eb'
+        });
+        setSelectedImage(null); // Limpiamos la foto inválida
+        return; // ⛔ Cortamos aquí para que no se abra la vista de edición
+      }
+
+      // Si pasó la validación, cargamos los datos para editar
+      const infoIA = res.data.datos || {};
       setEditData({
-        doctor: res.data.doctor || "",
-        clinica: res.data.clinica || "",
-        // Formateamos fecha para input type="date" (YYYY-MM-DD)
-        fecha: res.data.fecha ? new Date(res.data.fecha).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-        diagnostico: res.data.diagnostico || res.data.observaciones || "",
-        medicamentos: Array.isArray(res.data.medicamentos) ? res.data.medicamentos : [],
-        precio: res.data.precio || 0,
-        mascotaId: selectedPet
+        doctor: infoIA.veterinario || "",
+        clinica: infoIA.clinica || "",
+        fecha: infoIA.fecha || new Date().toISOString().split('T')[0],
+        diagnostico: infoIA.diagnostico || "",
+        medicamentos: [],
+        precio: 0,
+        mascotaId: selectedPet,
+        consultaId: res.data.consultaId
       });
 
     } catch (e) {
@@ -64,20 +74,30 @@ const ConsultationScanner = ({ mascotas, onScanComplete }: any) => {
     }
   };
 
-  // ✅ Nueva función para persistir los cambios en la base de datos
+  // Dentro de ConsultationScanner.tsx
   const handleGuardarConsulta = async () => {
     setLoading(true);
     try {
-      await api.guardarConsultaVet(editData);
-      Toast.fire({ 
-        icon: 'success', 
-        title: '¡Consulta Guardada!', 
-        text: 'Los datos se sincronizaron con el historial.' 
-      });
+      const dataParaEnviar = {
+        id: editData.consultaId,
+        mascotaId: editData.mascotaId,
+        veterinario: editData.doctor,
+        clinica: editData.clinica,
+        diagnostico: editData.diagnostico,
+        nombre: editData.diagnostico,
+        precio: editData.precio,
+        // ✅ FIX FECHA: Agregamos la hora para que LocalDateTime no explote
+        fecha: editData.fecha.includes('T') ? editData.fecha : `${editData.fecha}T00:00:00`
+      };
+
+      await api.guardarConsultaVet(dataParaEnviar);
+
+      Toast.fire({ icon: 'success', title: '¡Consulta Guardada!' });
       setEditData(null);
       setSelectedImage(null);
       if (onScanComplete) onScanComplete();
     } catch (e) {
+      console.error("Error al guardar:", e);
       Toast.fire({ icon: 'error', title: 'No se pudo guardar la consulta' });
     } finally {
       setLoading(false);
@@ -121,7 +141,7 @@ const ConsultationScanner = ({ mascotas, onScanComplete }: any) => {
                 <div className="bg-blue-50 p-5 rounded-full mb-4 inline-block text-blue-200">
                   <FileText size={40} />
                 </div>
-                <p className="text-blue-900/40 font-black uppercase text-[10px] tracking-widest leading-tight">Escaneá la receta o <br />factura médica</p>
+                <p className="text-blue-900/40 font-black uppercase text-[10px] tracking-widest leading-tight">Escaneá la receta</p>
               </div>
             )}
           </div>
@@ -162,21 +182,21 @@ const ConsultationScanner = ({ mascotas, onScanComplete }: any) => {
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-slate-50 p-4 rounded-3xl border border-slate-100">
                   <p className="text-[9px] font-black text-slate-400 uppercase mb-1 flex items-center gap-1"><Stethoscope size={10} /> Veterinario</p>
-                  <input 
-                    type="text" 
-                    className="w-full bg-transparent text-xs font-black text-slate-700 outline-none border-b border-transparent focus:border-blue-300" 
-                    value={editData.doctor} 
-                    onChange={(e) => setEditData({...editData, doctor: e.target.value})}
+                  <input
+                    type="text"
+                    className="w-full bg-transparent text-xs font-black text-slate-700 outline-none border-b border-transparent focus:border-blue-300"
+                    value={editData.doctor}
+                    onChange={(e) => setEditData({ ...editData, doctor: e.target.value })}
                     placeholder="Nombre del médico"
                   />
                 </div>
                 <div className="bg-slate-50 p-4 rounded-3xl border border-slate-100">
                   <p className="text-[9px] font-black text-slate-400 uppercase mb-1 flex items-center gap-1"><MapPin size={10} /> Clínica</p>
-                  <input 
-                    type="text" 
-                    className="w-full bg-transparent text-xs font-black text-slate-700 outline-none border-b border-transparent focus:border-blue-300" 
-                    value={editData.clinica} 
-                    onChange={(e) => setEditData({...editData, clinica: e.target.value})}
+                  <input
+                    type="text"
+                    className="w-full bg-transparent text-xs font-black text-slate-700 outline-none border-b border-transparent focus:border-blue-300"
+                    value={editData.clinica}
+                    onChange={(e) => setEditData({ ...editData, clinica: e.target.value })}
                     placeholder="Lugar"
                   />
                 </div>
@@ -186,20 +206,20 @@ const ConsultationScanner = ({ mascotas, onScanComplete }: any) => {
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-blue-50/50 p-4 rounded-3xl border border-blue-100">
                   <p className="text-[9px] font-black text-blue-600 uppercase mb-1 flex items-center gap-1"><Calendar size={10} /> Fecha</p>
-                  <input 
-                    type="date" 
-                    className="w-full bg-transparent text-xs font-black text-slate-700 outline-none" 
-                    value={editData.fecha} 
-                    onChange={(e) => setEditData({...editData, fecha: e.target.value})}
+                  <input
+                    type="date"
+                    className="w-full bg-transparent text-xs font-black text-slate-700 outline-none"
+                    value={editData.fecha}
+                    onChange={(e) => setEditData({ ...editData, fecha: e.target.value })}
                   />
                 </div>
                 <div className="bg-emerald-50/50 p-4 rounded-3xl border border-emerald-100">
                   <p className="text-[9px] font-black text-emerald-600 uppercase mb-1 flex items-center gap-1"><DollarSign size={10} /> Costo ($)</p>
-                  <input 
-                    type="number" 
-                    className="w-full bg-transparent text-xs font-black text-emerald-700 outline-none" 
-                    value={editData.precio} 
-                    onChange={(e) => setEditData({...editData, precio: parseFloat(e.target.value) || 0})}
+                  <input
+                    type="number"
+                    className="w-full bg-transparent text-xs font-black text-emerald-700 outline-none"
+                    value={editData.precio}
+                    onChange={(e) => setEditData({ ...editData, precio: parseFloat(e.target.value) || 0 })}
                   />
                 </div>
               </div>
@@ -207,12 +227,12 @@ const ConsultationScanner = ({ mascotas, onScanComplete }: any) => {
               {/* Diagnóstico */}
               <div className="bg-slate-50 p-5 rounded-[2rem] border border-slate-100">
                 <p className="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Diagnóstico / Motivo</p>
-                <textarea 
-                    className="w-full bg-transparent text-sm font-bold text-slate-600 italic leading-relaxed outline-none border-b border-transparent focus:border-blue-200 resize-none" 
-                    rows={3}
-                    value={editData.diagnostico} 
-                    onChange={(e) => setEditData({...editData, diagnostico: e.target.value})}
-                    placeholder="Escribí aquí el detalle de la consulta..."
+                <textarea
+                  className="w-full bg-transparent text-sm font-bold text-slate-600 italic leading-relaxed outline-none border-b border-transparent focus:border-blue-200 resize-none"
+                  rows={3}
+                  value={editData.diagnostico}
+                  onChange={(e) => setEditData({ ...editData, diagnostico: e.target.value })}
+                  placeholder="Escribí aquí el detalle de la consulta..."
                 />
               </div>
 
@@ -231,13 +251,13 @@ const ConsultationScanner = ({ mascotas, onScanComplete }: any) => {
             </div>
 
             <div className="flex gap-2 mt-8">
-              <button 
-                onClick={() => { setEditData(null); setSelectedImage(null); }} 
+              <button
+                onClick={() => { setEditData(null); setSelectedImage(null); }}
                 className="flex-1 py-5 bg-slate-100 text-slate-400 rounded-[2rem] font-black uppercase text-xs"
               >
                 Descartar
               </button>
-              <button 
+              <button
                 onClick={handleGuardarConsulta}
                 disabled={loading}
                 className="flex-[2] py-5 bg-blue-600 text-white rounded-[2rem] font-black uppercase text-xs tracking-widest shadow-xl flex items-center justify-center gap-2 transition-all active:scale-95"

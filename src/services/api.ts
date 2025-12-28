@@ -45,7 +45,8 @@ export const api = {
   getPresupuestoMensual: () => apiClient.get('/presupuesto-mensual'),
   comparar: (ids: string[]) => apiClient.post('/comparar', { ids }),
 
-  guardarConsultaVet: (data: any) => apiClient.post('/analizar-veterinario', data),
+  guardarConsultaVet: (data: any) =>
+    apiClient.post('/guardar-consulta', data),
   guardarReceta: (data: any) => apiClient.post('/guardar-receta', data),
 
   getUserProfile: async () => {
@@ -59,6 +60,7 @@ export const api = {
       throw error;
     }
   },
+
 
   logout: () => apiClient.post('/logout'),
 };

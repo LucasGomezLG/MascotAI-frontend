@@ -3,6 +3,7 @@ import { Camera, Loader2, User, RefreshCw, Sparkles, X, Image as ImageIcon, Acti
 import { api } from '../../../services/api';
 import { Toast } from '../../../utils/alerts';
 import MedicalReport from './MedicalReport'; // ✅ Importación vital
+import Swal from 'sweetalert2';
 
 const SymptomScanner = ({ mascotas, onScanComplete }: any) => {
   const [selectedPet, setSelectedPet] = useState("");
@@ -28,12 +29,29 @@ const SymptomScanner = ({ mascotas, onScanComplete }: any) => {
 
   const handleAnalizar = async () => {
     if (!selectedImage) return;
+    setResult(null);
     setLoading(true);
     try {
       const res = await api.analizarTriaje(selectedImage, activeTab, selectedPet || "");
+
+      // ✅ DETECCIÓN DEL ESCUDO DE SEGURIDAD
+      if (res.data.error === "NO_DETECTADO") {
+        Swal.fire({
+          title: 'Imagen no reconocida',
+          text: `MascotAI no detectó evidencia de "${activeTab}" en la foto. Asegurate de que la imagen sea clara o que la categoría seleccionada sea la correcta.`,
+          icon: 'warning',
+          confirmButtonColor: '#ef4444', // Rojo
+          confirmButtonText: 'Reintentar'
+        });
+        return; // Cortamos la ejecución para no mostrar resultados vacíos
+      }
+
+      // Si todo está ok, mostramos el resultado
       setResult(res.data);
       if (onScanComplete) onScanComplete();
+
     } catch (e) {
+      console.error("Error en triaje:", e);
       Toast.fire({ icon: 'error', title: 'Error en el análisis' });
     } finally {
       setLoading(false);
