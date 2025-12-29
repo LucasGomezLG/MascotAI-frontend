@@ -3,7 +3,6 @@ import { X, Camera, Image as ImageIcon } from 'lucide-react';
 import { api } from '../../services/api';
 
 const PetModal = ({ onClose }: { onClose: () => void }) => {
-  // ✅ Estado para el archivo real (Blob/File) que va al backend
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   
   const [nuevaMascota, setNuevaMascota] = useState({
@@ -11,8 +10,8 @@ const PetModal = ({ onClose }: { onClose: () => void }) => {
     especie: 'Gato',
     fechaNacimiento: '',
     peso: '',
-    condicion: 'Sano',
-    foto: '' // Este se usa solo para la preview visual
+    condicion: '', // ✅ Inicializamos vacío para que el placeholder sea visible
+    foto: '' 
   });
 
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -21,11 +20,7 @@ const PetModal = ({ onClose }: { onClose: () => void }) => {
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    // ✅ Guardamos el archivo real para el FormData
     setSelectedFile(file);
-
-    // Generamos la preview para la interfaz
     const reader = new FileReader();
     reader.onloadend = () => {
       setNuevaMascota({ ...nuevaMascota, foto: reader.result as string });
@@ -39,7 +34,9 @@ const PetModal = ({ onClose }: { onClose: () => void }) => {
       return;
     }
 
-    // ✅ Usamos FormData para enviar el archivo real, no el Base64
+    // ✅ Lógica de Fallback: Si no escribió nada, enviamos "Sano"
+    const condicionFinal = nuevaMascota.condicion.trim() || "Sano";
+
     const formData = new FormData();
     if (selectedFile) {
       formData.append('file', selectedFile);
@@ -49,10 +46,9 @@ const PetModal = ({ onClose }: { onClose: () => void }) => {
     formData.append('especie', nuevaMascota.especie);
     formData.append('fechaNacimiento', nuevaMascota.fechaNacimiento);
     formData.append('peso', nuevaMascota.peso);
-    formData.append('condicion', nuevaMascota.condicion);
+    formData.append('condicion', condicionFinal); // ✅ Enviamos el valor procesado
 
     try {
-      // ✅ Llamada al nuevo endpoint que creamos en el Service de Java
       await api.guardarPerfilConFoto(formData);
       onClose();
     } catch (e) {
@@ -70,7 +66,7 @@ const PetModal = ({ onClose }: { onClose: () => void }) => {
         <h3 className="text-2xl font-black text-slate-800 mb-6 tracking-tight">Nueva Mascota</h3>
 
         <div className="space-y-6">
-          {/* SECCIÓN DE FOTO DE PERFIL CON PREVIEW */}
+          {/* SECCIÓN FOTO */}
           <div className="flex flex-col items-center gap-4">
             <div className="relative w-28 h-28">
               <div className="w-full h-full bg-slate-100 rounded-[2rem] border-4 border-white shadow-md overflow-hidden flex items-center justify-center">
@@ -81,26 +77,14 @@ const PetModal = ({ onClose }: { onClose: () => void }) => {
                 )}
               </div>
               <div className="absolute -bottom-2 -right-2 flex gap-1">
-                <button
-                  type="button"
-                  onClick={() => cameraInputRef.current?.click()}
-                  className="bg-orange-600 text-white p-2 rounded-xl shadow-lg active:scale-90 transition-transform"
-                >
-                  <Camera size={16} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => galleryInputRef.current?.click()}
-                  className="bg-slate-800 text-white p-2 rounded-xl shadow-lg active:scale-90 transition-transform"
-                >
-                  <ImageIcon size={16} />
-                </button>
+                <button type="button" onClick={() => cameraInputRef.current?.click()} className="bg-orange-600 text-white p-2 rounded-xl shadow-lg active:scale-90 transition-transform"><Camera size={16} /></button>
+                <button type="button" onClick={() => galleryInputRef.current?.click()} className="bg-slate-800 text-white p-2 rounded-xl shadow-lg active:scale-90 transition-transform"><ImageIcon size={16} /></button>
               </div>
             </div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Foto de perfil</p>
           </div>
 
           <div className="space-y-4">
+            {/* NOMBRE */}
             <div className="space-y-1">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-tighter ml-2">Nombre</label>
               <input
@@ -110,6 +94,7 @@ const PetModal = ({ onClose }: { onClose: () => void }) => {
               />
             </div>
 
+            {/* ESPECIE */}
             <div className="space-y-1">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-tighter ml-2">Especie</label>
               <select
@@ -122,6 +107,7 @@ const PetModal = ({ onClose }: { onClose: () => void }) => {
               </select>
             </div>
 
+            {/* FECHA Y PESO */}
             <div className="flex gap-2">
               <div className="w-1/2 space-y-1">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-tighter ml-2">Nacimiento</label>
@@ -143,18 +129,17 @@ const PetModal = ({ onClose }: { onClose: () => void }) => {
               </div>
             </div>
 
+            {/* ✅ ESTADO DE SALUD (AHORA ES UN INPUT DE TEXTO) */}
             <div className="space-y-1">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-tighter ml-2">Estado de Salud</label>
-              <select
-                className="w-full p-4 bg-slate-50 rounded-xl font-bold outline-none border-2 border-transparent focus:border-orange-500"
+              <input
+                type="text"
+                placeholder="Sano (o ej: Alergias, Sobrepeso...)"
+                className="w-full p-4 bg-slate-50 rounded-xl font-bold border-2 border-transparent focus:border-orange-500 outline-none transition-all text-sm"
+                value={nuevaMascota.condicion}
                 onChange={e => setNuevaMascota({ ...nuevaMascota, condicion: e.target.value })}
-              >
-                <option value="Sano">Sano</option>
-                <option value="Obesidad">Obesidad (Adelina)</option>
-                <option value="Alergias">Alergias (Helena)</option>
-                <option value="Problemas renales">Problemas renales</option>
-                <option value="Problemas urinarios">Problemas urinarios</option>
-              </select>
+              />
+              <p className="text-[8px] text-slate-400 ml-2 italic">* Si queda vacío se guardará como "Sano"</p>
             </div>
 
             <button
@@ -166,7 +151,6 @@ const PetModal = ({ onClose }: { onClose: () => void }) => {
           </div>
         </div>
 
-        {/* Inputs ocultos activados por los botones de arriba */}
         <input type="file" ref={cameraInputRef} accept="image/*" capture="environment" className="hidden" onChange={handleFile} />
         <input type="file" ref={galleryInputRef} accept="image/*" className="hidden" onChange={handleFile} />
       </div>

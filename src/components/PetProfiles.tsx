@@ -3,7 +3,6 @@ import { User, Edit2, Save, X, PlusCircle, Trash2 } from 'lucide-react';
 import { api } from '../services/api';
 import Swal from 'sweetalert2';
 
-// ✅ Agregamos onAddClick a las props para conectar con el PetModal global
 const PetProfiles = ({ mascotas, onUpdate, onAddClick }: any) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<any>({});
@@ -15,8 +14,13 @@ const PetProfiles = ({ mascotas, onUpdate, onAddClick }: any) => {
 
   const handleSave = async () => {
     try {
-      // ✅ Enviamos el formData completo, incluyendo el nuevo peso
-      await api.guardarPerfil(formData);
+      // ✅ Lógica de Fallback: Si el campo está vacío al guardar, ponemos "Sano"
+      const dataAEnviar = {
+        ...formData,
+        condicion: formData.condicion?.trim() || "Sano"
+      };
+
+      await api.guardarPerfil(dataAEnviar);
       setEditingId(null);
       onUpdate();
     } catch (e) { 
@@ -49,20 +53,18 @@ const PetProfiles = ({ mascotas, onUpdate, onAddClick }: any) => {
         {mascotas.map((pet: any) => (
           <div key={pet.id} className="bg-white rounded-[2.5rem] p-6 shadow-sm border border-slate-100 relative overflow-hidden">
             {editingId === pet.id ? (
-              /* --- MODO EDICIÓN (CON CAMPO DE PESO) --- */
-              <div className="space-y-4">
+              /* --- MODO EDICIÓN --- */
+              <div className="space-y-4 text-left">
                 <div className="space-y-1">
                   <label className="text-[10px] font-black text-slate-400 uppercase ml-2 tracking-tighter">Nombre</label>
                   <input
                     className="w-full p-3 bg-slate-50 rounded-xl font-bold border-2 border-orange-100 outline-none focus:border-orange-500"
                     value={formData.nombre}
                     onChange={e => setFormData({ ...formData, nombre: e.target.value })}
-                    placeholder="Nombre"
                   />
                 </div>
 
                 <div className="flex gap-2">
-                  {/* ✅ Nuevo campo de Peso */}
                   <div className="w-1/3 space-y-1">
                     <label className="text-[10px] font-black text-slate-400 uppercase ml-2 tracking-tighter">Peso (kg)</label>
                     <input
@@ -73,19 +75,17 @@ const PetProfiles = ({ mascotas, onUpdate, onAddClick }: any) => {
                       onChange={e => setFormData({ ...formData, peso: e.target.value })}
                     />
                   </div>
-                  {/* Condición de Salud */}
+                  
+                  {/* ✅ CAMBIO: De Selector a Input de texto libre */}
                   <div className="w-2/3 space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase ml-2 tracking-tighter">Condición</label>
-                    <select
-                      className="w-full p-3 bg-slate-50 rounded-xl font-bold border-2 border-orange-100 outline-none focus:border-orange-500"
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-2 tracking-tighter">Estado de Salud</label>
+                    <input
+                      type="text"
+                      placeholder="Sano (o ej: Alergias, Dieta...)"
+                      className="w-full p-3 bg-slate-50 rounded-xl font-bold border-2 border-orange-100 outline-none focus:border-orange-500 text-sm"
                       value={formData.condicion}
                       onChange={e => setFormData({ ...formData, condicion: e.target.value })}
-                    >
-                      <option value="Sano">Sano</option>
-                      <option value="Alergias">Alergias (Helena)</option>
-                      <option value="Obesidad">Obesidad (Adelina)</option>
-                      <option value="Problemas urinarios">Problemas Urinarios</option>
-                    </select>
+                    />
                   </div>
                 </div>
 
@@ -99,8 +99,8 @@ const PetProfiles = ({ mascotas, onUpdate, onAddClick }: any) => {
                 </div>
               </div>
             ) : (
-              /* --- MODO VISTA (CON FOTO "BLINDADA") --- */
-              <div className="flex justify-between items-center">
+              /* --- MODO VISTA --- */
+              <div className="flex justify-between items-center text-left">
                 <div className="flex items-center gap-4">
                   <div className="w-16 h-16 bg-orange-100 rounded-3xl border-2 border-white shadow-sm overflow-hidden flex items-center justify-center text-orange-600 relative">
                     <User size={32} className="absolute" />
@@ -109,9 +109,7 @@ const PetProfiles = ({ mascotas, onUpdate, onAddClick }: any) => {
                         src={pet.foto}
                         alt={pet.nombre}
                         className="w-full h-full object-cover z-10 relative"
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none'; // Evita el loop de error
-                        }}
+                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
                       />
                     )}
                   </div>
@@ -119,11 +117,11 @@ const PetProfiles = ({ mascotas, onUpdate, onAddClick }: any) => {
                   <div>
                     <h3 className="font-black text-lg text-slate-800 leading-none">{pet.nombre}</h3>
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">
-                      {pet.especie} • {pet.edad || 5} años {/* Edad calculada en Java */}
+                      {pet.especie} • {pet.edad || 0} años
                     </p>
                     <div className="flex gap-2 mt-2">
                       <span className="px-3 py-1 bg-orange-50 text-orange-600 text-[8px] font-black rounded-lg uppercase border border-orange-100">
-                        {pet.condicion}
+                        {pet.condicion || "Sano"}
                       </span>
                       {pet.peso > 0 && (
                         <span className="px-3 py-1 bg-slate-50 text-slate-500 text-[8px] font-black rounded-lg uppercase border border-slate-100">
