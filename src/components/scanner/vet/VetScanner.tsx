@@ -27,7 +27,7 @@ const VetScanner = ({ mascotas, onScanComplete, initialData, onReset }: VetScann
         <div className="space-y-1">
           <p className="text-[10px] font-black uppercase text-amber-900 tracking-widest leading-none">Recordatorio</p>
           <p className="text-[11px] font-bold text-amber-800/80 leading-tight">
-            ¡Cuidemos la salud de nuestras mascotas! MascotAI es una guía orientativa. Ante síntomas persistentes,
+            ¡Cuidemos la salud de nuestras mascotas! MascotAI es una guía orientativa.
             <span className="text-amber-900 font-black"> consultá siempre a tu veterinario </span> de confianza.
           </p>
         </div>
