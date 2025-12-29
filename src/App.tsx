@@ -224,7 +224,7 @@ function App() {
                   className="w-full py-8 border-4 border-dashed border-slate-200 rounded-[2.5rem] flex flex-col items-center justify-center gap-2 text-slate-400 hover:text-orange-500 hover:border-orange-200 transition-all"
                 >
                   <PlusCircle size={32} />
-                  <span className="font-black text-xs uppercase tracking-widest">Registrar a mis gatos</span>
+                  <span className="font-black text-xs uppercase tracking-widest">Registrar Mascota</span>
                 </button>
               )}
             </section>
