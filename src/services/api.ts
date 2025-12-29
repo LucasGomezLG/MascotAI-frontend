@@ -63,6 +63,8 @@ export const api = {
   borrarAlimento: (id: string) => apiClient.delete(`/historial/${id}`),
   borrarTriaje: (id: string) => apiClient.delete(`/triaje/${id}`),
 
+  eliminarConsultaVet: (id: string) => apiClient.delete(`/consulta-vet/${id}`),
+
 
   // ==========================================
   // 🍱 ALIMENTACIÓN, STOCK Y MERCADO
