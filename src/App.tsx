@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Camera, Dog, LayoutDashboard, Stethoscope, Plus, ShieldPlus, Bell, User as UserIcon } from 'lucide-react';
+import { 
+  Camera, Dog, LayoutDashboard, Stethoscope, ShieldPlus, 
+  Bell, User as UserIcon, Settings, PawPrint 
+} from 'lucide-react'; // ✅ Quitamos 'Plus' de los imports si no se usa más aquí
 import { api } from './services/api';
 import { useAuth } from './context/AuthContext';
 import LoginView from './components/login/LoginView';
@@ -10,11 +13,14 @@ import ReportsManager from './components/reports/ReportsManager';
 import PetModal from './components/ui/PetModal';
 import NotificationsCenter from './components/ui/NotificationsCenter';
 import LogoutModal from './components/login/LogoutModal';
+import PetProfiles from './components/PetProfiles'; 
+
+type TabType = 'scanner' | 'stats' | 'vet' | 'health' | 'pets';
 
 function App() {
   const { user, loading: authLoading, logout } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<'scanner' | 'stats' | 'vet' | 'health'>('scanner');
+  const [activeTab, setActiveTab] = useState<TabType>('scanner');
   const [mascotas, setMascotas] = useState<any[]>([]);
   const [showPetModal, setShowPetModal] = useState(false);
   const [showAlerts, setShowAlerts] = useState(false);
@@ -44,7 +50,6 @@ function App() {
     );
   }
 
-  // ✅ Si no hay usuario cargado en el contexto, mostramos el login
   if (!user) return <LoginView />;
 
   const verDetalle = (item: any, tipo: 'food' | 'vet' | 'health') => {
@@ -56,11 +61,10 @@ function App() {
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-24 text-left">
       <header className="bg-white p-4 border-b sticky top-0 z-40 flex items-center justify-between shadow-sm">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 cursor-pointer" onClick={() => setActiveTab('scanner')}>
           <div className="bg-orange-600 p-2 rounded-xl shadow-lg rotate-3"><Dog size={24} className="text-white" /></div>
           <div>
             <h1 className="text-xl font-black text-orange-900 tracking-tighter uppercase leading-none">MascotAI</h1>
-            {/* ✅ Encadenamiento opcional para seguridad */}
             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">
               Hola, {user?.name?.split(' ')[0] || user?.email?.split('@')[0] || 'Usuario'}!
             </p>
@@ -68,6 +72,7 @@ function App() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Notificaciones */}
           <div className="relative">
             <button onClick={() => setShowAlerts(!showAlerts)} className={`p-2 rounded-xl transition-all ${alertas.length > 0 ? 'bg-orange-50 text-orange-600' : 'bg-slate-50 text-slate-400'}`}>
               <Bell size={20} />
@@ -76,11 +81,29 @@ function App() {
             {showAlerts && <NotificationsCenter alertas={alertas} onMarkRead={(id: string) => api.marcarAlertaLeida(id).then(refreshData)} onClose={() => setShowAlerts(false)} />}
           </div>
 
-          <button onClick={() => setShowLogoutModal(true)} className="w-10 h-10 rounded-xl overflow-hidden border-2 border-orange-100 shadow-sm active:scale-90 transition-transform">
-            {user.picture ? <img src={user.picture} alt="profile" className="w-full h-full object-cover" /> : <div className="bg-slate-100 w-full h-full flex items-center justify-center text-slate-400"><UserIcon size={20} /></div>}
+          {/* ÍCONO ANIMALITO -> Gestión de Mascotas */}
+          <button 
+            onClick={() => setActiveTab('pets')}
+            className={`p-2 rounded-xl transition-all ${activeTab === 'pets' ? 'bg-orange-600 text-white shadow-lg' : 'bg-slate-50 text-slate-400'}`}
+          >
+            <PawPrint size={20} />
           </button>
 
-          <button onClick={() => setShowPetModal(true)} className="bg-orange-600 text-white p-2 rounded-xl shadow-md"><Plus size={20} /></button>
+          {/* Foto de Perfil -> Logout */}
+          <button 
+            onClick={() => setShowLogoutModal(true)} 
+            className="w-10 h-10 rounded-xl overflow-hidden border-2 border-orange-100 shadow-sm active:scale-90 transition-transform"
+          >
+            {user.picture ? (
+              <img src={user.picture} alt="profile" className="w-full h-full object-cover" />
+            ) : (
+              <div className="bg-slate-100 w-full h-full flex items-center justify-center text-slate-400">
+                <UserIcon size={20} />
+              </div>
+            )}
+          </button>
+
+          {/* ✅ BOTÓN "+" ELIMINADO DE AQUÍ PARA CENTRALIZAR EN PETPROFILES */}
         </div>
       </header>
 
@@ -89,6 +112,16 @@ function App() {
         {activeTab === 'vet' && <VetScanner mascotas={mascotas} onScanComplete={refreshData} initialData={vetParaVer} onReset={() => setVetParaVer(null)} />}
         {activeTab === 'health' && <SaludScanner mascotas={mascotas} onScanComplete={refreshData} initialData={healthParaVer} onReset={() => setHealthParaVer(null)} />}
         {activeTab === 'stats' && <ReportsManager onVerDetalle={verDetalle} />}
+        
+        {activeTab === 'pets' && (
+          <div className="space-y-6">
+            <PetProfiles 
+              mascotas={mascotas} 
+              onUpdate={refreshData} 
+              onAddClick={() => setShowPetModal(true)} // ✅ El modal se sigue abriendo desde aquí
+            />
+          </div>
+        )}
       </main>
 
       {showPetModal && <PetModal onClose={() => { setShowPetModal(false); refreshData(); }} />}
