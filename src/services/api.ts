@@ -119,6 +119,8 @@ export const api = {
 
   logout: () => apiClient.post('/logout'),
 
+  crearSuscripcion: () => apiClient.post('/usuarios/suscribirme'),
+
   // ==========================================
   // 📍 COMUNIDAD: MASCOTAS PERDIDAS
   // ==========================================

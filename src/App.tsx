@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import {
   Camera, Dog, LayoutDashboard, Stethoscope, ShieldPlus,
-  Bell, User as UserIcon, Settings, PawPrint, Home, Heart, MapPin, PlusCircle, Plus, Users
+  Bell, User as UserIcon, Settings, PawPrint, Home, Heart, MapPin, PlusCircle, Plus, Users,
+  Loader2,
+  Sparkles
 } from 'lucide-react';
 import { api } from './services/api';
 import { useAuth } from './context/AuthContext';
@@ -19,6 +21,7 @@ import LostPetCard from './components/LostPet/LostPetCard';
 import AdoptionCard from './components/AdoptionPet/AdoptionCard';
 import AdoptionModal from './components/AdoptionPet/AdoptionModal';
 import DeleteConfirmModal from './components/ui/DeleteConfirmModal';
+import Swal from 'sweetalert2';
 
 type TabType = 'home' | 'scanner' | 'stats' | 'vet' | 'health' | 'pets';
 
@@ -31,6 +34,7 @@ function App() {
   const [alertas, setAlertas] = useState<any[]>([]);
   const [perdidos, setPerdidos] = useState<any[]>([]);
   const [adopciones, setAdopciones] = useState<any[]>([]);
+  const [loadingSuscripcion, setLoadingSuscripcion] = useState(false);
 
   // Estados de Modales
   const [showPetModal, setShowPetModal] = useState(false);
@@ -83,6 +87,45 @@ function App() {
     api.getMascotasAdopcion().then(res => setAdopciones(res.data)).catch(() => { });
   };
 
+  const handleSuscripcion = () => {
+    // Si ya es colaborador, no mostramos el cartel
+    if (user?.esColaborador) return;
+
+    Swal.fire({
+      title: '¿Quieres colaborar?',
+      text: "Ayuda a mantener la aplicación funcionando",
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#f97316', // Color naranja de MascotAI
+      cancelButtonColor: '#94a3b8', // Color slate para el "No"
+      confirmButtonText: 'Sí, donar',
+      cancelButtonText: 'Ahora no',
+      reverseButtons: true,
+      customClass: {
+        popup: 'rounded-[2rem]', // Mantiene tu estilo redondeado
+        confirmButton: 'rounded-xl font-black uppercase text-xs px-6 py-3',
+        cancelButton: 'rounded-xl font-black uppercase text-xs px-6 py-3'
+      }
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        setLoadingSuscripcion(true);
+        try {
+          const response = await api.crearSuscripcion();
+          // Redirigimos al checkout de Mercado Pago
+          window.location.href = response.data.url;
+        } catch (error) {
+          Swal.fire({
+            title: 'Error',
+            text: 'No se pudo conectar con Mercado Pago. Intenta más tarde.',
+            icon: 'error',
+            confirmButtonColor: '#f97316'
+          });
+        } finally {
+          setLoadingSuscripcion(false);
+        }
+      }
+    });
+  };
   useEffect(() => {
     if (user) refreshData();
   }, [user]);
@@ -178,6 +221,23 @@ function App() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* ✅ BOTÓN DE COLABORACIÓN EN EL HEADER */}
+          <button
+            onClick={handleSuscripcion}
+            disabled={loadingSuscripcion}
+            className={`p-2 rounded-xl transition-all shadow-sm active:scale-90 ${user?.esColaborador
+                ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
+                : 'bg-gradient-to-tr from-orange-500 to-amber-400 text-white'
+              }`}
+          >
+            {loadingSuscripcion ? (
+              <Loader2 size={20} className="animate-spin" />
+            ) : user?.esColaborador ? (
+              <Sparkles size={20} />
+            ) : (
+              <Heart size={20} fill={loadingSuscripcion ? "none" : "currentColor"} />
+            )}
+          </button>
           <div className="relative">
             <button onClick={() => setShowAlerts(!showAlerts)} className={`p-2 rounded-xl transition-all ${alertas.length > 0 ? 'bg-orange-50 text-orange-600' : 'bg-slate-50 text-slate-400'}`}>
               <Bell size={20} />
