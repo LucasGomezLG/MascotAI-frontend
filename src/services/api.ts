@@ -116,4 +116,29 @@ export const api = {
   },
 
   logout: () => apiClient.post('/logout'),
+
+  // ==========================================
+  // 📍 COMUNIDAD: MASCOTAS PERDIDAS
+  // ==========================================
+
+  // Envía el FormData con las 2 fotos y coordenadas
+  reportarMascotaPerdida: (formData: FormData) => {
+    return apiClient.post('/perdidas/reportar', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+
+  // Trae la lista de reportes para el Inicio
+  getMascotasPerdidas: () => apiClient.get('/perdidas/todas'),
+
+  getMascotasAdopcion: () => apiClient.get('/adopciones/todas'),
+
+  publicarMascotaAdopcion: (formData: FormData) => {
+    return apiClient.post('/adopciones/publicar', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+
+  eliminarMascotaPerdida: (id: string) => apiClient.delete(`/perdidas/${id}`),
+  eliminarMascotaAdopcion: (id: string) => apiClient.delete(`/adopciones/${id}`),
 };
