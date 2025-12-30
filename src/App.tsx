@@ -88,44 +88,45 @@ function App() {
   };
 
   const handleSuscripcion = () => {
-    // Si ya es colaborador, no mostramos el cartel
     if (user?.esColaborador) return;
 
     Swal.fire({
       title: '¿Quieres colaborar?',
-      text: "Ayuda a mantener la aplicación funcionando",
-      icon: 'question',
+      text: "Ingresa el monto que desees donar para mantener MascotAI",
+      input: 'number', // ✅ Agregamos un input numérico
+      inputLabel: 'Monto en AR$',
+      inputValue: 2000, // Monto sugerido
       showCancelButton: true,
-      confirmButtonColor: '#f97316', // Color naranja de MascotAI
-      cancelButtonColor: '#94a3b8', // Color slate para el "No"
-      confirmButtonText: 'Sí, donar',
+      confirmButtonColor: '#f97316',
+      cancelButtonColor: '#94a3b8',
+      confirmButtonText: 'Ir a pagar',
       cancelButtonText: 'Ahora no',
       reverseButtons: true,
+      inputValidator: (value) => {
+        if (!value || parseInt(value) < 100) {
+          return 'El monto mínimo es $100'
+        }
+      },
       customClass: {
-        popup: 'rounded-[2rem]', // Mantiene tu estilo redondeado
-        confirmButton: 'rounded-xl font-black uppercase text-xs px-6 py-3',
-        cancelButton: 'rounded-xl font-black uppercase text-xs px-6 py-3'
+        popup: 'rounded-[2rem]',
       }
     }).then(async (result) => {
       if (result.isConfirmed) {
+        const montoElegido = result.value;
         setLoadingSuscripcion(true);
         try {
-          const response = await api.crearSuscripcion();
-          // Redirigimos al checkout de Mercado Pago
+          // ✅ Enviamos el monto al backend en la query
+          const response = await api.crearSuscripcion(montoElegido);
           window.location.href = response.data.url;
         } catch (error) {
-          Swal.fire({
-            title: 'Error',
-            text: 'No se pudo conectar con Mercado Pago. Intenta más tarde.',
-            icon: 'error',
-            confirmButtonColor: '#f97316'
-          });
+          Swal.fire('Error', 'No se pudo generar el link.', 'error');
         } finally {
           setLoadingSuscripcion(false);
         }
       }
     });
   };
+
   useEffect(() => {
     if (user) refreshData();
   }, [user]);
@@ -226,8 +227,8 @@ function App() {
             onClick={handleSuscripcion}
             disabled={loadingSuscripcion}
             className={`p-2 rounded-xl transition-all shadow-sm active:scale-90 ${user?.esColaborador
-                ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
-                : 'bg-gradient-to-tr from-orange-500 to-amber-400 text-white'
+              ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
+              : 'bg-gradient-to-tr from-orange-500 to-amber-400 text-white'
               }`}
           >
             {loadingSuscripcion ? (

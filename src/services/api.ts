@@ -119,7 +119,12 @@ export const api = {
 
   logout: () => apiClient.post('/logout'),
 
-  crearSuscripcion: () => apiClient.post('/usuarios/suscribirme'),
+  // En api.ts
+  // ✅ Cambiamos a GET y pasamos el monto como params
+  crearSuscripcion: (monto: number) =>
+    apiClient.get('/usuarios/suscribirme', {
+      params: { monto }
+    }),
 
   // ==========================================
   // 📍 COMUNIDAD: MASCOTAS PERDIDAS
