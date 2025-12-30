@@ -41,8 +41,8 @@ export const api = {
   analizarVet: (image: string, tipo: string, mascotaId: string) =>
     apiClient.post('/analizar-veterinario', { image, tipo, mascotaId }),
 
-  analizarTriaje: (image: string, tipo: string, mascotaId: string) =>
-    apiClient.post('/triaje/analizar', { image, tipo, mascotaId }),
+  analizarTriaje: (imagen: string, tipo: string, mascotaId: string) =>
+    apiClient.post('/triaje/analizar', { imagen, tipo, mascotaId }),
 
   analizarSalud: (image: string, mascotaId: string) =>
     apiClient.post('/analizar-salud', { image, mascotaId }),

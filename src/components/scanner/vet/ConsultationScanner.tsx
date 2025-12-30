@@ -16,7 +16,7 @@ const ConsultationScanner = ({ mascotas, onScanComplete }: any) => {
 
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
-  
+
   // 🛡️ Obtener fecha de hoy para validaciones
   const hoy = new Date().toISOString().split("T")[0];
 
@@ -107,6 +107,10 @@ const ConsultationScanner = ({ mascotas, onScanComplete }: any) => {
       const dataParaEnviar = {
         id: editData.consultaId,
         mascotaId: editData.mascotaId,
+
+        // 🛡️ AGREGÁ ESTA LÍNEA (El blindaje la exige):
+        tipo: "CONSULTA",
+
         veterinario: editData.doctor,
         clinica: editData.clinica,
         diagnostico: editData.diagnostico,

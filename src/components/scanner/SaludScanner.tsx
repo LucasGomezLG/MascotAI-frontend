@@ -52,19 +52,29 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
 
   const handleAnalizarSalud = async () => {
     if (!selectedPet) {
-      Swal.fire({ text: 'Seleccioná una mascota primero para el análisis.', icon: 'info' });
+      Swal.fire({
+        text: 'Seleccioná a qué mascota le pertenece este producto.',
+        icon: 'info',
+        confirmButtonColor: '#10b981'
+      });
       return;
     }
-    if (!selectedImage) return;
+
+    if (!selectedImage) {
+      Swal.fire({ text: 'Capturá o subí una foto de la etiqueta.', icon: 'warning' });
+      return;
+    }
 
     setLoading(true);
+    setEditData(null);
+
     try {
       const res = await api.analizarSalud(selectedImage, selectedPet);
 
       if (res.data.error === "PRODUCTO_NO_VALIDO") {
         Swal.fire({
-          title: 'Imagen no válida',
-          text: 'MascotAI no detectó un producto médico claro.',
+          title: 'Imagen no reconocida',
+          text: 'MascotAI no detectó un producto médico. Intentá con más luz.',
           icon: 'error',
           confirmButtonColor: '#10b981'
         });
@@ -74,62 +84,102 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
       if (res.data.error === "ESPECIE_INCORRECTA") {
         Swal.fire({
           title: '⚠️ ¡ALERTA DE SEGURIDAD!',
-          text: 'Este producto parece no ser para gatos. Verificá antes de aplicar.',
+          text: 'Este producto no parece ser apto para tu mascota. ¡Verificá antes de usar!',
           icon: 'warning',
           confirmButtonColor: '#ef4444'
         });
         return;
       }
 
+      // ✅ Mapeo de datos (Sin el cartel de "analizado con éxito")
       setEditData({
-        nombre: res.data.nombre || "",
+        nombre: res.data.nombre || "Producto desconocido",
         tipo: res.data.tipo || "MEDICAMENTO",
-        fechaAplicacion: res.data.fechaAplicacion || hoy,
-        proximaFecha: res.data.proximaFecha || "",
+
+        // 🛡️ Forzamos 'hoy' para la aplicación (ignoramos fechas viejas de la IA)
+        fechaAplicacion: hoy,
+
+        // 🛡️ El refuerzo queda vacío para que vos lo elijas o la IA sugiera
+        proximaFecha: (res.data.proximaFecha && res.data.proximaFecha > hoy)
+          ? res.data.proximaFecha
+          : "",
+
         precio: res.data.precio || 0,
-        dosis: res.data.notas || "",
+        dosis: res.data.notas || res.data.dosis || "Dosis no detectada",
         completado: true,
         mascotaId: selectedPet
+
       });
 
-    } catch (e) {
-      Toast.fire({ icon: 'error', title: 'Error al procesar el producto' });
+      // Se eliminó: Toast.fire({ icon: 'success', title: 'Producto analizado con éxito' });
+
+    } catch (e: any) {
+      console.error("Error en análisis de salud:", e);
+      const errorMsg = e.response?.data || 'Error al procesar el producto';
+
+      Swal.fire({
+        title: 'Error de Análisis',
+        text: typeof errorMsg === 'string' ? errorMsg : 'Revisá la conexión con el servidor.',
+        icon: 'error',
+        confirmButtonColor: '#10b981'
+      });
     } finally {
       setLoading(false);
     }
   };
 
   const handleGuardar = async () => {
-    // 🛡️ VALIDACIONES MANUALES (Reforzadas)
+    // 1. 🛡️ Validar Nombre
     if (!editData.nombre.trim()) {
       Swal.fire({ text: 'El nombre del producto es obligatorio.', icon: 'warning' });
       return;
     }
 
+    // 2. 🛡️ Validar Fecha de Aplicación (No puede ser futura)
     if (editData.fechaAplicacion > hoy) {
-      Swal.fire({ text: 'La fecha de aplicación no puede ser futura.', icon: 'error' });
-      return;
-    }
-
-    // 🛡️ NUEVO BLINDAJE: Fecha de refuerzo debe ser mayor a hoy
-    if (editData.proximaFecha && editData.proximaFecha <= hoy) {
       Swal.fire({
-        title: 'Fecha de refuerzo inválida',
-        text: 'La fecha del próximo refuerzo debe ser posterior al día de hoy.',
-        icon: 'warning',
-        confirmButtonColor: '#f27121' // Naranja para advertencia
+        text: 'La fecha de aplicación no puede ser futura.',
+        icon: 'error',
+        confirmButtonColor: '#10b981'
       });
       return;
     }
 
+    // 3. 🛡️ RECUPERADO: Validar Próximo Refuerzo (Debe ser mayor a hoy)
+    if (editData.proximaFecha && editData.proximaFecha <= hoy) {
+      Swal.fire({
+        title: 'Fecha de refuerzo inválida',
+        text: 'La fecha del próximo refuerzo debe ser posterior al día de hoy para poder avisarte.',
+        icon: 'warning',
+        confirmButtonColor: '#f27121'
+      });
+      return;
+    }
+
+    // 4. 🛡️ Validar Precio (Para el presupuesto con Abril)
     if (editData.precio < 0 || editData.precio > 999999) {
       Swal.fire({ text: 'Ingresá un costo válido (máx 6 cifras).', icon: 'warning' });
       return;
     }
 
+    setLoading(true);
     try {
-      setLoading(true);
-      await api.guardarEventoSalud(editData);
+      const dataParaEnviar = {
+        ...editData,
+        mascotaId: selectedPet,
+        tipo: editData.tipo || "MEDICAMENTO",
+        precio: editData.precio || 0,
+        completado: editData.completado,
+        notas: editData.dosis || "Sin notas",
+
+        // Blindaje de formato LocalDate (YYYY-MM-DD)
+        fechaAplicacion: editData.fechaAplicacion.split('T')[0],
+        proximaFecha: editData.proximaFecha
+          ? editData.proximaFecha.split('T')[0]
+          : null
+      };
+
+      await api.guardarEventoSalud(dataParaEnviar);
 
       Swal.fire({
         title: '¡Salud Registrada!',
@@ -143,7 +193,8 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
       setSelectedImage(null);
       if (onScanComplete) onScanComplete();
     } catch (e) {
-      Swal.fire({ title: 'Error', text: 'No se pudo guardar el registro.', icon: 'error' });
+      console.error("Error al guardar salud:", e);
+      Swal.fire({ title: 'Error', text: 'No se pudo guardar. Revisá los campos.', icon: 'error' });
     } finally {
       setLoading(false);
     }
@@ -256,23 +307,26 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
             </div>
 
             <div className="grid grid-cols-2 gap-3 text-center">
+              {/* 🛡️ INPUT CORREGIDO: FECHA APLICACIÓN */}
               <div className="bg-emerald-50/50 p-4 rounded-3xl border border-emerald-100">
                 <p className="text-[9px] font-black text-emerald-600 uppercase mb-2">Fecha Aplicación</p>
                 <input
                   type="date"
-                  max={hoy} // 🛡️ Evitar fechas futuras
+                  max={hoy} // 🛡️ No puede ser futura
                   className="w-full bg-transparent text-xs font-black text-slate-700 outline-none"
-                  value={editData.fechaAplicacion || ""}
+                  value={editData.fechaAplicacion || ""} // ✅ Ahora sí usa fechaAplicacion
                   onChange={(e) => setEditData({ ...editData, fechaAplicacion: e.target.value })}
                 />
               </div>
+
+              {/* 🛡️ INPUT CORREGIDO: PRÓXIMO REFUERZO */}
               <div className="bg-orange-50/50 p-4 rounded-3xl border border-orange-100">
                 <p className="text-[9px] font-black text-orange-600 uppercase mb-2">Próximo Refuerzo</p>
                 <input
                   type="date"
-                  min={hoy} // 🛡️ Bloquea visualmente días pasados y hoy
+                  min={hoy} // 🛡️ No puede ser pasada
                   className="w-full bg-transparent text-xs font-black text-slate-700 outline-none"
-                  value={editData.proximaFecha || ""}
+                  value={editData.proximaFecha || ""} // ✅ Muestra dd/mm/aaaa si está vacío
                   onChange={(e) => setEditData({ ...editData, proximaFecha: e.target.value })}
                 />
               </div>

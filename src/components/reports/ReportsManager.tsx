@@ -172,7 +172,7 @@ const ReportsManager = ({ onVerDetalle }: { onVerDetalle: (item: any, tipo: 'foo
           <PetBudget />
           <div className="mt-4 p-5 bg-blue-50 rounded-[2rem] border border-blue-100 flex items-center gap-4 text-blue-800">
             <BarChart3 size={20} className="text-blue-600" />
-            <p className="text-xs font-bold">Tus ahorros del mes están bajo control, Lucas.</p>
+            <p className="text-xs font-bold">Tus ahorros del mes están bajo control.</p>
           </div>
         </div>
       )}

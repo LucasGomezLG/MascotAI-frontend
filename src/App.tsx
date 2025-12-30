@@ -100,7 +100,7 @@ function App() {
       showCancelButton: true,
       confirmButtonColor: '#f97316',
       cancelButtonColor: '#94a3b8',
-      confirmButtonText: 'Ir a pagar',
+      confirmButtonText: 'Donar',
       cancelButtonText: 'Ahora no',
       reverseButtons: true,
       inputValidator: (value) => {

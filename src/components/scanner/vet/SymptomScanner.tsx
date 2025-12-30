@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'; // ✅ Importamos us
 import { Camera, Loader2, User, RefreshCw, Sparkles, X, Image as ImageIcon, Activity } from 'lucide-react';
 import { api } from '../../../services/api';
 import { Toast } from '../../../utils/alerts';
-import MedicalReport from './MedicalReport'; 
+import MedicalReport from './MedicalReport';
 import Swal from 'sweetalert2';
 
 // ✅ 1. Agregamos initialData a las props
@@ -30,7 +30,7 @@ const SymptomScanner = ({ mascotas, initialData, onScanComplete }: any) => {
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setResult(null); 
+    setResult(null);
     const reader = new FileReader();
     reader.onloadend = () => {
       setSelectedImage(reader.result as string);
@@ -44,7 +44,10 @@ const SymptomScanner = ({ mascotas, initialData, onScanComplete }: any) => {
     setResult(null);
     setLoading(true);
     try {
-      const res = await api.analizarTriaje(selectedImage, activeTab, selectedPet || "");
+      // 🛡️ Si no hay mascota elegida, mandamos "GENERIC" en lugar de un string vacío
+      const petId = selectedPet || "GENERIC";
+
+      const res = await api.analizarTriaje(selectedImage, activeTab, petId);
 
       if (res.data.error === "NO_DETECTADO") {
         Swal.fire({

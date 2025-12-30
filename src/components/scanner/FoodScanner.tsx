@@ -231,8 +231,9 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
 
     try {
       await api.activarStock(result.alimento.id, {
-        precio: precioInput,
-        peso: pesoBolsaInput,
+        // 🛡️ Cambiamos los nombres para que coincidan con el Backend
+        precioComprado: precioInput,
+        pesoBolsaKg: pesoBolsaInput,
         costoDiario: calcularCostoDiario()
       });
       setResult({
