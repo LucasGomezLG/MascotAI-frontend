@@ -3,7 +3,8 @@ import {
   Camera, Loader2, Utensils, User, Wallet, Search,
   CheckCircle, MessageCircle, Sparkles, ThumbsUp, ThumbsDown,
   ShoppingBag, X, Package, AlertCircle, RefreshCw,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Info
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { Toast } from '../../utils/alerts';
@@ -502,6 +503,43 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
           </div>
         </div>
       )}
+      {/* CARTEL INFORMATIVO AL FINAL */}
+      <div className="mt-10 bg-amber-50/80 border border-amber-200 p-6 rounded-[2.5rem] shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-700">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="bg-amber-100 p-2 rounded-xl text-amber-600">
+            <Info size={20} />
+          </div>
+          <h4 className="font-black text-amber-900 uppercase text-xs tracking-widest">
+            ¿Cómo funciona esta sección?
+          </h4>
+        </div>
+
+        <div className="space-y-3 text-left">
+          <div className="flex gap-3">
+            <div className="mt-1 bg-amber-200/50 h-1.5 w-1.5 rounded-full shrink-0" />
+            <p className="text-[11px] font-bold text-amber-800/90 leading-relaxed">
+              <span className="text-amber-900 font-black uppercase text-[9px]">Análisis Inteligente:</span>
+              Escaneá la tabla nutricional para conocer la calidad del alimento (Gama) y un veredicto sobre sus ingredientes.
+            </p>
+          </div>
+
+          <div className="flex gap-3">
+            <div className="mt-1 bg-amber-200/50 h-1.5 w-1.5 rounded-full shrink-0" />
+            <p className="text-[11px] font-bold text-amber-800/90 leading-relaxed">
+              <span className="text-amber-900 font-black uppercase text-[9px]">Raciones Exactas:</span>
+              Calculamos automáticamente cuántos gramos debe comer tu mascota según su edad, peso y estado de salud.
+            </p>
+          </div>
+
+          <div className="flex gap-3">
+            <div className="mt-1 bg-amber-200/50 h-1.5 w-1.5 rounded-full shrink-0" />
+            <p className="text-[11px] font-bold text-amber-800/90 leading-relaxed">
+              <span className="text-amber-900 font-black uppercase text-[9px]">Pet Finance:</span>
+              Registrá el costo de la bolsa para saber cuánto gastás por día y compará precios online para ahorrar.
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

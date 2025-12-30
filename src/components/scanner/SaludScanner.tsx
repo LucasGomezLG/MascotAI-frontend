@@ -1,7 +1,8 @@
 import React, { useState, useRef } from 'react';
 import {
   Loader2, User, Syringe, ShieldPlus, ClipboardPlus,
-  X, Wallet, RefreshCw, Sparkles, Image as ImageIcon
+  X, Wallet, RefreshCw, Sparkles, Image as ImageIcon,
+  Info
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { Toast } from '../../utils/alerts';
@@ -317,6 +318,43 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
           </div>
         </div>
       )}
+      {/* CARTEL INFORMATIVO AL FINAL DE SALUD */}
+      <div className="mt-10 bg-amber-50/80 border border-amber-200 p-6 rounded-[2.5rem] shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-700">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="bg-amber-100 p-2 rounded-xl text-amber-600">
+            <Info size={20} />
+          </div>
+          <h4 className="font-black text-amber-900 uppercase text-xs tracking-widest">
+            ¿Cómo funciona esta sección?
+          </h4>
+        </div>
+
+        <div className="space-y-3 text-left">
+          <div className="flex gap-3">
+            <div className="mt-1 bg-amber-200/50 h-1.5 w-1.5 rounded-full shrink-0" />
+            <p className="text-[11px] font-bold text-amber-800/90 leading-relaxed">
+              <span className="text-amber-900 font-black uppercase text-[9px]">Escaneado de Salud:</span>
+              Capturá la caja de un medicamento o la libreta de vacunación para registrar automáticamente el nombre del producto y la dosis aplicada.
+            </p>
+          </div>
+
+          <div className="flex gap-3">
+            <div className="mt-1 bg-amber-200/50 h-1.5 w-1.5 rounded-full shrink-0" />
+            <p className="text-[11px] font-bold text-amber-800/90 leading-relaxed">
+              <span className="text-amber-900 font-black uppercase text-[9px]">Escudos de Seguridad:</span>
+              Nuestra IA verifica si el producto es apto para gatos o perros, lanzando una alerta crítica si detecta un medicamento peligroso para la especie.
+            </p>
+          </div>
+
+          <div className="flex gap-3">
+            <div className="mt-1 bg-amber-200/50 h-1.5 w-1.5 rounded-full shrink-0" />
+            <p className="text-[11px] font-bold text-amber-800/90 leading-relaxed">
+              <span className="text-amber-900 font-black uppercase text-[9px]">Control de Refuerzos:</span>
+              Registramos la fecha de aplicación y calculamos el próximo vencimiento para enviarte recordatorios y mantener la cartilla siempre al día.
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
