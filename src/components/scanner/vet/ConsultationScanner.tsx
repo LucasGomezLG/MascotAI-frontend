@@ -107,16 +107,23 @@ const ConsultationScanner = ({ mascotas, onScanComplete }: any) => {
       const dataParaEnviar = {
         id: editData.consultaId,
         mascotaId: editData.mascotaId,
-
-        // 🛡️ AGREGÁ ESTA LÍNEA (El blindaje la exige):
         tipo: "CONSULTA",
-
         veterinario: editData.doctor,
         clinica: editData.clinica,
         diagnostico: editData.diagnostico,
-        nombre: editData.diagnostico,
-        precio: editData.precio,
-        fecha: editData.fecha.includes('T') ? editData.fecha : `${editData.fecha}T00:00:00`
+
+        // 🛡️ Mantenemos el nombre truncado para que no salte el error de longitud
+        nombre: editData.diagnostico.length > 40
+          ? editData.diagnostico.substring(0, 37) + "..."
+          : editData.diagnostico,
+
+        precio: editData.precio || 0,
+
+        // 🛡️ BLINDAJE FINAL DE FECHA: Agregamos la hora para el LocalDateTime
+        // Si la fecha ya tiene 'T', la dejamos. Si no, le sumamos T00:00:00
+        fecha: editData.fecha.includes('T')
+          ? editData.fecha
+          : `${editData.fecha}T00:00:00`
       };
 
       await api.guardarConsultaVet(dataParaEnviar);
