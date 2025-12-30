@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Camera, Loader2, User, RefreshCw, Sparkles, X,
   Image as ImageIcon, FileText, ClipboardList,
@@ -8,7 +8,7 @@ import { api } from '../../../services/api';
 import { Toast } from '../../../utils/alerts';
 import Swal from 'sweetalert2';
 
-const ConsultationScanner = ({ mascotas, onScanComplete }: any) => {
+const ConsultationScanner = ({ mascotas, onScanComplete, initialData }: any) => {
   const [selectedPet, setSelectedPet] = useState("");
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -145,7 +145,22 @@ const ConsultationScanner = ({ mascotas, onScanComplete }: any) => {
       setLoading(false);
     }
   };
-
+  
+  useEffect(() => {
+    if (initialData && (initialData.esDocumentoMedico || initialData.diagnostico)) {
+      setEditData({
+        doctor: initialData.veterinario || "",
+        clinica: initialData.clinica || "",
+        fecha: initialData.fecha ? initialData.fecha.split('T')[0] : new Date().toISOString().split("T")[0],
+        diagnostico: initialData.diagnostico || "",
+        precio: initialData.precio || 0,
+        mascotaId: initialData.mascotaId || "",
+        consultaId: initialData.id
+      });
+      if (initialData.mascotaId) setSelectedPet(initialData.mascotaId);
+    }
+  }, [initialData]);
+  
   return (
     <div className="animate-in fade-in duration-500 w-full">
       {!editData ? (

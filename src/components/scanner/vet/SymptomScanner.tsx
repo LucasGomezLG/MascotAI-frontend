@@ -16,11 +16,10 @@ const SymptomScanner = ({ mascotas, initialData, onScanComplete }: any) => {
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
 
-  // ✅ 2. EFECTO DE CARGA AUTOMÁTICA DESDE HISTORIAL
   useEffect(() => {
-    if (initialData) {
-      console.log("Cargando datos desde historial en Vete:", initialData);
-      setResult(initialData); // Esto hace que se muestre el MedicalReport directamente
+    // 🛡️ Solo cargamos el resultado si NO es un documento médico
+    if (initialData && !initialData.esDocumentoMedico) {
+      setResult(initialData);
       if (initialData.mascotaId) {
         setSelectedPet(initialData.mascotaId);
       }

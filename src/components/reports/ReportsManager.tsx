@@ -2,7 +2,8 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Utensils, Stethoscope, Clock, Calendar, Trash2, Swords,
   CheckSquare, Square, X, Sparkles, Scale, Package, AlertCircle,
-  ShieldPlus, Wallet, BarChart3, Activity, Receipt, User, ChevronRight
+  ShieldPlus, Wallet, BarChart3, Activity, Receipt, User, ChevronRight,
+  MapPin
 } from 'lucide-react';
 import { api } from '../../services/api';
 import Dashboard from '../../Dashboard';
@@ -361,42 +362,61 @@ const ReportsManager = ({ onVerDetalle }: { onVerDetalle: (item: any, tipo: 'foo
               historialVet
                 .filter(v => {
                   const tipo = (v.tipo || "").toUpperCase();
-                  // ✅ CORRECCIÓN: Si no tiene tipo pero tiene diagnóstico, es un documento
-                  const esDocumento = tipo === 'RECETA' || tipo === 'CONSULTA' || tipo === 'RECETA_IA' || tipo === 'GASTO' || v.diagnostico;
-                  return esDocumento;
+                  return tipo === 'RECETA' || tipo === 'CONSULTA' || tipo === 'RECETA_IA' || tipo === 'GASTO' || v.diagnostico;
                 })
-                .map(v => (
-                  <div key={v.id}
-                    className="bg-white p-6 rounded-[2.5rem] border-l-8 border-l-slate-900 shadow-sm border border-slate-100 text-left transition-all active:scale-[0.98] cursor-pointer"
-                    onClick={() => {
-                      // Sincronizamos con los campos de la DB
-                      onVerDetalle({
-                        ...v,
-                        analisis_detalle: v.diagnostico || v.analisis || v.notas || "Sin detalles",
-                        nivel_urgencia: "BAJA",
-                        resumen_final: v.nombre || "Consulta Médica"
-                      }, 'vet');
-                    }}>
-                    <div className="flex justify-between items-start mb-3">
-                      <div className="flex items-center gap-2">
-                        {/* Si el tipo es null, mostramos 'CONSULTA' por defecto */}
-                        <span className="bg-slate-900 text-white text-[8px] font-black px-2 py-1 rounded-md uppercase">{v.tipo || "CONSULTA"}</span>
-                        {v.precio > 0 && <span className="bg-emerald-100 text-emerald-700 text-[9px] font-black px-2 py-1 rounded-md tracking-tighter">${v.precio.toLocaleString()}</span>}
+                .map(v => {
+                  // 🛡️ Buscamos la mascota para mostrar su nombre
+                  const pet = mascotas.find(m => m.id === v.mascotaId);
+
+                  return (
+                    <div key={v.id}
+                      className="bg-white p-6 rounded-[2.5rem] border-l-8 border-l-slate-900 shadow-sm border border-slate-100 text-left transition-all active:scale-[0.98] cursor-pointer"
+                      onClick={() => {
+                        onVerDetalle({
+                          ...v,
+                          esDocumentoMedico: true,
+                          analisis_detalle: v.diagnostico || v.analisis || v.notas || "Sin detalles",
+                          nivel_urgencia: "BAJA",
+                          resumen_final: v.nombre || "Consulta Médica"
+                        }, 'vet');
+                      }}>
+
+                      <div className="flex justify-between items-start mb-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="bg-slate-900 text-white text-[8px] font-black px-2 py-1 rounded-md uppercase">{v.tipo || "CONSULTA"}</span>
+                          {v.precio > 0 && <span className="bg-emerald-100 text-emerald-700 text-[9px] font-black px-2 py-1 rounded-md tracking-tighter">${v.precio.toLocaleString()}</span>}
+
+                          {/* ✅ NOMBRE DE LA MASCOTA */}
+                          {pet && (
+                            <span className="flex items-center gap-1 bg-blue-50 text-blue-600 text-[8px] font-black px-2 py-1 rounded-md uppercase border border-blue-100">
+                              <User size={10} /> {pet.nombre}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-[9px] text-slate-400 font-bold uppercase">{new Date(v.fecha).toLocaleDateString()}</span>
+                          <button onClick={(e) => { e.stopPropagation(); api.borrarConsultaVet(v.id).then(cargar); }} className="text-slate-200 hover:text-red-500">
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-[9px] text-slate-400 font-bold uppercase">{new Date(v.fecha).toLocaleDateString()}</span>
-                        <button onClick={(e) => { e.stopPropagation(); api.borrarConsultaVet(v.id).then(cargar); }} className="text-slate-200 hover:text-red-500">
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
+
+                      <h4 className="font-black text-slate-800 text-sm mb-1 uppercase tracking-tight">{v.nombre || v.diagnostico}</h4>
+
+                      {/* ✅ CLÍNICA VETERINARIA */}
+                      {v.clinica && (
+                        <div className="flex items-center gap-1 mb-2">
+                          <MapPin size={10} className="text-slate-400" />
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{v.clinica}</p>
+                        </div>
+                      )}
+
+                      <p className="text-xs text-slate-500 leading-relaxed italic line-clamp-2">
+                        "{(v.diagnostico || v.analisis || v.notas || "Ver detalles")}"
+                      </p>
                     </div>
-                    {/* Usamos 'nombre' o 'diagnostico' de la DB */}
-                    <h4 className="font-black text-slate-800 text-sm mb-1 uppercase tracking-tight">{v.nombre || v.diagnostico}</h4>
-                    <p className="text-xs text-slate-500 leading-relaxed italic line-clamp-2">
-                      "{(v.diagnostico || v.analisis || v.notas || "Ver detalles")}"
-                    </p>
-                  </div>
-                ))
+                  );
+                })
             )}
           </div>
         </div>

@@ -14,11 +14,15 @@ const VetScanner = ({ mascotas, onScanComplete, initialData, onReset }: VetScann
   const [activeTab, setActiveTab] = useState<'triaje' | 'consultas'>('triaje');
 
   useEffect(() => {
-    if (initialData && initialData.precio !== undefined) {
-      setActiveTab('consultas');
+    if (initialData) {
+      // 🛡️ Priorizamos la bandera que pusimos en ReportsManager
+      if (initialData.esDocumentoMedico === true || initialData.diagnostico) {
+        setActiveTab('consultas');
+      } else {
+        setActiveTab('triaje');
+      }
     }
   }, [initialData]);
-
   return (
     <div className="space-y-6 pb-20 w-full animate-in fade-in duration-500">
       {/* 🛡️ Cartel de Advertencia Amigable */}
@@ -57,9 +61,19 @@ const VetScanner = ({ mascotas, onScanComplete, initialData, onReset }: VetScann
 
       <div className="w-full">
         {activeTab === 'triaje' ? (
-          <SymptomScanner mascotas={mascotas} onScanComplete={onScanComplete} initialData={initialData} onReset={onReset} />
+          <SymptomScanner
+            mascotas={mascotas}
+            onScanComplete={onScanComplete}
+            initialData={initialData}
+            onReset={onReset}
+          />
         ) : (
-          <ConsultationScanner mascotas={mascotas} onScanComplete={onScanComplete} />
+          <ConsultationScanner
+            mascotas={mascotas}
+            onScanComplete={onScanComplete}
+            initialData={initialData} // ✅ AHORA SÍ: Le pasamos la receta para que la muestre
+            onReset={onReset}
+          />
         )}
       </div>
       {/* CARTEL INFORMATIVO AL FINAL DE VETE */}
