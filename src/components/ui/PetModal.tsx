@@ -1,25 +1,38 @@
 import React, { useState, useRef } from 'react';
 import { X, Camera, Image as ImageIcon } from 'lucide-react';
 import { api } from '../../services/api';
+import Swal from 'sweetalert2'; // ✅ Importamos SweetAlert
 
 const PetModal = ({ onClose }: { onClose: () => void }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  
   const [nuevaMascota, setNuevaMascota] = useState({
     nombre: '',
     especie: 'Gato',
     fechaNacimiento: '',
     peso: '',
-    condicion: '', // ✅ Inicializamos vacío para que el placeholder sea visible
-    foto: '' 
+    condicion: '',
+    foto: ''
   });
 
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
+  const hoy = new Date().toISOString().split("T")[0];
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      // ✅ Alerta linda para el tamaño de foto
+      Swal.fire({
+        title: '¡Foto muy pesada!',
+        text: 'El límite es de 10MB para cuidar el almacenamiento.',
+        icon: 'warning',
+        confirmButtonColor: '#ea580c', // Color orange-600 de tu tema
+      });
+      return;
+    }
+
     setSelectedFile(file);
     const reader = new FileReader();
     reader.onloadend = () => {
@@ -29,30 +42,67 @@ const PetModal = ({ onClose }: { onClose: () => void }) => {
   };
 
   const guardar = async () => {
-    if (!nuevaMascota.nombre || !nuevaMascota.fechaNacimiento) {
-      alert("Faltan datos obligatorios");
+    // 🛡️ Validaciones con SweetAlert
+    if (!nuevaMascota.nombre.trim() || !nuevaMascota.fechaNacimiento) {
+      Swal.fire({
+        title: 'Faltan datos',
+        text: 'El nombre y la fecha son obligatorios.',
+        icon: 'info',
+        confirmButtonColor: '#ea580c',
+      });
       return;
     }
 
-    // ✅ Lógica de Fallback: Si no escribió nada, enviamos "Sano"
-    const condicionFinal = nuevaMascota.condicion.trim() || "Sano";
-
-    const formData = new FormData();
-    if (selectedFile) {
-      formData.append('file', selectedFile);
+    if (nuevaMascota.fechaNacimiento > hoy) {
+      Swal.fire({
+        title: 'Fecha inválida',
+        text: 'La fecha de nacimiento no puede ser futura.',
+        icon: 'error',
+        confirmButtonColor: '#ea580c',
+      });
+      return;
     }
 
+    const pesoNum = parseFloat(nuevaMascota.peso);
+    if (nuevaMascota.peso && (pesoNum < 0.1 || pesoNum > 100)) {
+      Swal.fire({
+        title: 'Peso fuera de rango',
+        text: 'Por favor, ingresá un peso entre 0.1 y 100 kg.',
+        icon: 'warning',
+        confirmButtonColor: '#ea580c',
+      });
+      return;
+    }
+
+    const condicionFinal = nuevaMascota.condicion.trim() || "Sano";
+    const formData = new FormData();
+    if (selectedFile) formData.append('file', selectedFile);
     formData.append('nombre', nuevaMascota.nombre);
     formData.append('especie', nuevaMascota.especie);
     formData.append('fechaNacimiento', nuevaMascota.fechaNacimiento);
     formData.append('peso', nuevaMascota.peso);
-    formData.append('condicion', condicionFinal); // ✅ Enviamos el valor procesado
+    formData.append('condicion', condicionFinal);
 
     try {
       await api.guardarPerfilConFoto(formData);
+
+      // ✅ Alerta de éxito total
+      Swal.fire({
+        title: '¡Mascota registrada!',
+        text: `${nuevaMascota.nombre} ya es parte de MascotAI`,
+        icon: 'success',
+        timer: 2000,
+        showConfirmButton: false,
+      });
+
       onClose();
     } catch (e) {
-      alert("Error al subir la imagen y registrar la mascota");
+      Swal.fire({
+        title: 'Error de conexión',
+        text: 'No pudimos guardar los datos. Intentá de nuevo más tarde.',
+        icon: 'error',
+        confirmButtonColor: '#ea580c',
+      });
     }
   };
 
@@ -84,17 +134,17 @@ const PetModal = ({ onClose }: { onClose: () => void }) => {
           </div>
 
           <div className="space-y-4">
-            {/* NOMBRE */}
             <div className="space-y-1">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-tighter ml-2">Nombre</label>
               <input
                 placeholder="Ej: Helena"
+                maxLength={20}
                 className="w-full p-4 bg-slate-50 rounded-xl font-bold border-2 border-transparent focus:border-orange-500 outline-none transition-all"
+                value={nuevaMascota.nombre}
                 onChange={e => setNuevaMascota({ ...nuevaMascota, nombre: e.target.value })}
               />
             </div>
 
-            {/* ESPECIE */}
             <div className="space-y-1">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-tighter ml-2">Especie</label>
               <select
@@ -107,12 +157,12 @@ const PetModal = ({ onClose }: { onClose: () => void }) => {
               </select>
             </div>
 
-            {/* FECHA Y PESO */}
             <div className="flex gap-2">
               <div className="w-1/2 space-y-1">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-tighter ml-2">Nacimiento</label>
                 <input
                   type="date"
+                  max={hoy}
                   className="w-full p-4 bg-slate-50 rounded-xl font-bold border-2 border-transparent focus:border-orange-500 outline-none text-xs"
                   onChange={e => setNuevaMascota({ ...nuevaMascota, fechaNacimiento: e.target.value })}
                 />
@@ -122,19 +172,22 @@ const PetModal = ({ onClose }: { onClose: () => void }) => {
                 <input
                   type="number"
                   step="0.1"
+                  min="0.1"
+                  max="100"
                   placeholder="4.5"
                   className="w-full p-4 bg-slate-50 rounded-xl font-bold border-2 border-transparent focus:border-orange-500 outline-none"
+                  value={nuevaMascota.peso}
                   onChange={e => setNuevaMascota({ ...nuevaMascota, peso: e.target.value })}
                 />
               </div>
             </div>
 
-            {/* ✅ ESTADO DE SALUD (AHORA ES UN INPUT DE TEXTO) */}
             <div className="space-y-1">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-tighter ml-2">Estado de Salud</label>
               <input
                 type="text"
-                placeholder="Sano (o ej: Alergias, Sobrepeso...)"
+                maxLength={20}
+                placeholder="Ej: Sano, Alergias..."
                 className="w-full p-4 bg-slate-50 rounded-xl font-bold border-2 border-transparent focus:border-orange-500 outline-none transition-all text-sm"
                 value={nuevaMascota.condicion}
                 onChange={e => setNuevaMascota({ ...nuevaMascota, condicion: e.target.value })}

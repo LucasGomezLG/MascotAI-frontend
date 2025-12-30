@@ -52,7 +52,7 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
       // ✅ NORMALIZACIÓN CLAVE: Si viene del historial, "envolvemos" el objeto 
       // para que el resto del código (que busca result.alimento) no rompa.
       const normalized = initialData.alimento ? initialData : { alimento: initialData, ...initialData };
-      
+
       setResult(normalized);
       setPorcion(normalized.alimento?.porcionRecomendada || null);
       setPrecioInput(normalized.alimento?.precioComprado?.toString() || "");
@@ -68,6 +68,18 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // 🛡️ BLINDAJE: Tamaño de foto (10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      Swal.fire({
+        title: 'Foto muy pesada',
+        text: 'El límite es 10MB para mantener el escaneo rápido.',
+        icon: 'warning',
+        confirmButtonColor: '#f27121',
+      });
+      return;
+    }
+
     setResult(null);
     setPorcion(null);
     setPrecioInput("");
@@ -127,12 +139,36 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
   };
 
   const sincronizarFinanzas = async () => {
-    if (!result?.alimento?.id) return;
+    if (!result?.alimento?.id || !precioInput || !pesoBolsaInput) return;
+
+    const p = parseFloat(precioInput);
+    const w = parseFloat(pesoBolsaInput);
+
+    // 🛡️ BLINDAJE: Evita que el precio sea menor al peso (error de tipeo común)
+    if (p < w) {
+      Swal.fire({
+        title: '¿Valores invertidos?',
+        text: `Ingresaste un precio ($${p}) menor al peso (${w}kg). ¿Estás seguro de que no los trocaste?`,
+        icon: 'question',
+        confirmButtonColor: '#f27121',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, es correcto',
+        cancelButtonText: 'Dejame corregir'
+      }).then((res) => {
+        if (res.isConfirmed) enviarFinanzas(p, w);
+      });
+      return;
+    }
+
+    enviarFinanzas(p, w);
+  };
+
+  const enviarFinanzas = async (p: number, w: number) => {
     try {
       await api.guardarFinanzas({
         id: result.alimento.id,
-        precio: precioInput,
-        peso: pesoBolsaInput,
+        precio: p.toString(),
+        peso: w.toString(),
         costoDiario: calcularCostoDiario(),
         busquedaIA: busquedaResult,
         porcionRecomendada: porcion
@@ -140,8 +176,58 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
     } catch (e) { console.error(e); }
   };
 
+  // 🛡️ FUNCIÓN DE VALIDACIÓN COMPARTIDA
+  const validarDatosFinancieros = () => {
+    const p = parseFloat(precioInput);
+    const w = parseFloat(pesoBolsaInput);
+
+    if (!p || !w || p <= 0 || w <= 0) {
+      Swal.fire({
+        title: 'Datos incompletos',
+        text: 'Ingresá un precio y un peso válidos antes de continuar.',
+        icon: 'warning',
+        confirmButtonColor: '#f27121'
+      });
+      return false;
+    }
+
+    // 🛡️ BLINDAJE: Si el precio es menor al peso (ej: $15 < 15kg)
+    if (p < w) {
+      Swal.fire({
+        title: '¿Valores invertidos?',
+        text: `El precio ($${p}) es menor al peso (${w}kg). ¿Estás seguro de que están bien?`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#f27121',
+        confirmButtonText: 'Sí, es correcto',
+        cancelButtonText: 'Corregir'
+      }).then((result) => {
+        if (result.isConfirmed) return true;
+      });
+      return false; // Frena la ejecución hasta que confirme o corrija
+    }
+    return true;
+  };
+
   const handleActivarBolsa = async () => {
     if (!result?.alimento?.id) return;
+
+    const p = parseFloat(precioInput);
+    const w = parseFloat(pesoBolsaInput);
+
+    // Validamos antes de activar
+    if (p < w) {
+      const confirm = await Swal.fire({
+        title: 'Revisá los datos',
+        text: `¿El precio es $${p} por una bolsa de ${w}kg? Parece estar al revés.`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Activar igual',
+        cancelButtonText: 'Cancelar'
+      });
+      if (!confirm.isConfirmed) return;
+    }
+
     try {
       await api.activarStock(result.alimento.id, {
         precio: precioInput,
@@ -279,7 +365,7 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
             <>
               <div className="mb-6">
                 <label className="text-[10px] font-black text-slate-400 uppercase mb-1 block tracking-tighter">Marca Detectada</label>
-                <input className="text-3xl font-black bg-transparent border-b-2 outline-none w-full border-slate-100 focus:border-orange-500" value={result.alimento?.marca || ""} onChange={(e) => setResult({ ...result, alimento: {...result.alimento, marca: e.target.value} })} />
+                <input className="text-3xl font-black bg-transparent border-b-2 outline-none w-full border-slate-100 focus:border-orange-500" value={result.alimento?.marca || ""} onChange={(e) => setResult({ ...result, alimento: { ...result.alimento, marca: e.target.value } })} />
               </div>
 
               <div className="space-y-4 mb-8">
@@ -310,8 +396,29 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
                 <div className="bg-blue-50 p-6 rounded-3xl border border-blue-100 space-y-4">
                   <div className="flex items-center gap-2 text-blue-900 font-black text-xs uppercase tracking-widest"><Wallet size={16} /> Pet Finance</div>
                   <div className="flex gap-2">
-                    <input type="number" placeholder="Precio ($)" className="w-1/2 p-3 rounded-xl border border-blue-200 font-bold" value={precioInput} onChange={e => setPrecioInput(e.target.value)} onBlur={sincronizarFinanzas} />
-                    <input type="number" placeholder="Bolsa (kg)" className="w-1/2 p-3 rounded-xl border border-blue-200 font-bold" value={pesoBolsaInput} onChange={e => setPesoBolsaInput(e.target.value)} onBlur={sincronizarFinanzas} />
+                    {/* PRECIO: Máximo 6 caracteres (ej: 999.999) */}
+                    <input
+                      type="number"
+                      placeholder="Precio ($)"
+                      className="w-1/2 p-3 rounded-xl border border-blue-200 font-bold"
+                      value={precioInput}
+                      onChange={e => {
+                        if (e.target.value.length <= 6) setPrecioInput(e.target.value);
+                      }}
+                      onBlur={sincronizarFinanzas}
+                    />
+
+                    {/* PESO: Máximo 6 caracteres (ej: 100.00) */}
+                    <input
+                      type="number"
+                      placeholder="Bolsa (kg)"
+                      className="w-1/2 p-3 rounded-xl border border-blue-200 font-bold"
+                      value={pesoBolsaInput}
+                      onChange={e => {
+                        if (e.target.value.length <= 6) setPesoBolsaInput(e.target.value);
+                      }}
+                      onBlur={sincronizarFinanzas}
+                    />
                   </div>
                   {calcularCostoDiario() && (
                     <div className="bg-white p-3 rounded-xl border-2 border-blue-100 text-center">
@@ -347,7 +454,7 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
                   ))}
                 </div>
               </div>
-              
+
               {/* ... El resto de Opiniones se mantiene igual ... */}
               <div className="space-y-4 mb-8">
                 <div className="flex items-center justify-between">
