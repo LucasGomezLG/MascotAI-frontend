@@ -25,10 +25,10 @@ const SubscriptionCard = ({ user }: { user: any }) => {
   const handleSuscripcion = async () => {
     setLoading(true);
     try {
-      // 🛡️ CORRECCIÓN: Pasamos el monto de 2000 que definiste en el botón
+      // ✅ Agregamos el monto (2000) exigido por la definición de tu API
       const response = await api.crearSuscripcion(2000);
 
-      // ✅ Redirigimos al init_point de Mercado Pago
+      // Redirigimos a la URL de Mercado Pago
       window.location.href = response.data.url;
     } catch (error) {
       alert("No se pudo generar el link de pago. Reintentá en unos minutos.");
