@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Camera, Dog, LayoutDashboard, Stethoscope, ShieldPlus,
   Bell, User as UserIcon, Settings, PawPrint, Home, Heart, MapPin, PlusCircle, Plus, Users,
-  Loader2,
+  Loader2, X,
   Sparkles
 } from 'lucide-react';
 import { api } from './services/api';
@@ -35,6 +35,7 @@ function App() {
   const [perdidos, setPerdidos] = useState<any[]>([]);
   const [adopciones, setAdopciones] = useState<any[]>([]);
   const [loadingSuscripcion, setLoadingSuscripcion] = useState(false);
+  const [zoomedPhoto, setZoomedPhoto] = useState<string | null>(null); // ✅ Nuevo estado para el zoom
 
   // Estados de Modales
   const [showPetModal, setShowPetModal] = useState(false);
@@ -260,7 +261,6 @@ function App() {
       <main className="max-w-md mx-auto p-6">
         {activeTab === 'home' && (
           <div className="space-y-10 animate-in fade-in duration-500">
-
             {/* 1. MIS MASCOTAS */}
             <section className="space-y-4">
               <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Mis Mascotas</h2>
@@ -268,7 +268,11 @@ function App() {
                 <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
                   {mascotas.map(pet => (
                     <div key={pet.id} className="flex flex-col items-center gap-2 min-w-[80px]">
-                      <div className="w-20 h-20 rounded-[2rem] border-4 border-white shadow-md overflow-hidden bg-orange-100 flex items-center justify-center text-orange-600">
+                      {/* ✅ Foto con Zoom al hacer clic */}
+                      <div
+                        onClick={() => pet.foto && setZoomedPhoto(pet.foto)}
+                        className="w-20 h-20 rounded-[2rem] border-4 border-white shadow-md overflow-hidden bg-orange-100 flex items-center justify-center text-orange-600 cursor-zoom-in active:scale-95 transition-transform"
+                      >
                         {pet.foto ? (
                           <img src={pet.foto} alt={pet.nombre} className="w-full h-full object-cover" />
                         ) : (
@@ -403,6 +407,23 @@ function App() {
       {showPetModal && <PetModal onClose={() => { setShowPetModal(false); refreshData(); }} />}
       {showLostPetModal && <LostPetModal onClose={() => { setShowLostPetModal(false); refreshData(); }} />}
       {showAdoptionModal && <AdoptionModal onClose={() => { setShowAdoptionModal(false); refreshData(); }} />}
+      {zoomedPhoto && (
+        <div
+          className="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300 cursor-zoom-out"
+          onClick={() => setZoomedPhoto(null)}
+        >
+          <button className="absolute top-6 right-6 text-white/70 hover:text-white p-2 bg-white/10 rounded-full transition-colors">
+            <X size={24} />
+          </button>
+
+          <img
+            src={zoomedPhoto}
+            className="max-w-full max-h-[85vh] rounded-[2.5rem] shadow-2xl animate-in zoom-in-95 duration-500 object-contain border-4 border-white/10"
+            alt="Zoom Mascota"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
       <LogoutModal isOpen={showLogoutModal} onClose={() => setShowLogoutModal(false)} onConfirm={logout} />
 
       <DeleteConfirmModal
