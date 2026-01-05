@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Camera, Dog, LayoutDashboard, Stethoscope, ShieldPlus,
-  Bell, User as UserIcon, Settings, PawPrint, Home, Heart, MapPin, PlusCircle, Plus, Users,
+  Bell, User as UserIcon, PawPrint, Home, Heart, MapPin, PlusCircle, Plus,
   Loader2, X,
   Sparkles
 } from 'lucide-react';
@@ -151,8 +151,8 @@ function App() {
 
       // 2. Filtro de "Cercanas"
       if (soloCercanas) {
-        // Si el GPS todavía no tiene coordenadas, no filtramos nada (mostramos todo)
-        if (!userCoords) return true;
+        // Si el GPS todavía no tiene coordenadas, ocultamos para mostrar "Obteniendo ubicación..."
+        if (!userCoords) return false;
 
         const itemLat = Number(item.lat);
         const itemLng = Number(item.lng);
@@ -217,7 +217,7 @@ function App() {
           <div>
             <h1 className="text-xl font-black text-orange-900 tracking-tighter uppercase leading-none">MascotAI</h1>
             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">
-              Hola, {user?.name?.split(' ')[0] || 'Usuario'}!
+              Hola, {user?.nombre?.split(' ')[0] || 'Usuario'}!
             </p>
           </div>
         </div>
@@ -252,8 +252,18 @@ function App() {
             <PawPrint size={20} />
           </button>
 
-          <button onClick={() => setShowLogoutModal(true)} className="w-10 h-10 rounded-xl overflow-hidden border-2 border-orange-100 shadow-sm active:scale-90 transition-transform">
-            {user.picture ? <img src={user.picture} alt="profile" className="w-full h-full object-cover" /> : <div className="bg-slate-100 w-full h-full flex items-center justify-center text-slate-400"><UserIcon size={20} /></div>}
+          <button
+            onClick={() => setShowLogoutModal(true)}
+            className="w-10 h-10 rounded-xl overflow-hidden border-2 border-orange-100 shadow-sm active:scale-90 transition-transform"
+          >
+            {/* ✅ Cambiamos user.picture por user.foto */}
+            {user?.foto ? (
+              <img src={user.foto} alt="profile" className="w-full h-full object-cover" />
+            ) : (
+              <div className="bg-slate-100 w-full h-full flex items-center justify-center text-slate-400">
+                <UserIcon size={20} />
+              </div>
+            )}
           </button>
         </div>
       </header>

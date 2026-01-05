@@ -17,6 +17,7 @@ export const api = {
   // 🐾 GESTIÓN DE PERFILES Y MASCOTAS
   // ==========================================
   getPerfiles: () => apiClient.get('/perfiles'),
+  /** @deprecated Usar getPerfiles() - Mantenido por compatibilidad */
   getMascotas: () => apiClient.get('/perfiles'),
 
   // Guardado tradicional (JSON)
@@ -27,6 +28,8 @@ export const api = {
     return apiClient.post('/con-foto', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
+    // No forzar Content-Type manualmente; Axios lo detecta y añade el boundary correcto
+    return apiClient.post('/con-foto', formData);
   },
 
   borrarMascota: (id: string) => apiClient.delete(`/perfiles/${id}`),
@@ -63,6 +66,7 @@ export const api = {
   borrarAlimento: (id: string) => apiClient.delete(`/historial/${id}`),
   borrarTriaje: (id: string) => apiClient.delete(`/triaje/${id}`),
 
+  /** @deprecated Usar borrarConsultaVet() - Mantenido por compatibilidad */
   eliminarConsultaVet: (id: string) => apiClient.delete(`/consulta-vet/${id}`),
 
 
@@ -126,6 +130,8 @@ export const api = {
       params: { monto }
     }),
 
+  loginNativoGoogle: (token: string) => apiClient.post('/public/auth/google-native', { token }),
+
   // ==========================================
   // 📍 COMUNIDAD: MASCOTAS PERDIDAS
   // ==========================================
@@ -135,6 +141,7 @@ export const api = {
     return apiClient.post('/perdidas/reportar', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
+    return apiClient.post('/perdidas/reportar', formData);
   },
 
   // Trae la lista de reportes para el Inicio
@@ -146,6 +153,7 @@ export const api = {
     return apiClient.post('/adopciones/publicar', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
+    return apiClient.post('/adopciones/publicar', formData);
   },
 
   eliminarMascotaPerdida: (id: string) => apiClient.delete(`/perdidas/${id}`),
