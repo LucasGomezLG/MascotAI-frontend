@@ -5,18 +5,14 @@ const config: CapacitorConfig = {
   appName: 'MascotAI',
   webDir: 'dist',
   plugins: {
-    // capacitor.config.ts
     GoogleAuth: {
       scopes: ['profile', 'email'],
-      // 🔄 Probá usando el ID WEB aquí también si el de Android falla
       androidClientId: '412244128184-507a1mt5t8lqtr0ce6sajpofb7akod2c.apps.googleusercontent.com',
       serverClientId: '412244128184-507a1mt5t8lqtr0ce6sajpofb7akod2c.apps.googleusercontent.com',
       forceCodeForRefreshToken: true,
     },
     CapacitorCookies: {
-      enabled: true,
+      enabled: true, // Ya lo tenías, mantenelo así
     },
   },
 };
-
-export default config;
