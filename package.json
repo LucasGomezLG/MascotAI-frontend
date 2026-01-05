@@ -11,7 +11,8 @@
     "preview": "vite preview",
     "android:sync": "npm run build && npx cap sync android",
     "android:run": "npm run build && npx cap sync android && npx cap run android",
-    "android:open": "npm run build && npx cap sync android && npx cap open android"
+    "android:open": "npm run build && npx cap sync android && npx cap open android",
+    "build:clean": "rimraf dist && rimraf android && npm run build && npx cap add android && npx cap sync android"
   },
   "dependencies": {
     "@capacitor/android": "^8.0.0",
