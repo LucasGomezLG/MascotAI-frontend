@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { api } from '../services/api';
-import { Capacitor } from '@capacitor/core'; // 👈 Importante para detectar plataforma
+import { Capacitor } from '@capacitor/core';
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 
 const AuthContext = createContext<any>(null);
@@ -11,8 +11,28 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const SERVER_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
 
+  // ✅ Función Maestra de Formateo: Busca los datos en cualquier rincón del objeto
+  const formatUserData = (data: any) => {
+    if (!data) return null;
+    
+    // Si la data viene anidada (data.data o data.user), la extraemos
+    const raw = data.data || data.user || data;
+    
+    // Detectamos la foto genérica /picture/0 que mencionaste
+    const esFotoGenerica = raw.foto?.includes('picture/0') || raw.picture?.includes('picture/0');
+    
+    return {
+      ...raw,
+      // Aseguramos que siempre existan 'name' y 'picture' para el Header
+      name: raw.nombre || raw.name || raw.displayName || 'Usuario',
+      picture: esFotoGenerica ? null : (raw.foto || raw.picture || raw.imageUrl),
+      // Mantenemos los nombres de tu MongoDB
+      nombre: raw.nombre || raw.name,
+      foto: raw.foto || raw.picture
+    };
+  };
+
   useEffect(() => {
-    // Inicializar el plugin nativo una sola vez
     if (Capacitor.isNativePlatform()) {
       GoogleAuth.initialize();
     }
@@ -28,12 +48,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     try {
       const res = await api.getUserProfile();
-      if (res?.data?.email) {
-        setUser(res.data);
-      } else {
-        localStorage.removeItem('mascotai_logged_in');
+      // ✅ Si res es la respuesta de Axios, res.data es el cuerpo
+      if (res) {
+        const formatted = formatUserData(res);
+        console.log("👤 Usuario cargado:", formatted);
+        setUser(formatted);
       }
     } catch (error) {
+      console.error("❌ Error en initAuth:", error);
       localStorage.removeItem('mascotai_logged_in');
       setUser(null);
     } finally {
@@ -45,33 +67,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (Capacitor.isNativePlatform()) {
       try {
         const googleUser = await GoogleAuth.signIn();
-        const idToken = googleUser.authentication.idToken;
-
-        // 1. Llamada al backend en Railway
-        const res = await api.loginNativoGoogle(idToken);
-
-        if (res.data) {
-          // 2. Mapeo de datos: Si el backend devuelve el nombre como 'nombre',
-          // nos aseguramos de que el estado lo tenga disponible.
-          const userData = {
-            ...res.data,
-            // 🛡️ Si la foto es el placeholder 'picture/0', usamos la de googleUser que es real
-            foto: res.data.foto?.includes('picture/0') ? googleUser.imageUrl : res.data.foto,
-            // Forzamos el campo 'name' para que tu componente actual no rompa, 
-            // aunque lo ideal es que uses 'nombre' en todo el proyecto.
-            name: res.data.nombre
-          };
-
-          console.log("Usuario sincronizado con éxito:", userData);
-
-          setUser(userData);
+        const res = await api.loginNativoGoogle(googleUser.authentication.idToken);
+        if (res) {
+          setUser(formatUserData(res));
           localStorage.setItem('mascotai_logged_in', 'true');
         }
       } catch (error) {
-        console.error("Error Login Nativo:", error);
+        console.error("Error Login:", error);
       }
     } else {
-      // Flujo Web para Vercel (se mantiene igual para no romper nada)
       localStorage.setItem('mascotai_logged_in', 'true');
       window.location.href = `${SERVER_URL}/oauth2/authorization/google`;
     }
@@ -82,7 +86,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       localStorage.clear();
       await api.logout();
     } catch (error) {
-      console.warn("Error al desloguear");
+      console.warn("Error logout");
     } finally {
       setUser(null);
       window.location.href = window.location.origin;

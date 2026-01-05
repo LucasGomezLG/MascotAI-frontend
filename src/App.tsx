@@ -1,10 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Camera, Dog, LayoutDashboard, Stethoscope, ShieldPlus,
-  Bell, User as UserIcon, PawPrint, Home, Heart, MapPin, PlusCircle, Plus,
-  Loader2, X,
-  Sparkles
-} from 'lucide-react';
+import { X } from 'lucide-react';
 import { api } from './services/api';
 import { useAuth } from './context/AuthContext';
 import LoginView from './components/login/LoginView';
@@ -13,15 +8,15 @@ import VetScanner from './components/scanner/vet/VetScanner';
 import SaludScanner from './components/scanner/SaludScanner';
 import ReportsManager from './components/reports/ReportsManager';
 import PetModal from './components/ui/PetModal';
-import NotificationsCenter from './components/ui/NotificationsCenter';
 import LogoutModal from './components/login/LogoutModal';
 import PetProfiles from './components/PetProfiles';
 import LostPetModal from './components/LostPet/LostPetModal';
-import LostPetCard from './components/LostPet/LostPetCard';
-import AdoptionCard from './components/AdoptionPet/AdoptionCard';
 import AdoptionModal from './components/AdoptionPet/AdoptionModal';
 import DeleteConfirmModal from './components/ui/DeleteConfirmModal';
 import Swal from 'sweetalert2';
+import AppHeader from './components/layout/AppHeader';
+import AppBottomNav from './components/layout/AppBottomNav';
+import HomeContent from './components/home/HomeContent';
 
 type TabType = 'home' | 'scanner' | 'stats' | 'vet' | 'health' | 'pets';
 
@@ -211,194 +206,37 @@ function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-24 text-left">
-      <header className="bg-white p-4 border-b sticky top-0 z-40 flex items-center justify-between shadow-sm">
-        <div className="flex items-center gap-2 cursor-pointer" onClick={() => setActiveTab('home')}>
-          <div className="bg-orange-600 p-2 rounded-xl shadow-lg rotate-3"><Dog size={24} className="text-white" /></div>
-          <div>
-            <h1 className="text-xl font-black text-orange-900 tracking-tighter uppercase leading-none">MascotAI</h1>
-            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">
-              Hola, {user?.nombre?.split(' ')[0] || 'Usuario'}!
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {/* ✅ BOTÓN DE COLABORACIÓN EN EL HEADER */}
-          <button
-            onClick={handleSuscripcion}
-            disabled={loadingSuscripcion}
-            className={`p-2 rounded-xl transition-all shadow-sm active:scale-90 ${user?.esColaborador
-              ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
-              : 'bg-gradient-to-tr from-orange-500 to-amber-400 text-white'
-              }`}
-          >
-            {loadingSuscripcion ? (
-              <Loader2 size={20} className="animate-spin" />
-            ) : user?.esColaborador ? (
-              <Sparkles size={20} />
-            ) : (
-              <Heart size={20} fill={loadingSuscripcion ? "none" : "currentColor"} />
-            )}
-          </button>
-          <div className="relative">
-            <button onClick={() => setShowAlerts(!showAlerts)} className={`p-2 rounded-xl transition-all ${alertas.length > 0 ? 'bg-orange-50 text-orange-600' : 'bg-slate-50 text-slate-400'}`}>
-              <Bell size={20} />
-              {alertas.length > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 border-2 border-white rounded-full animate-pulse"></span>}
-            </button>
-            {showAlerts && <NotificationsCenter alertas={alertas} onMarkRead={(id: string) => api.marcarAlertaLeida(id).then(refreshData)} onClose={() => setShowAlerts(false)} />}
-          </div>
-
-          <button onClick={() => setActiveTab('pets')} className={`p-2 rounded-xl transition-all ${activeTab === 'pets' ? 'bg-orange-600 text-white shadow-lg' : 'bg-slate-50 text-slate-400'}`}>
-            <PawPrint size={20} />
-          </button>
-
-          <button
-            onClick={() => setShowLogoutModal(true)}
-            className="w-10 h-10 rounded-xl overflow-hidden border-2 border-orange-100 shadow-sm active:scale-90 transition-transform"
-          >
-            {/* ✅ Cambiamos user.picture por user.foto */}
-            {user?.foto ? (
-              <img src={user.foto} alt="profile" className="w-full h-full object-cover" />
-            ) : (
-              <div className="bg-slate-100 w-full h-full flex items-center justify-center text-slate-400">
-                <UserIcon size={20} />
-              </div>
-            )}
-          </button>
-        </div>
-      </header>
+      <AppHeader
+        user={user}
+        setActiveTab={setActiveTab}
+        handleSuscripcion={handleSuscripcion}
+        loadingSuscripcion={loadingSuscripcion}
+        alertas={alertas}
+        showAlerts={showAlerts}
+        setShowAlerts={setShowAlerts}
+        onMarkRead={(id: string) => api.marcarAlertaLeida(id).then(refreshData)}
+        setShowLogoutModal={setShowLogoutModal}
+        activeTab={activeTab}
+      />
 
       <main className="max-w-md mx-auto p-6">
         {activeTab === 'home' && (
-          <div className="space-y-10 animate-in fade-in duration-500">
-            {/* 1. MIS MASCOTAS */}
-            <section className="space-y-4">
-              <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Mis Mascotas</h2>
-              {mascotas.length > 0 ? (
-                <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
-                  {mascotas.map(pet => (
-                    <div key={pet.id} className="flex flex-col items-center gap-2 min-w-[80px]">
-                      {/* ✅ Foto con Zoom al hacer clic */}
-                      <div
-                        onClick={() => pet.foto && setZoomedPhoto(pet.foto)}
-                        className="w-20 h-20 rounded-[2rem] border-4 border-white shadow-md overflow-hidden bg-orange-100 flex items-center justify-center text-orange-600 cursor-zoom-in active:scale-95 transition-transform"
-                      >
-                        {pet.foto ? (
-                          <img src={pet.foto} alt={pet.nombre} className="w-full h-full object-cover" />
-                        ) : (
-                          <Dog size={32} />
-                        )}
-                      </div>
-                      <span className="text-[10px] font-black uppercase text-slate-600 tracking-tight">{pet.nombre}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <button
-                  onClick={() => setActiveTab('pets')}
-                  className="w-full py-8 border-4 border-dashed border-slate-200 rounded-[2.5rem] flex flex-col items-center justify-center gap-2 text-slate-400 hover:text-orange-500 hover:border-orange-200 transition-all"
-                >
-                  <PlusCircle size={32} />
-                  <span className="font-black text-xs uppercase tracking-widest">Registrar Mascota</span>
-                </button>
-              )}
-            </section>
-
-            {/* BARRA DE FILTROS ACTUALIZADA */}
-            <div className="sticky top-[72px] z-30 -mx-6 px-6 py-4 bg-slate-50/80 backdrop-blur-md flex items-center justify-between border-b border-slate-200/50">
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setSoloCercanas(!soloCercanas)}
-                  className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all flex items-center gap-1.5 ${soloCercanas ? 'bg-red-500 text-white shadow-md' : 'bg-slate-200/50 text-slate-500'}`}
-                >
-                  <MapPin size={12} />
-                  {soloCercanas ? "Cercanas (10km)" : "Todo Bs.As."}
-                </button>
-
-                <button
-                  onClick={() => setSoloMisPublicaciones(!soloMisPublicaciones)}
-                  className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all flex items-center gap-1.5 ${soloMisPublicaciones ? 'bg-slate-800 text-white shadow-md' : 'bg-slate-200/50 text-slate-500'}`}
-                >
-                  <UserIcon size={12} />
-                  Míos
-                </button>
-              </div>
-
-              <p className="text-[10px] font-black text-slate-400 uppercase">
-                {perdidosFiltrados.length + adopcionesFiltradas.length} resultados
-              </p>
-            </div>
-
-            {/* 2. MASCOTAS PERDIDAS */}
-            <section className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-red-600">
-                  <MapPin size={20} />
-                  <h2 className="text-lg font-black uppercase tracking-tighter">Perdidos</h2>
-                </div>
-                <button
-                  onClick={() => setShowLostPetModal(true)}
-                  className="p-2 bg-red-50 text-red-600 rounded-xl active:scale-90 transition-all"
-                >
-                  <Plus size={20} />
-                </button>
-              </div>
-
-              {perdidosFiltrados.length > 0 ? (
-                <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
-                  {perdidosFiltrados.map(p => (
-                    <LostPetCard
-                      key={p.id}
-                      reporte={p}
-                      currentUser={user}
-                      onDelete={() => abrirConfirmacionBorrado(p.id, 'perdido')}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="h-32 bg-slate-50 rounded-[2.5rem] flex items-center justify-center border-2 border-dashed border-slate-200 text-center px-6">
-                  <p className="text-[10px] font-black text-slate-400 uppercase italic tracking-widest">
-                    {soloCercanas && !userCoords ? "Obteniendo ubicación..." : "No hay reportes cercanos"}
-                  </p>
-                </div>
-              )}
-            </section>
-
-            {/* 3. MASCOTAS EN ADOPCIÓN */}
-            <section className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-emerald-600">
-                  <Heart size={20} />
-                  <h2 className="text-lg font-black uppercase tracking-tighter">En adopción</h2>
-                </div>
-                <button
-                  onClick={() => setShowAdoptionModal(true)}
-                  className="p-2 bg-emerald-50 text-emerald-600 rounded-xl active:scale-90 transition-all"
-                >
-                  <Plus size={20} />
-                </button>
-              </div>
-
-              <div className="flex gap-4 overflow-x-auto pb-6 no-scrollbar">
-                {adopcionesFiltradas.length > 0 ? (
-                  adopcionesFiltradas.map(a => (
-                    <AdoptionCard
-                      key={a.id}
-                      mascota={a}
-                      currentUser={user}
-                      onDelete={() => abrirConfirmacionBorrado(a.id, 'adopcion')}
-                    />
-                  ))
-                ) : (
-                  <div className="w-full h-32 bg-emerald-50/30 rounded-[2.5rem] flex items-center justify-center border-2 border-dashed border-emerald-100 text-center px-6">
-                    <p className="text-[10px] font-black text-emerald-400 uppercase italic tracking-widest">
-                      {soloCercanas && !userCoords ? "Obteniendo ubicación..." : "Sin publicaciones cercanas"}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </section>
-          </div>
+          <HomeContent
+            mascotas={mascotas}
+            setActiveTab={setActiveTab}
+            setZoomedPhoto={setZoomedPhoto}
+            soloCercanas={soloCercanas}
+            setSoloCercanas={setSoloCercanas}
+            soloMisPublicaciones={soloMisPublicaciones}
+            setSoloMisPublicaciones={setSoloMisPublicaciones}
+            perdidosFiltrados={perdidosFiltrados}
+            adopcionesFiltradas={adopcionesFiltradas}
+            setShowLostPetModal={setShowLostPetModal}
+            setShowAdoptionModal={setShowAdoptionModal}
+            user={user}
+            abrirConfirmacionBorrado={abrirConfirmacionBorrado}
+            userCoords={userCoords}
+          />
         )}
 
         {/* RESTO DE PESTAÑAS */}
@@ -447,23 +285,7 @@ function App() {
       />
 
       {/* NAV INFERIOR */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 pb-8 flex justify-around items-center z-50 shadow-lg">
-        <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center gap-1 ${activeTab === 'home' ? 'text-orange-600 scale-110' : 'text-slate-400'}`}>
-          <Home size={24} /><span className="text-[8px] font-black uppercase">Inicio</span>
-        </button>
-        <button onClick={() => setActiveTab('scanner')} className={`flex flex-col items-center gap-1 ${activeTab === 'scanner' ? 'text-orange-600' : 'text-slate-400'}`}>
-          <Camera size={24} /><span className="text-[8px] font-black uppercase">Comida</span>
-        </button>
-        <button onClick={() => setActiveTab('vet')} className={`flex flex-col items-center gap-1 ${activeTab === 'vet' ? 'text-red-600' : 'text-slate-400'}`}>
-          <Stethoscope size={24} /><span className="text-[8px] font-black uppercase">Vete</span>
-        </button>
-        <button onClick={() => setActiveTab('health')} className={`flex flex-col items-center gap-1 ${activeTab === 'health' ? 'text-emerald-600' : 'text-slate-400'}`}>
-          <ShieldPlus size={24} /><span className="text-[8px] font-black uppercase">Salud</span>
-        </button>
-        <button onClick={() => setActiveTab('stats')} className={`flex flex-col items-center gap-1 ${activeTab === 'stats' ? 'text-orange-600' : 'text-slate-400'}`}>
-          <LayoutDashboard size={24} /><span className="text-[8px] font-black uppercase">Reportes</span>
-        </button>
-      </nav>
+      <AppBottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
     </div>
   );
 }
