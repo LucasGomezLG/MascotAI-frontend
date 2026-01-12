@@ -16,7 +16,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (!data) return null;
     const raw = data.data || data.user || data;
     const esFotoGenerica = raw.foto?.includes('picture/0') || raw.picture?.includes('picture/0');
-    
+
     return {
       ...raw,
       name: raw.nombre || raw.name || raw.displayName || 'Usuario',
@@ -57,16 +57,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
    * 🔄 NUEVA FUNCIÓN: Refresca los datos del usuario desde el servidor.
    * Úsala después de cada escaneo exitoso o pago de suscripción.
    */
+  // Dentro de AuthContext.tsx
   const refreshUser = async () => {
+    console.log("🔄 Sincronizando créditos IA..."); // Debug para ver en consola de Android/Xcode
     try {
       const res = await api.getUserProfile();
       if (res && res.data) {
         const formatted = formatUserData(res.data);
-        setUser(formatted);
+        setUser({ ...formatted }); // 🛡️ Usamos el spread {...} para forzar un nuevo objeto y que React lo detecte
+        console.log("✅ Créditos actualizados:", formatted.intentosIA);
         return formatted;
       }
     } catch (error) {
-      console.error("❌ Error al refrescar datos del usuario:", error);
+      console.error("❌ Falló el refresco de usuario en mobile:", error);
     }
     return null;
   };
