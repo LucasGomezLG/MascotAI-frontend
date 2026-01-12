@@ -28,7 +28,13 @@ export default function AppHeader({
   const profileImage = user?.picture || user?.foto || null;
 
   return (
-    <header className="bg-white p-4 border-b sticky top-0 z-40 flex items-center justify-between shadow-sm">
+    <header 
+      className="bg-white p-4 border-b sticky top-0 z-40 flex items-center justify-between shadow-sm"
+      style={{ 
+        // 🛡️ Ajuste Híbrido: En Web es 16px, en Móvil es 16px + Barra de Estado
+        paddingTop: 'calc(1rem + env(safe-area-inset-top))' 
+      }}
+    >
       <div className="flex items-center gap-2 cursor-pointer" onClick={() => setActiveTab('home')}>
         <div className="bg-orange-600 p-2 rounded-xl shadow-lg rotate-3">
           <Dog size={24} className="text-white" />
@@ -95,7 +101,6 @@ export default function AppHeader({
               alt="profile" 
               className="w-full h-full object-cover"
               onError={(e) => {
-                // Si la imagen de Google falla, la ocultamos y queda el icono gris de fondo
                 e.currentTarget.style.display = 'none';
               }}
             />

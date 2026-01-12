@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { api } from './services/api';
 import { useAuth } from './context/AuthContext';
+import { Geolocation } from '@capacitor/geolocation'; 
 import LoginView from './components/login/LoginView';
 import FoodScanner from './components/scanner/FoodScanner';
 import VetScanner from './components/scanner/vet/VetScanner';
@@ -30,7 +31,7 @@ function App() {
   const [perdidos, setPerdidos] = useState<any[]>([]);
   const [adopciones, setAdopciones] = useState<any[]>([]);
   const [loadingSuscripcion, setLoadingSuscripcion] = useState(false);
-  const [zoomedPhoto, setZoomedPhoto] = useState<string | null>(null); // ✅ Nuevo estado para el zoom
+  const [zoomedPhoto, setZoomedPhoto] = useState<string | null>(null);
 
   // Estados de Modales
   const [showPetModal, setShowPetModal] = useState(false);
@@ -40,38 +41,46 @@ function App() {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [itemABorrar, setItemABorrar] = useState<{ id: string, tipo: 'perdido' | 'adopcion' } | null>(null);
 
-  // Estados de Selección
+  // Estados de Selección (Historial)
   const [foodParaVer, setFoodParaVer] = useState<any>(null);
   const [vetParaVer, setVetParaVer] = useState<any>(null);
   const [healthParaVer, setHealthParaVer] = useState<any>(null);
 
-  // ✅ FILTROS
+  // FILTROS
   const [soloMisPublicaciones, setSoloMisPublicaciones] = useState(false);
   const [soloCercanas, setSoloCercanas] = useState(true);
   const [userCoords, setUserCoords] = useState<{ lat: number, lng: number } | null>(null);
 
-  // --- GEOLOCALIZACIÓN OPTIMIZADA ---
-  useEffect(() => {
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          console.log("📍 GPS OK:", position.coords.latitude, position.coords.longitude);
-          setUserCoords({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          });
-        },
-        (error) => {
-          console.warn("⚠️ GPS falló, usando vista general:", error.message);
-          setSoloCercanas(false); // Si falla el GPS, mostramos todo automáticamente
-        },
-        {
-          enableHighAccuracy: false, // ❌ CAMBIO: false para que sea más rápido y no de Timeout
-          timeout: 10000,
-          maximumAge: 60000
+  // --- 🛰️ LÓGICA DE GPS NATIVO BLINDADA ---
+  const obtenerUbicacion = async () => {
+    try {
+      const permissions = await Geolocation.checkPermissions();
+      
+      if (permissions.location !== 'granted') {
+        const request = await Geolocation.requestPermissions();
+        if (request.location !== 'granted') {
+          setSoloCercanas(false);
+          return;
         }
-      );
+      }
+
+      const position = await Geolocation.getCurrentPosition({
+        enableHighAccuracy: false, 
+        timeout: 10000
+      });
+
+      setUserCoords({
+        lat: position.coords.latitude,
+        lng: position.coords.longitude
+      });
+    } catch (error) {
+      console.warn("⚠️ GPS denegado o apagado. Se mostrarán todas las mascotas.");
+      setSoloCercanas(false);
     }
+  };
+
+  useEffect(() => {
+    obtenerUbicacion();
   }, []);
 
   // --- FUNCIONES DE CARGA ---
@@ -89,9 +98,9 @@ function App() {
     Swal.fire({
       title: '¿Quieres colaborar?',
       text: "Ingresa el monto que desees donar para mantener MascotAI",
-      input: 'number', // ✅ Agregamos un input numérico
+      input: 'number',
       inputLabel: 'Monto en AR$',
-      inputValue: 2000, // Monto sugerido
+      inputValue: 2000,
       showCancelButton: true,
       confirmButtonColor: '#f97316',
       cancelButtonColor: '#94a3b8',
@@ -103,15 +112,12 @@ function App() {
           return 'El monto mínimo es $100'
         }
       },
-      customClass: {
-        popup: 'rounded-[2rem]',
-      }
+      customClass: { popup: 'rounded-[2rem]' }
     }).then(async (result) => {
       if (result.isConfirmed) {
         const montoElegido = result.value;
         setLoadingSuscripcion(true);
         try {
-          // ✅ Enviamos el monto al backend en la query
           const response = await api.crearSuscripcion(montoElegido);
           window.location.href = response.data.url;
         } catch (error) {
@@ -138,30 +144,18 @@ function App() {
     return R * c;
   };
 
-  // --- LÓGICA DE FILTRADO (CON CORRECCIÓN DE TIPOS) ---
+  // --- LÓGICA DE FILTRADO ---
   const filtrarPublicaciones = (lista: any[]) => {
     return lista.filter(item => {
-      // 1. Filtro de "Míos" (Prioridad 1)
       if (soloMisPublicaciones && item.userId !== user?.id) return false;
-
-      // 2. Filtro de "Cercanas"
       if (soloCercanas) {
-        // Si el GPS todavía no tiene coordenadas, ocultamos para mostrar "Obteniendo ubicación..."
         if (!userCoords) return false;
-
         const itemLat = Number(item.lat);
         const itemLng = Number(item.lng);
-
-        // Si la mascota NO tiene coordenadas válidas, la mostramos igual 
-        // para que no "desaparezca" de la lista por error de datos.
         if (!itemLat || !itemLng || isNaN(itemLat)) return true;
-
         const dist = calcularDistancia(userCoords.lat, userCoords.lng, itemLat, itemLng);
-
-        // Solo ocultamos si estamos SEGUROS de que está a más de 10km
         return dist <= 10;
       }
-
       return true;
     });
   };
@@ -185,12 +179,18 @@ function App() {
       refreshData();
       setItemABorrar(null);
     } catch (e) {
-      alert("Hubo un error al eliminar la publicación.");
+      Swal.fire({ title: 'Error', text: 'No se pudo eliminar la publicación.', icon: 'error' });
     }
   };
 
   if (authLoading) return (
-    <div className="h-screen flex flex-col items-center justify-center bg-slate-50">
+    <div 
+      className="h-screen flex flex-col items-center justify-center bg-slate-50"
+      style={{ 
+        paddingTop: 'env(safe-area-inset-top)', 
+        paddingBottom: 'env(safe-area-inset-bottom)' 
+      }}
+    >
       <div className="w-12 h-12 border-4 border-orange-600 border-t-transparent rounded-full animate-spin mb-4"></div>
       <p className="font-black text-orange-900 uppercase text-xs tracking-widest">Verificando sesión...</p>
     </div>
@@ -205,7 +205,11 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-24 text-left">
+    <div 
+      className="min-h-screen bg-slate-50 font-sans text-slate-900 text-left"
+      // 🛡️ Ajuste Safe Area Inferior para el Nav
+      style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom))' }}
+    >
       <AppHeader
         user={user}
         setActiveTab={setActiveTab}
@@ -239,39 +243,38 @@ function App() {
           />
         )}
 
-        {/* RESTO DE PESTAÑAS */}
         {activeTab === 'scanner' && <FoodScanner mascotas={mascotas} onScanComplete={refreshData} initialData={foodParaVer} onReset={() => setFoodParaVer(null)} />}
         {activeTab === 'vet' && <VetScanner mascotas={mascotas} onScanComplete={refreshData} initialData={vetParaVer} onReset={() => setVetParaVer(null)} />}
         {activeTab === 'health' && <SaludScanner mascotas={mascotas} onScanComplete={refreshData} initialData={healthParaVer} onReset={() => setHealthParaVer(null)} />}
         {activeTab === 'stats' && <ReportsManager onVerDetalle={verDetalle} />}
-        {activeTab === 'pets' && (
-          <div className="space-y-6">
-            <PetProfiles mascotas={mascotas} onUpdate={refreshData} onAddClick={() => setShowPetModal(true)} />
-          </div>
-        )}
+        {activeTab === 'pets' && <PetProfiles mascotas={mascotas} onUpdate={refreshData} onAddClick={() => setShowPetModal(true)} />}
       </main>
 
-      {/* MODALES */}
       {showPetModal && <PetModal onClose={() => { setShowPetModal(false); refreshData(); }} />}
       {showLostPetModal && <LostPetModal onClose={() => { setShowLostPetModal(false); refreshData(); }} />}
       {showAdoptionModal && <AdoptionModal onClose={() => { setShowAdoptionModal(false); refreshData(); }} />}
+      
       {zoomedPhoto && (
         <div
           className="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300 cursor-zoom-out"
           onClick={() => setZoomedPhoto(null)}
         >
-          <button className="absolute top-6 right-6 text-white/70 hover:text-white p-2 bg-white/10 rounded-full transition-colors">
+          <button 
+            className="absolute right-6 text-white/70 hover:text-white p-2 bg-white/10 rounded-full transition-colors shadow-lg"
+            // 🛡️ Safe Area Superior para el botón de cierre del zoom
+            style={{ top: 'calc(1.5rem + env(safe-area-inset-top))' }}
+          >
             <X size={24} />
           </button>
-
           <img
             src={zoomedPhoto}
             className="max-w-full max-h-[85vh] rounded-[2.5rem] shadow-2xl animate-in zoom-in-95 duration-500 object-contain border-4 border-white/10"
-            alt="Zoom Mascota"
+            alt="Zoom"
             onClick={(e) => e.stopPropagation()}
           />
         </div>
       )}
+
       <LogoutModal isOpen={showLogoutModal} onClose={() => setShowLogoutModal(false)} onConfirm={logout} />
 
       <DeleteConfirmModal
@@ -284,7 +287,6 @@ function App() {
           : "La publicación de adopción desaparecerá de la comunidad."}
       />
 
-      {/* NAV INFERIOR */}
       <AppBottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
     </div>
   );

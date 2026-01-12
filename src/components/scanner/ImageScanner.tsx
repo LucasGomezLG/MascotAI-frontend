@@ -1,5 +1,8 @@
-import React, { useRef } from 'react';
-import { Camera } from 'lucide-react';
+import React from 'react';
+import { Camera as CameraIcon } from 'lucide-react';
+// 🛡️ IMPORTACIONES NATIVAS
+import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
+import { useCameraPermissions } from '../../hooks/useCameraPermissions';
 
 interface Props {
   onImageReady: (base64: string) => void;
@@ -8,36 +11,47 @@ interface Props {
 }
 
 const ImageScanner = ({ onImageReady, label, className }: Props) => {
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  // 🛡️ HOOK DE PERMISOS (Usando las nuevas funciones separadas)
+  const { validarCamara, validarGaleria } = useCameraPermissions();
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleCapture = async () => {
+    // 1. Para usar el 'Prompt' (menú de selección), validamos ambos permisos
+    // Esto asegura que el usuario no tenga problemas elija la opción que elija.
+    const camOk = await validarCamara();
+    if (!camOk) return;
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      onImageReady(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+    const galOk = await validarGaleria();
+    if (!galOk) return;
+
+    try {
+      // 2. Abrir la interfaz nativa con el menú de selección
+      const image = await Camera.getPhoto({
+        quality: 90,
+        allowEditing: false,
+        resultType: CameraResultType.Base64,
+        source: CameraSource.Prompt, 
+        promptLabelHeader: '¿De dónde sacamos la imagen?',
+        promptLabelPhoto: 'Galería de fotos',
+        promptLabelPicture: 'Tomar una foto'
+      });
+
+      if (image.base64String) {
+        // Devolvemos el string base64 con el prefijo correcto
+        onImageReady(`data:image/jpeg;base64,${image.base64String}`);
+      }
+    } catch (error) {
+      console.log("El usuario canceló la selección.");
+    }
   };
 
   return (
-    <>
-      <button 
-        onClick={() => fileInputRef.current?.click()}
-        className={className || "bg-orange-600 text-white p-4 rounded-xl flex items-center gap-2 font-black uppercase text-[10px]"}
-      >
-        <Camera size={16} /> {label}
-      </button>
-
-      <input
-        type="file"
-        ref={fileInputRef}
-        onChange={handleFileChange}
-        accept="image/*" // Abre cámara o galería en el celu
-        style={{ display: 'none' }}
-      />
-    </>
+    <button 
+      type="button" 
+      onClick={handleCapture}
+      className={className || "bg-orange-600 text-white p-4 rounded-xl flex items-center justify-center gap-2 font-black uppercase text-[10px] shadow-lg active:scale-95 transition-all"}
+    >
+      <CameraIcon size={16} /> {label}
+    </button>
   );
 };
 

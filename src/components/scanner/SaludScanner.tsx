@@ -1,12 +1,16 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Loader2, User, Syringe, ShieldPlus, ClipboardPlus,
   X, Wallet, RefreshCw, Sparkles, Image as ImageIcon,
-  Info
+  Info, Camera as CameraIcon
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { Toast } from '../../utils/alerts';
 import Swal from 'sweetalert2';
+
+// 🛡️ IMPORTACIONES NATIVAS
+import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
+import { useCameraPermissions } from '../../hooks/useCameraPermissions';
 
 const SaludScanner = ({ mascotas, onScanComplete }: any) => {
   const [selectedPet, setSelectedPet] = useState("");
@@ -14,34 +18,54 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
   const [loading, setLoading] = useState(false);
   const [editData, setEditData] = useState<any>(null);
 
-  const cameraInputRef = useRef<HTMLInputElement>(null);
-  const galleryInputRef = useRef<HTMLInputElement>(null);
+  // 🛡️ HOOK DE PERMISOS (Funciones separadas)
+  const { validarCamara, validarGaleria } = useCameraPermissions();
 
   // 🛡️ Fecha de hoy para validaciones
   const hoy = new Date().toISOString().split("T")[0];
 
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // 📸 FUNCIÓN NATIVA: CÁMARA (Solo permiso de cámara)
+  const handleNativeCamera = async () => {
+    const ok = await validarCamara();
+    if (!ok) return;
 
-    // 🛡️ BLINDAJE: Tamaño de foto
-    if (file.size > 10 * 1024 * 1024) {
-      Swal.fire({
-        title: 'Imagen muy pesada',
-        text: 'El límite es 10MB para procesar la etiqueta rápido.',
-        icon: 'warning',
-        confirmButtonColor: '#10b981'
+    try {
+      const image = await Camera.getPhoto({
+        quality: 90,
+        allowEditing: false,
+        resultType: CameraResultType.Base64,
+        source: CameraSource.Camera // Usa la lente del dispositivo
       });
-      return;
-    }
 
-    setEditData(null);
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setSelectedImage(reader.result as string);
-      e.target.value = "";
-    };
-    reader.readAsDataURL(file);
+      if (image.base64String) {
+        setSelectedImage(`data:image/jpeg;base64,${image.base64String}`);
+        setEditData(null);
+      }
+    } catch (error) {
+      console.log("Cámara cancelada");
+    }
+  };
+
+  // 🖼️ FUNCIÓN NATIVA: GALERÍA (Solo permiso de fotos)
+  const handleNativeGallery = async () => {
+    const ok = await validarGaleria();
+    if (!ok) return;
+
+    try {
+      const image = await Camera.getPhoto({
+        quality: 90,
+        allowEditing: false,
+        resultType: CameraResultType.Base64,
+        source: CameraSource.Photos // Abre el carrete
+      });
+
+      if (image.base64String) {
+        setSelectedImage(`data:image/jpeg;base64,${image.base64String}`);
+        setEditData(null);
+      }
+    } catch (error) {
+      console.log("Galería cancelada");
+    }
   };
 
   const handleBorrarFoto = (e: React.MouseEvent) => {
@@ -60,10 +84,7 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
       return;
     }
 
-    if (!selectedImage) {
-      Swal.fire({ text: 'Capturá o subí una foto de la etiqueta.', icon: 'warning' });
-      return;
-    }
+    if (!selectedImage) return;
 
     setLoading(true);
     setEditData(null);
@@ -91,32 +112,22 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
         return;
       }
 
-      // ✅ Mapeo de datos (Sin el cartel de "analizado con éxito")
       setEditData({
         nombre: res.data.nombre || "Producto desconocido",
         tipo: res.data.tipo || "MEDICAMENTO",
-
-        // 🛡️ Forzamos 'hoy' para la aplicación (ignoramos fechas viejas de la IA)
         fechaAplicacion: hoy,
-
-        // 🛡️ El refuerzo queda vacío para que vos lo elijas o la IA sugiera
         proximaFecha: (res.data.proximaFecha && res.data.proximaFecha > hoy)
           ? res.data.proximaFecha
           : "",
-
         precio: res.data.precio || 0,
         dosis: res.data.notas || res.data.dosis || "Dosis no detectada",
         completado: true,
         mascotaId: selectedPet
-
       });
-
-      // Se eliminó: Toast.fire({ icon: 'success', title: 'Producto analizado con éxito' });
 
     } catch (e: any) {
       console.error("Error en análisis de salud:", e);
       const errorMsg = e.response?.data || 'Error al procesar el producto';
-
       Swal.fire({
         title: 'Error de Análisis',
         text: typeof errorMsg === 'string' ? errorMsg : 'Revisá la conexión con el servidor.',
@@ -129,34 +140,26 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
   };
 
   const handleGuardar = async () => {
-    // 1. 🛡️ Validar Nombre
     if (!editData.nombre.trim()) {
       Swal.fire({ text: 'El nombre del producto es obligatorio.', icon: 'warning' });
       return;
     }
 
-    // 2. 🛡️ Validar Fecha de Aplicación (No puede ser futura)
     if (editData.fechaAplicacion > hoy) {
-      Swal.fire({
-        text: 'La fecha de aplicación no puede ser futura.',
-        icon: 'error',
-        confirmButtonColor: '#10b981'
-      });
+      Swal.fire({ text: 'La fecha de aplicación no puede ser futura.', icon: 'error', confirmButtonColor: '#10b981' });
       return;
     }
 
-    // 3. 🛡️ RECUPERADO: Validar Próximo Refuerzo (Debe ser mayor a hoy)
     if (editData.proximaFecha && editData.proximaFecha <= hoy) {
       Swal.fire({
         title: 'Fecha de refuerzo inválida',
-        text: 'La fecha del próximo refuerzo debe ser posterior al día de hoy para poder avisarte.',
+        text: 'La fecha del próximo refuerzo debe ser posterior al día de hoy.',
         icon: 'warning',
         confirmButtonColor: '#f27121'
       });
       return;
     }
 
-    // 4. 🛡️ Validar Precio (Para el presupuesto con Abril)
     if (editData.precio < 0 || editData.precio > 999999) {
       Swal.fire({ text: 'Ingresá un costo válido (máx 6 cifras).', icon: 'warning' });
       return;
@@ -171,12 +174,8 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
         precio: editData.precio || 0,
         completado: editData.completado,
         notas: editData.dosis || "Sin notas",
-
-        // Blindaje de formato LocalDate (YYYY-MM-DD)
         fechaAplicacion: editData.fechaAplicacion.split('T')[0],
-        proximaFecha: editData.proximaFecha
-          ? editData.proximaFecha.split('T')[0]
-          : null
+        proximaFecha: editData.proximaFecha ? editData.proximaFecha.split('T')[0] : null
       };
 
       await api.guardarEventoSalud(dataParaEnviar);
@@ -193,8 +192,7 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
       setSelectedImage(null);
       if (onScanComplete) onScanComplete();
     } catch (e) {
-      console.error("Error al guardar salud:", e);
-      Swal.fire({ title: 'Error', text: 'No se pudo guardar. Revisá los campos.', icon: 'error' });
+      Swal.fire({ title: 'Error', text: 'No se pudo guardar.', icon: 'error' });
     } finally {
       setLoading(false);
     }
@@ -219,50 +217,54 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
             </select>
           </div>
 
-          {/* Recuadro de Captura */}
+          {/* Recuadro de Captura (CÁMARA) */}
           <div
-            onClick={() => cameraInputRef.current?.click()}
+            onClick={handleNativeCamera}
             className="bg-white h-64 border-4 border-dashed border-emerald-100 rounded-[2.5rem] flex flex-col items-center justify-center cursor-pointer hover:border-emerald-300 transition-all active:scale-[0.98] group relative overflow-hidden shadow-inner"
           >
             {selectedImage ? (
               <>
                 <img src={selectedImage} alt="Preview" className="w-full h-full object-cover" />
-                <button onClick={handleBorrarFoto} className="absolute top-4 right-4 bg-white/90 p-2 rounded-full shadow-lg text-emerald-600 z-10"><X size={20} /></button>
+                <button onClick={handleBorrarFoto} className="absolute top-4 right-4 bg-white/90 p-2 rounded-full shadow-lg text-emerald-600 z-10">
+                    <X size={20} />
+                </button>
+                <div className="absolute inset-0 bg-black/20 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                   <RefreshCw className="text-white mb-2" />
+                   <span className="text-white font-black text-xs uppercase">Capturar de Nuevo</span>
+                </div>
               </>
             ) : (
               <div className="text-center px-6">
                 <div className="bg-emerald-50 p-5 rounded-full mb-4 inline-block shadow-sm text-emerald-200">
                   <ShieldPlus size={40} />
                 </div>
-                <p className="text-emerald-900/40 font-black uppercase text-[10px] tracking-[0.2em] leading-tight text-center">
-                  Escaneá la etiqueta médica
+                <p className="text-emerald-900/40 font-black uppercase text-[10px] tracking-widest leading-tight text-center">
+                  Capturar Etiqueta (Cámara)
                 </p>
               </div>
             )}
           </div>
 
+          {/* Botón de Galería */}
           <button
             type="button"
-            onClick={() => galleryInputRef.current?.click()}
+            onClick={handleNativeGallery}
             className="w-full py-3 rounded-2xl font-black text-xs uppercase bg-slate-100 text-slate-500 border-2 border-slate-200 flex items-center justify-center gap-2 active:scale-95 transition-all"
           >
-            <ImageIcon size={16} /> Cargar imagen
+            <ImageIcon size={16} /> Cargar desde Galería
           </button>
 
           <button
-            onClick={handleAnalizarSalud}
-            disabled={loading || !selectedImage}
-            className={`w-full flex items-center justify-center gap-3 py-6 rounded-[2rem] font-black text-xl shadow-xl transition-all active:scale-95 ${loading || !selectedImage ? 'bg-emerald-50 text-emerald-200' : 'bg-emerald-600 text-white shadow-emerald-200 hover:bg-emerald-700'
+            onClick={selectedImage ? handleAnalizarSalud : handleNativeCamera}
+            disabled={loading}
+            className={`w-full flex items-center justify-center gap-3 py-6 rounded-[2rem] font-black text-xl shadow-xl transition-all active:scale-95 ${loading || !selectedImage ? 'bg-emerald-50 text-emerald-300' : 'bg-emerald-600 text-white shadow-emerald-200 hover:bg-emerald-700'
               }`}
           >
-            {loading ? <Loader2 className="animate-spin" /> : <><Sparkles size={22} /> ANALIZAR PRODUCTO</>}
+            {loading ? <Loader2 className="animate-spin" /> : <><Sparkles size={22} /> {selectedImage ? "ANALIZAR PRODUCTO" : "ABRIR CÁMARA"}</>}
           </button>
-
-          <input type="file" ref={cameraInputRef} className="hidden" accept="image/*" capture="environment" onChange={handleFile} />
-          <input type="file" ref={galleryInputRef} className="hidden" accept="image/*" onChange={handleFile} />
         </div>
       ) : (
-        /* VISTA DE CONFIRMACIÓN CON BLINDAJES */
+        /* VISTA DE CONFIRMACIÓN (Intacta) */
         <div className="bg-white rounded-[2.5rem] shadow-2xl p-8 border-2 border-emerald-50 text-left animate-in zoom-in-95">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
@@ -274,22 +276,14 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
             </div>
 
             <div className="flex flex-col items-center gap-1">
-              {/* Switch / Toggle */}
               <button
                 onClick={() => setEditData({ ...editData, completado: !editData.completado })}
-                className={`relative inline-flex h-7 w-12 items-center rounded-full transition-all duration-300 ${editData.completado ? 'bg-emerald-500 shadow-md shadow-emerald-100' : 'bg-slate-200'
-                  }`}
+                className={`relative inline-flex h-7 w-12 items-center rounded-full transition-all duration-300 ${editData.completado ? 'bg-emerald-500 shadow-md shadow-emerald-100' : 'bg-slate-200'}`}
               >
-                <span
-                  className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform duration-300 ${editData.completado ? 'translate-x-6' : 'translate-x-1'
-                    }`}
-                />
+                <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform duration-300 ${editData.completado ? 'translate-x-6' : 'translate-x-1'}`} />
               </button>
-
-              {/* ✅ TEXTO DINÁMICO: Cambia según la selección */}
-              <span className={`text-[8px] font-black uppercase tracking-tighter transition-colors duration-300 ${editData.completado ? 'text-emerald-600' : 'text-slate-400'
-                }`}>
-                {editData.completado ? 'Activar' : 'Desactivar'}
+              <span className={`text-[8px] font-black uppercase tracking-tighter ${editData.completado ? 'text-emerald-600' : 'text-slate-400'}`}>
+                {editData.completado ? 'Aplicado' : 'Pendiente'}
               </span>
             </div>
           </div>
@@ -299,7 +293,6 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
               <p className="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Producto / Vacuna</p>
               <input
                 type="text"
-                maxLength={50} // 🛡️ Blindaje estético
                 className="w-full bg-transparent font-black text-lg text-slate-800 border-b-2 border-slate-100 focus:border-emerald-500 outline-none"
                 value={editData.nombre || ""}
                 onChange={(e) => setEditData({ ...editData, nombre: e.target.value })}
@@ -307,106 +300,69 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
             </div>
 
             <div className="grid grid-cols-2 gap-3 text-center">
-              {/* 🛡️ INPUT CORREGIDO: FECHA APLICACIÓN */}
               <div className="bg-emerald-50/50 p-4 rounded-3xl border border-emerald-100">
                 <p className="text-[9px] font-black text-emerald-600 uppercase mb-2">Fecha Aplicación</p>
                 <input
                   type="date"
-                  max={hoy} // 🛡️ No puede ser futura
+                  max={hoy}
                   className="w-full bg-transparent text-xs font-black text-slate-700 outline-none"
-                  value={editData.fechaAplicacion || ""} // ✅ Ahora sí usa fechaAplicacion
+                  value={editData.fechaAplicacion || ""}
                   onChange={(e) => setEditData({ ...editData, fechaAplicacion: e.target.value })}
                 />
               </div>
 
-              {/* 🛡️ INPUT CORREGIDO: PRÓXIMO REFUERZO */}
               <div className="bg-orange-50/50 p-4 rounded-3xl border border-orange-100">
                 <p className="text-[9px] font-black text-orange-600 uppercase mb-2">Próximo Refuerzo</p>
                 <input
                   type="date"
-                  min={hoy} // 🛡️ No puede ser pasada
+                  min={hoy}
                   className="w-full bg-transparent text-xs font-black text-slate-700 outline-none"
-                  value={editData.proximaFecha || ""} // ✅ Muestra dd/mm/aaaa si está vacío
+                  value={editData.proximaFecha || ""}
                   onChange={(e) => setEditData({ ...editData, proximaFecha: e.target.value })}
                 />
               </div>
             </div>
 
             <div className="bg-blue-50/50 p-5 rounded-3xl border border-blue-100">
-              <p className="text-[10px] font-black text-blue-500 uppercase mb-2 flex items-center gap-2"><Wallet size={12} /> Inversión / Precio</p>
-              <div className="relative flex items-center">
-                <span className="font-black text-slate-400 mr-1">$</span>
-                <input
-                  type="number"
-                  className="w-full bg-transparent font-black text-lg text-slate-800 border-b-2 border-slate-100 focus:border-blue-500 outline-none"
-                  value={editData.precio ?? ""}
-                  onChange={(e) => {
-                    if (e.target.value.length <= 6) setEditData({ ...editData, precio: parseFloat(e.target.value) || 0 });
-                  }} // 🛡️ Máximo 6 cifras
-                />
-              </div>
+              <p className="text-[10px] font-black text-blue-500 uppercase mb-2 flex items-center gap-2"><Wallet size={12} /> Precio ($)</p>
+              <input
+                type="number"
+                className="w-full bg-transparent font-black text-lg text-slate-800 border-b-2 border-slate-100 focus:border-blue-500 outline-none"
+                value={editData.precio ?? ""}
+                onChange={(e) => e.target.value.length <= 6 && setEditData({ ...editData, precio: parseFloat(e.target.value) || 0 })}
+              />
             </div>
 
             <div className="bg-emerald-50/30 p-4 rounded-2xl border border-emerald-100/50">
               <p className="text-[9px] font-black text-emerald-600 uppercase mb-2 flex items-center gap-1"><Syringe size={12} /> Dosis / Notas</p>
               <textarea
-                maxLength={200} // 🛡️ Blindaje de texto
                 className="w-full bg-transparent text-xs font-bold text-slate-700 outline-none resize-none"
                 rows={2}
                 value={editData.dosis || ""}
                 onChange={(e) => setEditData({ ...editData, dosis: e.target.value })}
               />
-              <p className="text-[8px] text-right text-slate-300 font-bold">{editData.dosis.length}/200</p>
             </div>
           </div>
 
           <div className="flex gap-2">
-            <button onClick={() => { setEditData(null); setSelectedImage(null); }} className="flex-1 py-4 bg-slate-100 text-slate-400 rounded-2xl font-black uppercase text-[10px] active:scale-95 transition-all">Descartar</button>
-            <button
-              onClick={handleGuardar}
-              disabled={loading}
-              className="flex-[2] py-4 bg-emerald-600 text-white rounded-2xl font-black shadow-lg uppercase text-[10px] flex items-center justify-center gap-2 active:scale-95 transition-all shadow-emerald-100 disabled:bg-slate-300"
-            >
+            <button onClick={() => { setEditData(null); setSelectedImage(null); }} className="flex-1 py-4 bg-slate-100 text-slate-400 rounded-2xl font-black uppercase text-[10px]">Descartar</button>
+            <button onClick={handleGuardar} disabled={loading} className="flex-[2] py-4 bg-emerald-600 text-white rounded-2xl font-black shadow-lg uppercase text-[10px] flex items-center justify-center gap-2 disabled:bg-slate-300">
               {loading ? <Loader2 className="animate-spin" size={14} /> : "REGISTRAR SALUD"}
             </button>
           </div>
         </div>
       )}
-      {/* CARTEL INFORMATIVO AL FINAL DE SALUD */}
-      <div className="mt-10 bg-amber-50/80 border border-amber-200 p-6 rounded-[2.5rem] shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-700">
+
+      {/* Info Footer (Intacto) */}
+      <div className="mt-10 bg-amber-50/80 border border-amber-200 p-6 rounded-[2.5rem] shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-700 text-left">
         <div className="flex items-center gap-3 mb-3">
-          <div className="bg-amber-100 p-2 rounded-xl text-amber-600">
-            <Info size={20} />
-          </div>
-          <h4 className="font-black text-amber-900 uppercase text-xs tracking-widest">
-            ¿Cómo funciona esta sección?
-          </h4>
+          <div className="bg-amber-100 p-2 rounded-xl text-amber-600"><Info size={20} /></div>
+          <h4 className="font-black text-amber-900 uppercase text-xs tracking-widest">¿Cómo funciona?</h4>
         </div>
-
-        <div className="space-y-3 text-left">
-          <div className="flex gap-3">
-            <div className="mt-1 bg-amber-200/50 h-1.5 w-1.5 rounded-full shrink-0" />
-            <p className="text-[11px] font-bold text-amber-800/90 leading-relaxed">
-              <span className="text-amber-900 font-black uppercase text-[9px]">Escaneado de Salud:</span>
-              Capturá la caja de un medicamento o la libreta de vacunación para registrar automáticamente el nombre del producto y la dosis aplicada.
-            </p>
-          </div>
-
-          <div className="flex gap-3">
-            <div className="mt-1 bg-amber-200/50 h-1.5 w-1.5 rounded-full shrink-0" />
-            <p className="text-[11px] font-bold text-amber-800/90 leading-relaxed">
-              <span className="text-amber-900 font-black uppercase text-[9px]">Escudos de Seguridad:</span>
-              Nuestra IA verifica si el producto es apto para gatos o perros, lanzando una alerta crítica si detecta un medicamento peligroso para la especie.
-            </p>
-          </div>
-
-          <div className="flex gap-3">
-            <div className="mt-1 bg-amber-200/50 h-1.5 w-1.5 rounded-full shrink-0" />
-            <p className="text-[11px] font-bold text-amber-800/90 leading-relaxed">
-              <span className="text-amber-900 font-black uppercase text-[9px]">Control de Refuerzos:</span>
-              Registramos la fecha de aplicación y calculamos el próximo vencimiento para enviarte recordatorios y mantener la cartilla siempre al día.
-            </p>
-          </div>
+        <div className="space-y-3">
+          <p className="text-[11px] font-bold text-amber-800/90 leading-relaxed"><span className="text-amber-900 font-black uppercase text-[9px]">Escaneado:</span> Capturá medicamentos o vacunas para registrarlos automáticamente.</p>
+          <p className="text-[11px] font-bold text-amber-800/90 leading-relaxed"><span className="text-amber-900 font-black uppercase text-[9px]">Seguridad:</span> La IA verifica si el producto es apto para la especie de tu mascota.</p>
+          <p className="text-[11px] font-bold text-amber-800/90 leading-relaxed"><span className="text-amber-900 font-black uppercase text-[9px]">Refuerzos:</span> Calculamos el próximo vencimiento para enviarte recordatorios.</p>
         </div>
       </div>
     </div>

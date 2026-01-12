@@ -1,9 +1,13 @@
-import React, { useState, useRef } from 'react';
-import { X, Camera, Heart, Plus, Loader2, Trash2, Info, MapPin } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, Camera as CameraIcon, Image as ImageIcon, Heart, Loader2, Trash2, Info, MapPin } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import { api } from '../../services/api';
-import Swal from 'sweetalert2'; // ✅ Importado
+import Swal from 'sweetalert2';
 import 'leaflet/dist/leaflet.css';
+
+// 🛡️ IMPORTACIONES NATIVAS
+import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
+import { useCameraPermissions } from '../../hooks/useCameraPermissions';
 
 const LocationMarker = ({ position, setPosition }: any) => {
   useMapEvents({
@@ -20,30 +24,56 @@ const AdoptionModal = ({ onClose }: { onClose: () => void }) => {
   const [posicion, setPosicion] = useState<{ lat: number, lng: number } | null>(null);
   const [previews, setPreviews] = useState<string[]>([]);
   const [archivos, setArchivos] = useState<File[]>([]);
-  const galleryInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // 🛡️ HOOK DE PERMISOS
+  const { validarCamara, validarGaleria } = useCameraPermissions();
 
-    // 🛡️ BLINDAJE: Tamaño de foto (10MB)
-    if (file.size > 10 * 1024 * 1024) {
-      Swal.fire({
-        title: 'Foto muy pesada',
-        text: 'El límite es 10MB para mantener la app rápida.',
-        icon: 'warning',
-        confirmButtonColor: '#059669',
+  // 📸 FUNCIÓN NATIVA: TOMAR FOTO
+  const handleNativeCamera = async () => {
+    if (archivos.length >= 4) return;
+    const ok = await validarCamara();
+    if (!ok) return;
+
+    try {
+      const image = await Camera.getPhoto({
+        quality: 90,
+        allowEditing: false,
+        resultType: CameraResultType.Uri,
+        source: CameraSource.Camera
       });
-      return;
-    }
 
-    if (archivos.length < 4) {
-      setArchivos(prev => [...prev, file]);
-      const reader = new FileReader();
-      reader.onloadend = () => setPreviews(prev => [...prev, reader.result as string]);
-      reader.readAsDataURL(file);
-    }
-    if (e.target) e.target.value = "";
+      if (image.webPath) {
+        setPreviews(prev => [...prev, image.webPath!]);
+        const response = await fetch(image.webPath);
+        const blob = await response.blob();
+        const file = new File([blob], `adoption_cam_${Date.now()}.jpg`, { type: 'image/jpeg' });
+        setArchivos(prev => [...prev, file]);
+      }
+    } catch (e) { console.log("Cámara cancelada"); }
+  };
+
+  // 🖼️ FUNCIÓN NATIVA: GALERÍA
+  const handleNativeGallery = async () => {
+    if (archivos.length >= 4) return;
+    const ok = await validarGaleria();
+    if (!ok) return;
+
+    try {
+      const image = await Camera.getPhoto({
+        quality: 90,
+        allowEditing: false,
+        resultType: CameraResultType.Uri,
+        source: CameraSource.Photos
+      });
+
+      if (image.webPath) {
+        setPreviews(prev => [...prev, image.webPath!]);
+        const response = await fetch(image.webPath);
+        const blob = await response.blob();
+        const file = new File([blob], `adoption_gal_${Date.now()}.jpg`, { type: 'image/jpeg' });
+        setArchivos(prev => [...prev, file]);
+      }
+    } catch (e) { console.log("Galería cancelada"); }
   };
 
   const removeFile = (index: number) => {
@@ -52,7 +82,6 @@ const AdoptionModal = ({ onClose }: { onClose: () => void }) => {
   };
 
   const handlePublicar = async () => {
-    // 🛡️ VALIDACIONES CON SWEETALERT
     if (archivos.length === 0) {
       Swal.fire({ text: 'Subí al menos una foto para que vean a la mascota.', icon: 'info', confirmButtonColor: '#059669' });
       return;
@@ -76,7 +105,6 @@ const AdoptionModal = ({ onClose }: { onClose: () => void }) => {
 
     try {
       await api.publicarMascotaAdopcion(formData);
-      
       await Swal.fire({
         title: '¡Publicado!',
         text: 'Gracias por ayudar a buscarle un hogar.',
@@ -84,7 +112,6 @@ const AdoptionModal = ({ onClose }: { onClose: () => void }) => {
         timer: 2000,
         showConfirmButton: false
       });
-
       onClose();
     } catch (e) {
       Swal.fire({ title: 'Error', text: 'No pudimos publicar la adopción.', icon: 'error' });
@@ -96,13 +123,14 @@ const AdoptionModal = ({ onClose }: { onClose: () => void }) => {
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 text-left">
       <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-6 shadow-2xl relative max-h-[95vh] overflow-y-auto animate-in zoom-in-95">
-        <button onClick={onClose} className="absolute top-6 right-6 text-slate-400 hover:text-slate-900 transition-colors"><X size={24} /></button>
+        <button onClick={onClose} className="absolute top-6 right-6 text-slate-400 hover:text-slate-900 transition-colors z-10"><X size={24} /></button>
 
         <h3 className="text-2xl font-black text-slate-800 mb-6 tracking-tight flex items-center gap-2">
           <Heart className="text-emerald-500" fill="currentColor" size={24} /> Dar en Adopción
         </h3>
 
         <div className="space-y-4">
+          {/* SECCIÓN DE FOTOS NATIVAS */}
           <div className="grid grid-cols-4 gap-2">
             {previews.map((p, i: number) => (
               <div key={i} className="relative h-20 group">
@@ -113,17 +141,27 @@ const AdoptionModal = ({ onClose }: { onClose: () => void }) => {
               </div>
             ))}
             {previews.length < 4 && (
-              <button onClick={() => galleryInputRef.current?.click()} className="h-20 bg-emerald-50 border-2 border-dashed border-emerald-100 rounded-xl flex items-center justify-center text-emerald-400 hover:bg-emerald-100 transition-colors group">
-                <Plus size={24} className="group-hover:scale-110 transition-transform" />
-                <input type="file" ref={galleryInputRef} className="hidden" onChange={handleFile} accept="image/*" />
-              </button>
+              <div className="col-span-1 flex flex-col gap-1">
+                <button 
+                  onClick={handleNativeCamera} 
+                  className="flex-1 bg-emerald-50 border-2 border-emerald-100 rounded-xl flex items-center justify-center text-emerald-600 hover:bg-emerald-100 active:scale-95 transition-all"
+                >
+                  <CameraIcon size={20} />
+                </button>
+                <button 
+                  onClick={handleNativeGallery} 
+                  className="flex-1 bg-slate-50 border-2 border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:bg-slate-100 active:scale-95 transition-all"
+                >
+                  <ImageIcon size={20} />
+                </button>
+              </div>
             )}
           </div>
 
           <div className="grid grid-cols-2 gap-2">
             <input 
               placeholder="Nombre" 
-              maxLength={20} // 🛡️ Blindaje estético
+              maxLength={20}
               className="p-3 bg-slate-50 rounded-xl font-bold outline-none text-sm border-2 border-transparent focus:border-emerald-500" 
               onChange={e => setData({ ...data, nombre: e.target.value })} 
             />
@@ -138,7 +176,7 @@ const AdoptionModal = ({ onClose }: { onClose: () => void }) => {
 
           <input 
             placeholder="Edad (ej: 2 meses)" 
-            maxLength={15} // 🛡️ Blindaje estético
+            maxLength={15}
             className="w-full p-3 bg-slate-50 rounded-xl font-bold outline-none text-sm border-2 border-transparent focus:border-emerald-500" 
             onChange={e => setData({ ...data, edad: e.target.value })} 
           />
@@ -150,7 +188,7 @@ const AdoptionModal = ({ onClose }: { onClose: () => void }) => {
               className="w-full p-3 bg-slate-50 rounded-xl font-bold outline-none text-sm border-2 border-transparent focus:border-emerald-500"
               onChange={e => setData({ ...data, direccion: e.target.value })}
             />
-            <div className="h-32 rounded-2xl overflow-hidden border-2 border-slate-100 relative grayscale-[0.2] shadow-inner">
+            <div className="h-32 rounded-2xl overflow-hidden border-2 border-slate-100 relative grayscale-[0.2] shadow-inner z-0">
               <MapContainer center={[-34.6037, -58.3816]} zoom={11} zoomControl={false} style={{ height: '100%', width: '100%' }}>
                 <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                 <LocationMarker position={posicion} setPosition={setPosicion} />
@@ -166,8 +204,8 @@ const AdoptionModal = ({ onClose }: { onClose: () => void }) => {
           <div className="space-y-1">
             <textarea 
               placeholder="Descripción..." 
-              maxLength={200} // 🛡️ Blindaje estético
-              className="w-full p-3 bg-slate-50 rounded-xl font-bold min-h-[60px] outline-none text-sm border-2 border-transparent focus:border-emerald-500 transition-all" 
+              maxLength={200}
+              className="w-full p-3 bg-slate-50 rounded-xl font-bold min-h-[60px] outline-none text-sm border-2 border-transparent focus:border-emerald-500 transition-all resize-none" 
               onChange={e => setData({ ...data, descripcion: e.target.value })} 
             />
             <p className="text-[9px] text-right text-slate-400 font-bold px-2">{data.descripcion.length}/200</p>

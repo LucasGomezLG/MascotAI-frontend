@@ -1,8 +1,12 @@
-import React, { useState, useRef } from 'react';
-import { X, Camera, MapPin, Loader2, Search, Trash2, Clock } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Camera as CameraIcon, MapPin, Loader2, Search, Trash2, Clock, Image as ImageIcon } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
 import { api } from '../../services/api';
-import Swal from 'sweetalert2'; // ✅ Importado
+import Swal from 'sweetalert2';
+
+// 🛡️ IMPORTACIONES NATIVAS
+import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
+import { useCameraPermissions } from '../../hooks/useCameraPermissions';
 
 function ChangeView({ center }: { center: [number, number] }) {
   const map = useMap();
@@ -22,30 +26,51 @@ const LostPetModal = ({ onClose }: { onClose: () => void }) => {
 
   const [previews, setPreviews] = useState<string[]>([]);
   const [archivos, setArchivos] = useState<File[]>([]);
-  const galleryInputRef = useRef<HTMLInputElement>(null);
+  
+  // 🛡️ HOOK DE PERMISOS (Funciones separadas)
+  const { validarCamara, validarGaleria } = useCameraPermissions();
 
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // 📸 FUNCIÓN NATIVA: TOMAR FOTO (Cámara física)
+  const handleCamera = async () => {
+    if (archivos.length >= 2) return;
+    if (!(await validarCamara())) return;
 
-    // 🛡️ BLINDAJE: Tamaño de foto
-    if (file.size > 10 * 1024 * 1024) {
-      Swal.fire({
-        title: 'Foto muy pesada',
-        text: 'Para reportes rápidos, el límite es 10MB.',
-        icon: 'warning',
-        confirmButtonColor: '#dc2626', // Rojo para emergencia
+    try {
+      const image = await Camera.getPhoto({
+        quality: 80,
+        allowEditing: false,
+        resultType: CameraResultType.Uri,
+        source: CameraSource.Camera
       });
-      return;
-    }
+      await procesarImagen(image);
+    } catch (e) { console.log("Cámara cancelada"); }
+  };
 
-    if (archivos.length < 2) {
+  // 🖼️ FUNCIÓN NATIVA: ELEGIR DE GALERÍA (Fotos guardadas)
+  const handleGallery = async () => {
+    if (archivos.length >= 2) return;
+    if (!(await validarGaleria())) return;
+
+    try {
+      const image = await Camera.getPhoto({
+        quality: 80,
+        allowEditing: false,
+        resultType: CameraResultType.Uri,
+        source: CameraSource.Photos
+      });
+      await procesarImagen(image);
+    } catch (e) { console.log("Galería cancelada"); }
+  };
+
+  // 🔄 PROCESADOR COMÚN (Convierte a File para el Backend)
+  const procesarImagen = async (image: any) => {
+    if (image.webPath) {
+      setPreviews(prev => [...prev, image.webPath!]);
+      const response = await fetch(image.webPath);
+      const blob = await response.blob();
+      const file = new File([blob], `lost_${Date.now()}.jpg`, { type: 'image/jpeg' });
       setArchivos(prev => [...prev, file]);
-      const reader = new FileReader();
-      reader.onloadend = () => setPreviews(prev => [...prev, reader.result as string]);
-      reader.readAsDataURL(file);
     }
-    if (e.target) e.target.value = "";
   };
 
   const removeFile = (index: number) => {
@@ -55,57 +80,28 @@ const LostPetModal = ({ onClose }: { onClose: () => void }) => {
 
   const handleBuscarDireccion = async () => {
     if (data.direccion.length < 4) {
-      Swal.fire({
-        text: 'Escribí una dirección más completa para ubicarla en el mapa.',
-        icon: 'info',
-        confirmButtonColor: '#1e293b',
-      });
+      Swal.fire({ text: 'Escribí una dirección más completa.', icon: 'info' });
       return;
     }
-    
     setBuscando(true);
     try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(data.direccion + ", Buenos Aires")}`
-      );
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(data.direccion + ", Buenos Aires")}`);
       const results = await response.json();
       if (results.length > 0) {
-        const { lat, lon } = results[0];
-        setData(prev => ({ ...prev, lat: parseFloat(lat), lng: parseFloat(lon) }));
+        setData(prev => ({ ...prev, lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon) }));
       } else {
-        Swal.fire({
-          title: 'No encontrada',
-          text: 'No pudimos ubicar esa dirección. Intentá ser más específico.',
-          icon: 'question',
-          confirmButtonColor: '#1e293b',
-        });
+        Swal.fire({ title: 'No encontrada', text: 'Intentá ser más específico.', icon: 'question' });
       }
     } catch (e) {
-      Swal.fire({
-        title: 'Error de Mapas',
-        text: 'Hubo un problema al conectar con el servidor de mapas.',
-        icon: 'error',
-      });
-    } finally {
-      setBuscando(false);
-    }
+      Swal.fire({ title: 'Error', text: 'Problema con el servidor de mapas.', icon: 'error' });
+    } finally { setBuscando(false); }
   };
 
   const handlePublicar = async () => {
-    // 🛡️ VALIDACIONES DE PUBLICACIÓN
     if (archivos.length === 0) {
-      Swal.fire({ text: 'Por favor, subí al menos una foto de la mascota.', icon: 'warning', confirmButtonColor: '#dc2626' });
+      Swal.fire({ text: 'Subí al menos una foto.', icon: 'warning' });
       return;
     }
-    if (data.descripcion.length < 10) {
-      Swal.fire({ text: 'La descripción debe tener al menos 10 caracteres para ayudar en la búsqueda.', icon: 'warning', confirmButtonColor: '#dc2626' });
-      return;
-    }
-    if (!data.direccion) {
-      Swal.fire({ text: 'La dirección es obligatoria.', icon: 'warning', confirmButtonColor: '#dc2626' });
-      return;
-    }
-
     setLoading(true);
     const formData = new FormData();
     archivos.forEach(file => formData.append('files', file));
@@ -116,64 +112,56 @@ const LostPetModal = ({ onClose }: { onClose: () => void }) => {
 
     try {
       await api.reportarMascotaPerdida(formData);
-      
-      await Swal.fire({
-        title: '¡Reporte Publicado!',
-        text: 'La comunidad de MascotAI ya puede verlo. ¡Ojalá aparezca pronto!',
-        icon: 'success',
-        timer: 3000,
-        showConfirmButton: false
-      });
-
+      await Swal.fire({ title: '¡Publicado!', text: 'La comunidad ya puede verlo.', icon: 'success', timer: 2500, showConfirmButton: false });
       onClose();
     } catch (e) {
-      Swal.fire({ title: 'Error', text: 'No pudimos publicar el reporte. Intentá de nuevo.', icon: 'error' });
-    } finally {
-      setLoading(false);
-    }
+      Swal.fire({ title: 'Error', text: 'No pudimos publicar el reporte.', icon: 'error' });
+    } finally { setLoading(false); }
   };
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 text-left">
       <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-6 shadow-2xl relative max-h-[95vh] overflow-y-auto">
-        <button onClick={onClose} className="absolute top-6 right-6 text-slate-400 hover:text-red-500"><X size={24} /></button>
+        <button 
+          onClick={onClose} 
+          className="absolute right-6 text-slate-400 hover:text-red-500 z-10"
+          style={{ top: 'calc(1.5rem + env(safe-area-inset-top))' }}
+        >
+          <X size={24} />
+        </button>
+
         <h3 className="text-2xl font-black text-slate-800 mb-6 tracking-tight italic">Reportar Mascota</h3>
 
         <div className="space-y-5">
+          {/* FOTOS CON BOTONES SEPARADOS */}
           <div className="grid grid-cols-2 gap-2">
             {previews.map((p, i) => (
-              <div key={i} className="relative group h-24">
-                <img src={p} className="w-full h-full object-cover rounded-2xl border-2 border-slate-100 shadow-sm" alt="Preview" />
-                <button
-                  onClick={() => removeFile(i)}
-                  className="absolute -top-2 -right-2 bg-red-600 text-white p-1.5 rounded-full shadow-lg active:scale-90 transition-transform"
-                >
-                  <Trash2 size={12} />
-                </button>
+              <div key={i} className="relative h-24">
+                <img src={p} className="w-full h-full object-cover rounded-2xl border-2 border-slate-100" alt="Preview" />
+                <button onClick={() => removeFile(i)} className="absolute -top-2 -right-2 bg-red-600 text-white p-1.5 rounded-full shadow-lg"><Trash2 size={12} /></button>
               </div>
             ))}
             {previews.length < 2 && (
-              <button
-                onClick={() => galleryInputRef.current?.click()}
-                className="h-24 bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center text-slate-400 hover:text-red-500 hover:border-red-200 transition-all group"
-              >
-                <Camera size={24} className="group-hover:scale-110 transition-transform" />
-                <span className="text-[8px] font-black uppercase mt-1">Añadir foto</span>
-                <input type="file" ref={galleryInputRef} className="hidden" onChange={handleFile} accept="image/*" />
-              </button>
+              <div className="flex gap-2 h-24 col-span-1">
+                <button onClick={handleCamera} className="flex-1 bg-red-50 border-2 border-dashed border-red-100 rounded-2xl flex flex-col items-center justify-center text-red-400 hover:bg-red-100 transition-all">
+                  <CameraIcon size={20} />
+                  <span className="text-[7px] font-black uppercase mt-1">Cámara</span>
+                </button>
+                <button onClick={handleGallery} className="flex-1 bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center text-slate-400 hover:bg-slate-100 transition-all">
+                  <ImageIcon size={20} />
+                  <span className="text-[7px] font-black uppercase mt-1">Galería</span>
+                </button>
+              </div>
             )}
           </div>
 
-          <div className="space-y-1">
-             <textarea
-                placeholder="Descripción (ej: Collar azul, asustadizo...)"
-                maxLength={200} // 🛡️ Límite físico
-                className="w-full p-4 bg-slate-50 rounded-xl font-bold min-h-[80px] outline-none text-sm border-2 border-transparent focus:border-red-500 transition-all"
-                value={data.descripcion}
-                onChange={e => setData({ ...data, descripcion: e.target.value })}
-              />
-              <p className="text-[9px] text-right text-slate-400 font-bold px-2">{data.descripcion.length}/200</p>
-          </div>
+          <textarea
+            placeholder="Descripción (ej: Collar azul, asustadizo...)"
+            maxLength={200}
+            className="w-full p-4 bg-slate-50 rounded-xl font-bold min-h-[80px] outline-none text-sm border-2 border-transparent focus:border-red-500 transition-all resize-none"
+            value={data.descripcion}
+            onChange={e => setData({ ...data, descripcion: e.target.value })}
+          />
 
           <div className="space-y-2">
             <div className="relative">
@@ -184,18 +172,11 @@ const LostPetModal = ({ onClose }: { onClose: () => void }) => {
                 value={data.direccion}
                 onChange={e => setData({ ...data, direccion: e.target.value })}
               />
-              <button
-                onClick={handleBuscarDireccion}
-                disabled={buscando}
-                className="absolute right-2 top-2 bottom-2 px-3 bg-slate-800 text-white rounded-lg text-[9px] font-black uppercase flex items-center gap-1 active:scale-95 transition-all disabled:opacity-50"
-              >
-                {buscando ? <Loader2 size={12} className="animate-spin" /> : <Search size={12} />}
-                Buscar
-              </button>
+              <button onClick={handleBuscarDireccion} className="absolute right-2 top-2 bottom-2 px-3 bg-slate-800 text-white rounded-lg text-[9px] font-black uppercase">{buscando ? <Loader2 className="animate-spin" size={12} /> : "Buscar"}</button>
             </div>
 
-            <div className="h-32 rounded-2xl overflow-hidden border-2 border-slate-100 relative shadow-inner">
-              <MapContainer center={[data.lat, data.lng]} zoom={15} zoomControl={false} style={{ height: '100%' }}>
+            <div className="h-32 rounded-2xl overflow-hidden border-2 border-slate-100 relative z-0 shadow-inner">
+              <MapContainer center={[data.lat, data.lng]} zoom={15} zoomControl={false} style={{ height: '100%', width: '100%' }}>
                 <ChangeView center={[data.lat, data.lng]} />
                 <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                 <Marker position={[data.lat, data.lng]} />
@@ -205,16 +186,10 @@ const LostPetModal = ({ onClose }: { onClose: () => void }) => {
 
           <div className="flex items-center gap-2 px-4 py-3 bg-orange-50 rounded-xl border border-orange-100">
             <Clock size={14} className="text-orange-500" />
-            <p className="text-[10px] font-bold text-orange-700 leading-tight">
-              Aviso: Este reporte caduca en 30 días para mantener el mapa actualizado.
-            </p>
+            <p className="text-[10px] font-bold text-orange-700 leading-tight">Aviso: El reporte caduca en 30 días.</p>
           </div>
 
-          <button
-            onClick={handlePublicar}
-            disabled={loading}
-            className="w-full py-5 bg-red-600 text-white rounded-2xl font-black shadow-lg shadow-red-100 flex items-center justify-center gap-2 active:scale-95 transition-all disabled:bg-slate-300"
-          >
+          <button onClick={handlePublicar} disabled={loading} className="w-full py-5 bg-red-600 text-white rounded-2xl font-black shadow-lg shadow-red-100 flex items-center justify-center gap-2 active:scale-95 transition-all">
             {loading ? <Loader2 className="animate-spin" /> : "PUBLICAR REPORTE"}
           </button>
         </div>

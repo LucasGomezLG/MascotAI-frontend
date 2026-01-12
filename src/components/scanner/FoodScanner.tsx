@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
-  Camera, Loader2, Utensils, User, Wallet, Search,
+  Camera as CameraIcon, Loader2, Utensils, User, Wallet, Search,
   CheckCircle, MessageCircle, Sparkles, ThumbsUp, ThumbsDown,
   ShoppingBag, X, Package, AlertCircle, RefreshCw,
   Image as ImageIcon,
@@ -10,7 +10,9 @@ import { api } from '../../services/api';
 import { Toast } from '../../utils/alerts';
 import Swal from 'sweetalert2';
 
-// Reemplaza tu componente FoodScanner con esta versión corregida:
+// 🛡️ IMPORTACIONES NATIVAS
+import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
+import { useCameraPermissions } from '../../hooks/useCameraPermissions';
 
 const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) => {
   const [selectedPet, setSelectedPet] = useState("");
@@ -26,9 +28,10 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
   const [resenas, setResenas] = useState<string[]>([]);
   const [showPriceModal, setShowPriceModal] = useState(false);
   const [showBrandWarning, setShowBrandWarning] = useState(false);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
-  const galleryInputRef = useRef<HTMLInputElement>(null);
   const [alertasSalud, setAlertasSalud] = useState<any[]>([]);
+
+  // 🛡️ HOOK DE PERMISOS (Funciones separadas)
+  const { validarCamara, validarGaleria } = useCameraPermissions();
 
   const petData = useMemo(() =>
     mascotas.find((p: any) => p.id === selectedPet),
@@ -50,10 +53,7 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
     api.getAlertasSalud().then(res => setAlertasSalud(res.data || []));
 
     if (initialData) {
-      // ✅ NORMALIZACIÓN CLAVE: Si viene del historial, "envolvemos" el objeto 
-      // para que el resto del código (que busca result.alimento) no rompa.
       const normalized = initialData.alimento ? initialData : { alimento: initialData, ...initialData };
-
       setResult(normalized);
       setPorcion(normalized.alimento?.porcionRecomendada || null);
       setPrecioInput(normalized.alimento?.precioComprado?.toString() || "");
@@ -66,33 +66,50 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
     }
   }, [initialData]);
 
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // 📸 FUNCIÓN NATIVA: CAPTURAR FOTO (Solo pide cámara)
+  const handleNativeCamera = async () => {
+    const ok = await validarCamara();
+    if (!ok) return;
 
-    // 🛡️ BLINDAJE: Tamaño de foto (10MB)
-    if (file.size > 10 * 1024 * 1024) {
-      Swal.fire({
-        title: 'Foto muy pesada',
-        text: 'El límite es 10MB para mantener el escaneo rápido.',
-        icon: 'warning',
-        confirmButtonColor: '#f27121',
+    try {
+      const image = await Camera.getPhoto({
+        quality: 90,
+        allowEditing: false,
+        resultType: CameraResultType.Base64,
+        source: CameraSource.Camera
       });
-      return;
-    }
 
-    setResult(null);
-    setPorcion(null);
-    setPrecioInput("");
-    setPesoBolsaInput("");
-    setResenas([]);
-    setBusquedaResult([]);
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setSelectedImage(reader.result as string);
-      e.target.value = "";
-    };
-    reader.readAsDataURL(file);
+      if (image.base64String) {
+        setSelectedImage(`data:image/jpeg;base64,${image.base64String}`);
+        setResult(null);
+        setPorcion(null);
+        setResenas([]);
+      }
+    } catch (error) {
+      console.log("Cámara cancelada");
+    }
+  };
+
+  // 🖼️ FUNCIÓN NATIVA: GALERÍA (Solo pide fotos)
+  const handleNativeGallery = async () => {
+    const ok = await validarGaleria();
+    if (!ok) return;
+
+    try {
+      const image = await Camera.getPhoto({
+        quality: 90,
+        allowEditing: false,
+        resultType: CameraResultType.Base64,
+        source: CameraSource.Photos
+      });
+
+      if (image.base64String) {
+        setSelectedImage(`data:image/jpeg;base64,${image.base64String}`);
+        setResult(null);
+      }
+    } catch (error) {
+      console.log("Galería cancelada");
+    }
   };
 
   const handleBorrarFoto = (e: React.MouseEvent) => {
@@ -105,7 +122,6 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
     setLoading(true);
     try {
       const res = await api.analizarAlimento(selectedImage, selectedPet || "");
-      // El escaneo nuevo ya viene con la estructura { alimento: {...} }
       setResult(res.data);
 
       if (res.data.error === "NO_ES_ALIMENTO") return;
@@ -141,26 +157,23 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
 
   const sincronizarFinanzas = async () => {
     if (!result?.alimento?.id || !precioInput || !pesoBolsaInput) return;
-
     const p = parseFloat(precioInput);
     const w = parseFloat(pesoBolsaInput);
 
-    // 🛡️ BLINDAJE: Evita que el precio sea menor al peso (error de tipeo común)
     if (p < w) {
       Swal.fire({
         title: '¿Valores invertidos?',
-        text: `Ingresaste un precio ($${p}) menor al peso (${w}kg). ¿Estás seguro de que no los trocaste?`,
+        text: `Ingresaste un precio ($${p}) menor al peso (${w}kg). ¿Estás seguro?`,
         icon: 'question',
         confirmButtonColor: '#f27121',
         showCancelButton: true,
-        confirmButtonText: 'Sí, es correcto',
-        cancelButtonText: 'Dejame corregir'
+        confirmButtonText: 'Sí',
+        cancelButtonText: 'Corregir'
       }).then((res) => {
         if (res.isConfirmed) enviarFinanzas(p, w);
       });
       return;
     }
-
     enviarFinanzas(p, w);
   };
 
@@ -177,61 +190,10 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
     } catch (e) { console.error(e); }
   };
 
-  // 🛡️ FUNCIÓN DE VALIDACIÓN COMPARTIDA
-  const validarDatosFinancieros = () => {
-    const p = parseFloat(precioInput);
-    const w = parseFloat(pesoBolsaInput);
-
-    if (!p || !w || p <= 0 || w <= 0) {
-      Swal.fire({
-        title: 'Datos incompletos',
-        text: 'Ingresá un precio y un peso válidos antes de continuar.',
-        icon: 'warning',
-        confirmButtonColor: '#f27121'
-      });
-      return false;
-    }
-
-    // 🛡️ BLINDAJE: Si el precio es menor al peso (ej: $15 < 15kg)
-    if (p < w) {
-      Swal.fire({
-        title: '¿Valores invertidos?',
-        text: `El precio ($${p}) es menor al peso (${w}kg). ¿Estás seguro de que están bien?`,
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonColor: '#f27121',
-        confirmButtonText: 'Sí, es correcto',
-        cancelButtonText: 'Corregir'
-      }).then((result) => {
-        if (result.isConfirmed) return true;
-      });
-      return false; // Frena la ejecución hasta que confirme o corrija
-    }
-    return true;
-  };
-
   const handleActivarBolsa = async () => {
     if (!result?.alimento?.id) return;
-
-    const p = parseFloat(precioInput);
-    const w = parseFloat(pesoBolsaInput);
-
-    // Validamos antes de activar
-    if (p < w) {
-      const confirm = await Swal.fire({
-        title: 'Revisá los datos',
-        text: `¿El precio es $${p} por una bolsa de ${w}kg? Parece estar al revés.`,
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonText: 'Activar igual',
-        cancelButtonText: 'Cancelar'
-      });
-      if (!confirm.isConfirmed) return;
-    }
-
     try {
       await api.activarStock(result.alimento.id, {
-        // 🛡️ Cambiamos los nombres para que coincidan con el Backend
         precioComprado: precioInput,
         pesoBolsaKg: pesoBolsaInput,
         costoDiario: calcularCostoDiario()
@@ -279,13 +241,12 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* ... Alertas de Salud (Mantenido igual) ... */}
       {alertasSalud.length > 0 && (
-        <div className="mb-6 space-y-2">
+        <div className="mb-6 space-y-2 text-left">
           {alertasSalud.map((alerta, idx) => (
             <div key={idx} className="bg-red-600 text-white p-4 rounded-2xl shadow-lg flex items-center gap-3 border-2 border-red-400">
               <div className="bg-white/20 p-2 rounded-lg"><AlertCircle size={20} /></div>
-              <div className="flex-1 text-left">
+              <div className="flex-1">
                 <p className="text-[10px] font-black uppercase opacity-80 leading-none mb-1 tracking-widest">Alerta de Salud</p>
                 <p className="text-xs font-black">{alerta.tipo}: {alerta.nombre} vence el {alerta.proximaFecha}</p>
               </div>
@@ -295,8 +256,8 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
       )}
 
       {!result ? (
-        <div className="space-y-6">
-          <div className="bg-white p-6 rounded-[2.5rem] shadow-xl border border-orange-100 text-left">
+        <div className="space-y-6 text-left">
+          <div className="bg-white p-6 rounded-[2.5rem] shadow-xl border border-orange-100">
             <label className="text-[10px] font-black text-orange-900 uppercase tracking-widest flex items-center gap-2 mb-3">
               <User size={14} /> Mascota
             </label>
@@ -313,7 +274,7 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
           </div>
 
           <div
-            onClick={() => cameraInputRef.current?.click()}
+            onClick={handleNativeCamera} // 📸 Pide solo cámara
             className="bg-white h-64 border-4 border-dashed border-orange-100 rounded-[2.5rem] flex flex-col items-center justify-center cursor-pointer hover:border-orange-300 transition-all active:scale-95 group relative overflow-hidden shadow-inner"
           >
             {selectedImage ? (
@@ -327,41 +288,38 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
               </>
             ) : (
               <>
-                <Camera size={60} className="text-orange-200 mb-4 group-hover:text-orange-400" />
-                <p className="text-orange-900/40 font-black uppercase text-[10px] tracking-widest px-6 text-center leading-tight">Toca para capturar la etiqueta</p>
+                <CameraIcon size={60} className="text-orange-200 mb-4 group-hover:text-orange-400" />
+                <p className="text-orange-900/40 font-black uppercase text-[10px] tracking-widest px-6 text-center leading-tight">Capturar Etiqueta (Cámara)</p>
               </>
             )}
           </div>
 
           <button
             type="button"
-            onClick={() => galleryInputRef.current?.click()}
+            onClick={handleNativeGallery} // 🖼️ Pide solo fotos
             className="w-full py-3 rounded-2xl font-black text-xs uppercase bg-slate-100 text-slate-500 border-2 border-slate-200 hover:bg-slate-200 transition-all flex items-center justify-center gap-2 active:scale-95"
           >
-            <ImageIcon size={16} /> O cargar imagen de galería
+            <ImageIcon size={16} /> Cargar desde Galería
           </button>
 
           <div className="w-full">
             <button
               type="button"
-              onClick={selectedImage ? handleScan : () => cameraInputRef.current?.click()}
+              onClick={selectedImage ? handleScan : handleNativeCamera}
               disabled={loading}
               className={`w-full flex items-center justify-center gap-3 py-6 rounded-2xl font-black text-xl shadow-xl transition-all active:scale-95 ${loading ? 'bg-orange-200' : 'bg-orange-600 text-white shadow-orange-200 hover:bg-orange-700'}`}
             >
-              {loading ? <Loader2 className="animate-spin" /> : selectedImage ? <><Sparkles size={22} className="text-orange-200" /> ESCANEAR AHORA</> : "ESCANEAR ETIQUETA"}
+              {loading ? <Loader2 className="animate-spin" /> : selectedImage ? <><Sparkles size={22} className="text-orange-200" /> ESCANEAR AHORA</> : "ABRIR CÁMARA"}
             </button>
-            <input type="file" ref={cameraInputRef} className="hidden" accept="image/*" capture="environment" onChange={handleFile} />
-            <input type="file" ref={galleryInputRef} className="hidden" accept="image/*" onChange={handleFile} />
           </div>
         </div>
       ) : (
-        /* VISTA DE RESULTADOS */
         <div className="bg-white rounded-[2.5rem] shadow-2xl p-8 border-2 border-orange-50 text-left animate-in zoom-in-95">
           {result.error === "NO_ES_ALIMENTO" ? (
             <div className="bg-red-50 border-2 border-red-100 p-8 rounded-3xl text-center">
-              <div className="bg-red-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-red-600"><Camera size={32} /></div>
-              <h3 className="text-red-900 font-black uppercase text-xs tracking-widest mb-2">Imagen no reconocida</h3>
-              <p className="text-red-700 text-[11px] font-bold italic leading-relaxed">MascotAI no detectó alimento. Intentá capturar la tabla nutricional más de cerca.</p>
+              <div className="bg-red-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-red-600"><CameraIcon size={32} /></div>
+              <h3 className="text-red-900 font-black uppercase text-xs tracking-widest mb-2">No detectado</h3>
+              <p className="text-red-700 text-[11px] font-bold italic leading-relaxed">No se detectó un alimento. Enfocá mejor la tabla nutricional.</p>
             </div>
           ) : (
             <>
@@ -382,7 +340,7 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
                         <div className="grid grid-cols-2 gap-y-3 pt-3 border-t border-white/20">
                           <div><p className="text-[8px] font-black uppercase opacity-60">Mascota</p><p className="text-sm font-bold">{petData.nombre}</p></div>
                           <div><p className="text-[8px] font-black uppercase opacity-60">Edad</p><p className="text-sm font-bold">{calcularEdad(petData.fechaNacimiento)} años</p></div>
-                          <div className="col-span-2"><p className="text-[8px] font-black uppercase opacity-60">Estado de salud</p><p className="text-sm font-bold">{petData.condicion}</p></div>
+                          <div className="col-span-2"><p className="text-[8px] font-black uppercase opacity-60">Salud</p><p className="text-sm font-bold">{petData.condicion}</p></div>
                         </div>
                       </>
                     ) : (
@@ -398,43 +356,36 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
                 <div className="bg-blue-50 p-6 rounded-3xl border border-blue-100 space-y-4">
                   <div className="flex items-center gap-2 text-blue-900 font-black text-xs uppercase tracking-widest"><Wallet size={16} /> Pet Finance</div>
                   <div className="flex gap-2">
-                    {/* PRECIO: Máximo 6 caracteres (ej: 999.999) */}
                     <input
                       type="number"
                       placeholder="Precio ($)"
                       className="w-1/2 p-3 rounded-xl border border-blue-200 font-bold"
                       value={precioInput}
-                      onChange={e => {
-                        if (e.target.value.length <= 6) setPrecioInput(e.target.value);
-                      }}
+                      onChange={e => e.target.value.length <= 6 && setPrecioInput(e.target.value)}
                       onBlur={sincronizarFinanzas}
                     />
-
-                    {/* PESO: Máximo 6 caracteres (ej: 100.00) */}
                     <input
                       type="number"
                       placeholder="Bolsa (kg)"
                       className="w-1/2 p-3 rounded-xl border border-blue-200 font-bold"
                       value={pesoBolsaInput}
-                      onChange={e => {
-                        if (e.target.value.length <= 6) setPesoBolsaInput(e.target.value);
-                      }}
+                      onChange={e => e.target.value.length <= 6 && setPesoBolsaInput(e.target.value)}
                       onBlur={sincronizarFinanzas}
                     />
                   </div>
                   {calcularCostoDiario() && (
                     <div className="bg-white p-3 rounded-xl border-2 border-blue-100 text-center">
-                      <p className="text-[10px] font-black text-blue-400 uppercase leading-none mb-1 tracking-tighter">Costo Diario Estimado</p>
+                      <p className="text-[10px] font-black text-blue-400 uppercase tracking-tighter mb-1">Costo Diario Estimado</p>
                       <p className="text-xl font-black text-blue-700">${calcularCostoDiario()}</p>
                     </div>
                   )}
                   {!result.alimento?.stockActivo && pesoBolsaInput && (
-                    <button onClick={handleActivarBolsa} className="w-full py-3 bg-orange-600 text-white rounded-xl font-black text-[10px] uppercase flex items-center justify-center gap-2 shadow-lg shadow-orange-100"><Package size={14} /> ¡Empecé esta bolsa hoy!</button>
+                    <button onClick={handleActivarBolsa} className="w-full py-3 bg-orange-600 text-white rounded-xl font-black text-[10px] uppercase shadow-lg shadow-orange-100 active:scale-95 transition-all flex items-center justify-center gap-2"><Package size={14} /> ¡Empecé esta bolsa hoy!</button>
                   )}
                   {result.alimento?.stockActivo && (
                     <div className="bg-green-100 text-green-700 p-3 rounded-xl flex items-center justify-center gap-2 font-black text-[10px] uppercase"><CheckCircle size={14} /> Bolsa en seguimiento</div>
                   )}
-                  <button onClick={handleBuscarPrecios} disabled={loadingBusqueda} className={`w-full py-3 rounded-xl font-black text-xs flex items-center justify-center gap-2 shadow-md ${loadingBusqueda ? 'bg-blue-200' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
+                  <button onClick={handleBuscarPrecios} disabled={loadingBusqueda} className={`w-full py-3 rounded-xl font-black text-xs flex items-center justify-center gap-2 shadow-md ${loadingBusqueda ? 'bg-blue-200' : 'bg-blue-600 text-white'}`}>
                     {loadingBusqueda ? <Loader2 className="animate-spin" size={14} /> : <Search size={14} />} BUSCAR PRECIOS ONLINE
                   </button>
                 </div>
@@ -444,24 +395,24 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
                 GAMA: {result.alimento?.calidad || result.alimento?.gama || "---"}
               </div>
               <p className="bg-orange-50 p-6 rounded-2xl mb-6 italic text-slate-800 text-center text-lg">
-                "{result.alimento?.veredicto || result.alimento?.analisis || "No hay veredicto disponible."}"
+                "{result.alimento?.veredicto || result.alimento?.analisis || "Veredicto no disponible"}"
               </p>
 
               <div className="mb-8">
                 <h3 className="font-black text-slate-800 flex items-center gap-2 mb-4 uppercase text-[10px] tracking-wider"><CheckCircle size={14} className="text-green-500" /> Ingredientes</h3>
                 <div className="flex flex-wrap gap-2">
-                  {/* Manejo de ingredientes tanto si es Array como String */}
                   {(Array.isArray(result.alimento?.ingredientes) ? result.alimento.ingredientes : result.alimento?.ingredientes?.split(',') || []).map((ing: string, i: number) => (
                     <span key={i} className="bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-xl text-[11px] font-bold text-slate-600">{ing.trim()}</span>
                   ))}
                 </div>
               </div>
 
-              {/* ... El resto de Opiniones se mantiene igual ... */}
               <div className="space-y-4 mb-8">
                 <div className="flex items-center justify-between">
                   <h3 className="font-black text-slate-800 flex items-center gap-2 uppercase text-[10px] tracking-wider"><MessageCircle size={14} className="text-blue-500" /> Opiniones</h3>
-                  <button onClick={handleBuscarResenas} disabled={loadingResenas} className="text-[9px] font-black text-blue-600 uppercase flex items-center gap-1">{loadingResenas ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />} Ver reseñas</button>
+                  <button onClick={handleBuscarResenas} disabled={loadingResenas} className="text-[9px] font-black text-blue-600 uppercase flex items-center gap-1">
+                    {loadingResenas ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />} Ver reseñas
+                  </button>
                 </div>
                 {resenas.length > 0 && (
                   <div className="grid gap-3">
@@ -479,18 +430,17 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
               </div>
             </>
           )}
-
           <button onClick={() => { setResult(null); setSelectedImage(null); onReset(); }} className="w-full py-4 bg-slate-900 text-white font-black text-xs uppercase tracking-widest rounded-2xl mt-6">FINALIZAR</button>
         </div>
       )}
-      {/* ... Modal de Precios (Mantenido igual) ... */}
+
       {showPriceModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-6">
           <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 relative animate-in zoom-in-95 text-left">
             <button onClick={() => setShowPriceModal(false)} className="absolute top-6 right-6 text-slate-400"><X size={24} /></button>
             <div className="flex items-center gap-4 mb-6">
               <div className="bg-blue-100 p-3 rounded-2xl text-blue-600"><ShoppingBag size={24} /></div>
-              <div><h3 className="text-xl font-black text-slate-800 leading-none">Ofertas Hoy</h3><p className="text-blue-500 font-bold text-[10px] uppercase mt-1">Precios en Argentina</p></div>
+              <div><h3 className="text-xl font-black text-slate-800 leading-none">Ofertas Hoy</h3><p className="text-blue-500 font-bold text-[10px] uppercase mt-1">Argentina</p></div>
             </div>
             <div className="space-y-3 mb-8 max-h-[350px] overflow-y-auto pr-2">
               {busquedaResult.map((o, i) => (
@@ -504,41 +454,16 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
           </div>
         </div>
       )}
-      {/* CARTEL INFORMATIVO AL FINAL */}
+
       <div className="mt-10 bg-amber-50/80 border border-amber-200 p-6 rounded-[2.5rem] shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-700">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="bg-amber-100 p-2 rounded-xl text-amber-600">
-            <Info size={20} />
-          </div>
-          <h4 className="font-black text-amber-900 uppercase text-xs tracking-widest">
-            ¿Cómo funciona esta sección?
-          </h4>
+        <div className="flex items-center gap-3 mb-3 text-left">
+          <div className="bg-amber-100 p-2 rounded-xl text-amber-600"><Info size={20} /></div>
+          <h4 className="font-black text-amber-900 uppercase text-xs tracking-widest">¿Cómo funciona?</h4>
         </div>
-
         <div className="space-y-3 text-left">
-          <div className="flex gap-3">
-            <div className="mt-1 bg-amber-200/50 h-1.5 w-1.5 rounded-full shrink-0" />
-            <p className="text-[11px] font-bold text-amber-800/90 leading-relaxed">
-              <span className="text-amber-900 font-black uppercase text-[9px]">Análisis Inteligente:</span>
-              Escaneá la tabla nutricional para conocer la calidad del alimento (Gama) y un veredicto sobre sus ingredientes.
-            </p>
-          </div>
-
-          <div className="flex gap-3">
-            <div className="mt-1 bg-amber-200/50 h-1.5 w-1.5 rounded-full shrink-0" />
-            <p className="text-[11px] font-bold text-amber-800/90 leading-relaxed">
-              <span className="text-amber-900 font-black uppercase text-[9px]">Raciones Exactas:</span>
-              Calculamos automáticamente cuántos gramos debe comer tu mascota según su edad, peso y estado de salud.
-            </p>
-          </div>
-
-          <div className="flex gap-3">
-            <div className="mt-1 bg-amber-200/50 h-1.5 w-1.5 rounded-full shrink-0" />
-            <p className="text-[11px] font-bold text-amber-800/90 leading-relaxed">
-              <span className="text-amber-900 font-black uppercase text-[9px]">Pet Finance:</span>
-              Registrá el costo de la bolsa para saber cuánto gastás por día y compará precios online para ahorrar.
-            </p>
-          </div>
+          <p className="text-[11px] font-bold text-amber-800/90 leading-relaxed"><span className="text-amber-900 font-black uppercase text-[9px]">IA Nutricional:</span> Analiza la etiqueta para darte la gama y calidad.</p>
+          <p className="text-[11px] font-bold text-amber-800/90 leading-relaxed"><span className="text-amber-900 font-black uppercase text-[9px]">Raciones:</span> Calcula gramos exactos según la salud de tu mascota.</p>
+          <p className="text-[11px] font-bold text-amber-800/90 leading-relaxed"><span className="text-amber-900 font-black uppercase text-[9px]">Finanzas:</span> Seguimiento de costo diario y ofertas online.</p>
         </div>
       </div>
     </div>
