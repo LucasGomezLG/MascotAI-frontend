@@ -1,8 +1,12 @@
 import React, { useState } from 'react';
-import { Heart, ChevronLeft, ChevronRight, Trash2, MapPin, X, ZoomIn } from 'lucide-react';
+import { 
+  Heart, ChevronLeft, ChevronRight, Trash2, MapPin, 
+  X, ZoomIn, MessageCircle, Copy, Check, ShieldAlert 
+} from 'lucide-react';
 import { MapContainer, TileLayer, Marker } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import Swal from 'sweetalert2';
 
 const customIcon = new L.Icon({
   iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
@@ -19,7 +23,10 @@ interface AdoptionCardProps {
 
 const AdoptionCard = ({ mascota, currentUser, onDelete }: AdoptionCardProps) => {
   const [currentFoto, setCurrentFoto] = useState(0);
-  const [isZoomed, setIsZoomed] = useState(false); // ✅ Estado para el zoom
+  const [isZoomed, setIsZoomed] = useState(false);
+  const [showContact, setShowContact] = useState(false);
+  const [copied, setCopied] = useState(false);
+
   const fotos = mascota.fotos || [];
   const tieneVariasFotos = fotos.length > 1;
   const esMia = mascota.userId === currentUser?.id;
@@ -32,6 +39,26 @@ const AdoptionCard = ({ mascota, currentUser, onDelete }: AdoptionCardProps) => 
   const nextFoto = (e: React.MouseEvent) => {
     e.stopPropagation();
     setCurrentFoto(curr => curr === fotos.length - 1 ? 0 : curr + 1);
+  };
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(mascota.contacto);
+    setCopied(true);
+    
+    const Toast = Swal.mixin({
+      toast: true,
+      position: 'top',
+      showConfirmButton: false,
+      timer: 2000,
+      timerProgressBar: true,
+    });
+    
+    Toast.fire({
+      icon: 'success',
+      title: '¡Contacto copiado!'
+    });
+
+    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
@@ -47,10 +74,9 @@ const AdoptionCard = ({ mascota, currentUser, onDelete }: AdoptionCardProps) => 
           </button>
         )}
 
-        {/* CONTENEDOR DE IMAGEN CON CLICK PARA ZOOM */}
         <div 
           className="relative h-40 bg-slate-100 cursor-zoom-in group/img"
-          onClick={() => setIsZoomed(true)} // ✅ Activa el zoom
+          onClick={() => setIsZoomed(true)}
         >
           <img src={fotos[currentFoto]} className="w-full h-full object-cover transition-transform duration-500 group-hover/img:scale-105" alt={mascota.nombre} />
           
@@ -74,7 +100,6 @@ const AdoptionCard = ({ mascota, currentUser, onDelete }: AdoptionCardProps) => 
           )}
         </div>
 
-        {/* MINI MAPA */}
         <div className="h-20 w-full relative border-y border-slate-50 grayscale-[0.3] contrast-[0.8]">
           {mascota.lat && mascota.lng ? (
             <MapContainer center={[mascota.lat, mascota.lng]} zoom={14} zoomControl={false} dragging={false} style={{ height: '100%', width: '100%' }}>
@@ -87,7 +112,6 @@ const AdoptionCard = ({ mascota, currentUser, onDelete }: AdoptionCardProps) => 
           <div className="absolute inset-0 z-10"></div>
         </div>
 
-        {/* INFO */}
         <div className="p-4 space-y-3 text-left">
           <div className="flex justify-between items-start">
             <div>
@@ -112,19 +136,74 @@ const AdoptionCard = ({ mascota, currentUser, onDelete }: AdoptionCardProps) => 
             ))}
           </div>
 
-          <button className="w-full py-2.5 bg-emerald-600 text-white rounded-xl font-black text-[10px] uppercase flex items-center justify-center gap-2 active:scale-95 transition-all shadow-md shadow-emerald-100">
+          <button 
+            onClick={() => setShowContact(true)} 
+            className="w-full py-2.5 bg-emerald-600 text-white rounded-xl font-black text-[10px] uppercase flex items-center justify-center gap-2 active:scale-95 transition-all shadow-md shadow-emerald-100"
+          >
             <Heart size={12} fill="white" /> Contactar
           </button>
         </div>
       </div>
 
-      {/* ✅ MODAL DE ZOOM (A PANTALLA COMPLETA) */}
+      {/* ✅ MODAL DE CONTACTO CON ADVERTENCIA DE SEGURIDAD */}
+      {showContact && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[110] flex items-center justify-center p-6 animate-in fade-in duration-300">
+          <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl relative animate-in zoom-in-95 duration-300 text-center">
+            <button 
+              onClick={() => setShowContact(false)}
+              className="absolute top-6 right-6 text-slate-400 hover:text-slate-600"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="bg-emerald-100 w-16 h-16 rounded-3xl flex items-center justify-center mx-auto mb-4 text-emerald-600">
+              <MessageCircle size={32} />
+            </div>
+
+            <h3 className="font-black text-slate-800 text-xl mb-1 tracking-tight">Datos del Tutor</h3>
+            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-6 italic">MascotAI • Adopción Responsable</p>
+
+            {/* 🛡️ ADVERTENCIA DE SEGURIDAD */}
+            <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl mb-6 flex gap-3 items-start text-left">
+              <div className="bg-amber-100 p-1.5 rounded-lg text-amber-600 shrink-0">
+                <ShieldAlert size={16} />
+              </div>
+              <div>
+                <p className="text-[10px] font-black text-amber-900 uppercase leading-none mb-1">Seguridad primero</p>
+                <p className="text-[10px] font-bold text-amber-800 leading-tight">
+                  Verificá bien el perfil antes de reunirte.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 p-4 rounded-2xl border-2 border-slate-100 mb-6 relative group">
+              <p className="text-xs font-black text-slate-700 break-all px-2">
+                {mascota.contacto || "No se proporcionó contacto"}
+              </p>
+            </div>
+
+            <button 
+              onClick={handleCopy}
+              className={`w-full py-4 rounded-2xl font-black text-xs uppercase flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg ${copied ? 'bg-emerald-500 text-white shadow-emerald-100' : 'bg-slate-900 text-white shadow-slate-200'}`}
+            >
+              {copied ? <Check size={16} /> : <Copy size={16} />}
+              {copied ? '¡Datos Copiados!' : 'Copiar para WhatsApp/IG'}
+            </button>
+            
+            <p className="mt-6 text-[8px] font-bold text-slate-300 leading-relaxed uppercase tracking-widest">
+              Al contactar aceptás los términos de adopción responsable. ❤️
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE ZOOM */}
       {isZoomed && (
         <div 
           className="fixed inset-0 bg-slate-900/95 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300"
           onClick={() => setIsZoomed(false)}
         >
-          <button className="absolute top-6 right-6 text-white/70 hover:text-white transition-colors">
+          <button className="absolute top-6 right-6 text-white/70 hover:text-white transition-colors" style={{ top: 'calc(1.5rem + env(safe-area-inset-top))' }}>
             <X size={32} />
           </button>
           
@@ -133,10 +212,6 @@ const AdoptionCard = ({ mascota, currentUser, onDelete }: AdoptionCardProps) => 
             className="max-w-full max-h-[85vh] rounded-3xl shadow-2xl animate-in zoom-in-95 duration-300"
             alt="Zoom mascota"
           />
-
-          <p className="absolute bottom-10 text-white/60 font-black uppercase text-[10px] tracking-widest">
-            {mascota.nombre} • Toca en cualquier lado para cerrar
-          </p>
         </div>
       )}
     </>

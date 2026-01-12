@@ -74,7 +74,7 @@ function App() {
         lng: position.coords.longitude
       });
     } catch (error) {
-      console.warn("⚠️ GPS denegado o apagado. Se mostrarán todas las mascotas.");
+      console.warn("⚠️ GPS denegado o apagado.");
       setSoloCercanas(false);
     }
   };
@@ -102,7 +102,7 @@ function App() {
       input: 'number',
       inputLabel: 'Monto en AR$',
       inputValue: 5000,
-      // 🛡️ Blindaje de atributos del input para móviles
+      // 🛡️ Blindaje de atributos del input (Evita negativos en el teclado numérico)
       inputAttributes: {
         min: '100',
         max: '500000',
@@ -114,7 +114,7 @@ function App() {
       confirmButtonText: 'Donar',
       cancelButtonText: 'Ahora no',
       reverseButtons: true,
-      // 🛡️ Blindaje de validación lógica
+      // 🛡️ Blindaje de validación lógica estricta
       inputValidator: (value) => {
         if (!value) return 'Debes ingresar un monto';
         const amount = parseInt(value);
@@ -188,7 +188,7 @@ function App() {
       refreshData();
       setItemABorrar(null);
     } catch (e) {
-      Swal.fire({ title: 'Error', text: 'No se pudo eliminar la publicación.', icon: 'error' });
+      Swal.fire({ title: 'Error', text: 'No se pudo eliminar.', icon: 'error' });
     }
   };
 
@@ -290,8 +290,8 @@ function App() {
         onConfirm={ejecutarBorrado}
         titulo="¿Estás seguro?"
         mensaje={itemABorrar?.tipo === 'perdido'
-          ? "El reporte de mascota perdida se eliminará permanentemente."
-          : "La publicación de adopción desaparecerá de la comunidad."}
+          ? "El reporte se eliminará permanentemente."
+          : "La publicación de adopción desaparecerá."}
       />
 
       <AppBottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
