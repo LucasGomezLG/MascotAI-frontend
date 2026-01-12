@@ -2,7 +2,7 @@ import React from 'react';
 import { Dog, PlusCircle, MapPin, User as UserIcon, Plus, Heart, Globe } from 'lucide-react';
 import LostPetCard from '../LostPet/LostPetCard';
 import AdoptionCard from '../AdoptionPet/AdoptionCard';
-import RefugioCard from '../Refugio/RefugioCard'; // ✅ Asegúrate de que la ruta sea correcta
+import RefugioCard from '../Refugio/RefugioCard';
 
 interface HomeContentProps {
   mascotas: any[];
@@ -14,24 +14,27 @@ interface HomeContentProps {
   setSoloMisPublicaciones: (val: boolean) => void;
   perdidosFiltrados: any[];
   adopcionesFiltradas: any[];
-  refugiosFiltrados?: any[]; // ✅ Nueva prop
+  refugiosFiltrados?: any[];
   setShowLostPetModal: (val: boolean) => void;
   setShowAdoptionModal: (val: boolean) => void;
-  setShowRefugioModal: (val: boolean) => void; // ✅ Nueva prop
+  setShowRefugioModal: (val: boolean) => void;
   user: any;
   abrirConfirmacionBorrado: (id: string, tipo: any) => void;
   userCoords: { lat: number, lng: number } | null;
+  // 🛰️ Nuevas props para el GPS inteligente
+  locationPermissionGranted: boolean;
+  obtenerUbicacion: () => Promise<void>;
 }
 
 export default function HomeContent({
   mascotas = [], setActiveTab, setZoomedPhoto,
   soloCercanas, setSoloCercanas, soloMisPublicaciones, setSoloMisPublicaciones,
-  perdidosFiltrados = [], adopcionesFiltradas = [], refugiosFiltrados = [], // ✅ Valor por defecto []
+  perdidosFiltrados = [], adopcionesFiltradas = [], refugiosFiltrados = [],
   setShowLostPetModal, setShowAdoptionModal, setShowRefugioModal,
-  user, abrirConfirmacionBorrado
+  user, abrirConfirmacionBorrado, userCoords,
+  locationPermissionGranted, obtenerUbicacion
 }: HomeContentProps) {
   
-  // ✅ Cálculo seguro del total de resultados
   const totalResultados = (perdidosFiltrados?.length || 0) + 
                          (adopcionesFiltradas?.length || 0) + 
                          (refugiosFiltrados?.length || 0);
@@ -70,15 +73,32 @@ export default function HomeContent({
         )}
       </section>
 
-      {/* BARRA DE FILTROS */}
+      {/* BARRA DE FILTROS INTELIGENTE */}
       <div className="sticky top-[72px] z-30 -mx-6 px-6 py-4 bg-slate-50/80 backdrop-blur-md flex items-center justify-between border-b border-slate-200/50">
         <div className="flex gap-2">
           <button
-            onClick={() => setSoloCercanas(!soloCercanas)}
-            className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all flex items-center gap-1.5 ${soloCercanas ? 'bg-red-500 text-white shadow-md' : 'bg-slate-200/50 text-slate-500'}`}
+            onClick={() => {
+              if (!locationPermissionGranted) {
+                obtenerUbicacion();
+              } else {
+                setSoloCercanas(!soloCercanas);
+              }
+            }}
+            className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all flex items-center gap-1.5 
+              ${!locationPermissionGranted 
+                ? 'bg-slate-200 text-slate-500' 
+                : soloCercanas 
+                  ? 'bg-red-500 text-white shadow-md shadow-red-100' 
+                  : 'bg-slate-800 text-white shadow-md'
+              }`}
           >
             <MapPin size={12} />
-            {soloCercanas ? "Cercanas (10km)" : "Todo Bs.As."}
+            {!locationPermissionGranted 
+              ? "Activar GPS" 
+              : soloCercanas 
+                ? "Cercanas (15km)" 
+                : "Todo"
+            }
           </button>
 
           <button
@@ -114,7 +134,9 @@ export default function HomeContent({
           </div>
         ) : (
           <div className="h-32 bg-slate-50 rounded-[2.5rem] flex items-center justify-center border-2 border-dashed border-slate-200 text-center px-6">
-            <p className="text-[10px] font-black text-slate-400 uppercase italic tracking-widest">No hay reportes cercanos</p>
+            <p className="text-[10px] font-black text-slate-400 uppercase italic tracking-widest">
+              {soloCercanas && !userCoords ? "Obteniendo ubicación..." : "No hay reportes"}
+            </p>
           </div>
         )}
       </section>
@@ -137,13 +159,13 @@ export default function HomeContent({
             ))
           ) : (
             <div className="w-full h-32 bg-emerald-50/30 rounded-[2.5rem] flex items-center justify-center border-2 border-dashed border-emerald-100 text-center px-6">
-              <p className="text-[10px] font-black text-emerald-400 uppercase italic tracking-widest">Sin publicaciones cercanas</p>
+              <p className="text-[10px] font-black text-emerald-400 uppercase italic tracking-widest">Sin publicaciones</p>
             </div>
           )}
         </div>
       </section>
 
-      {/* 4. REFUGIOS (NUEVA SECCIÓN) */}
+      {/* 4. REFUGIOS */}
       <section className="space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-violet-600">
@@ -161,7 +183,7 @@ export default function HomeContent({
             ))
           ) : (
             <div className="w-full h-32 bg-violet-50/30 rounded-[2.5rem] flex items-center justify-center border-2 border-dashed border-violet-100 text-center px-6">
-              <p className="text-[10px] font-black text-violet-400 uppercase italic tracking-widest">Sin refugios en esta zona</p>
+              <p className="text-[10px] font-black text-violet-400 uppercase italic tracking-widest">Sin refugios registrados</p>
             </div>
           )}
         </div>

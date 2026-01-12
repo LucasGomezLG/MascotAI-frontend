@@ -13,7 +13,7 @@ import LogoutModal from './components/login/LogoutModal';
 import PetProfiles from './components/PetProfiles';
 import LostPetModal from './components/LostPet/LostPetModal';
 import AdoptionModal from './components/AdoptionPet/AdoptionModal';
-import RefugioModal from './components/Refugio/RefugioModal'; // ✅ Importación de Refugios
+import RefugioModal from './components/Refugio/RefugioModal'; 
 import DeleteConfirmModal from './components/ui/DeleteConfirmModal';
 import Swal from 'sweetalert2';
 import AppHeader from './components/layout/AppHeader';
@@ -31,7 +31,7 @@ function App() {
   const [alertas, setAlertas] = useState<any[]>([]);
   const [perdidos, setPerdidos] = useState<any[]>([]);
   const [adopciones, setAdopciones] = useState<any[]>([]);
-  const [refugios, setRefugios] = useState<any[]>([]); // ✅ Nuevo estado
+  const [refugios, setRefugios] = useState<any[]>([]); 
   const [loadingSuscripcion, setLoadingSuscripcion] = useState(false);
   const [zoomedPhoto, setZoomedPhoto] = useState<string | null>(null);
 
@@ -39,7 +39,7 @@ function App() {
   const [showPetModal, setShowPetModal] = useState(false);
   const [showLostPetModal, setShowLostPetModal] = useState(false);
   const [showAdoptionModal, setShowAdoptionModal] = useState(false);
-  const [showRefugioModal, setShowRefugioModal] = useState(false); // ✅ Nuevo modal
+  const [showRefugioModal, setShowRefugioModal] = useState(false); 
   const [showAlerts, setShowAlerts] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [itemABorrar, setItemABorrar] = useState<{ id: string, tipo: 'perdido' | 'adopcion' | 'refugio' } | null>(null);
@@ -49,35 +49,44 @@ function App() {
   const [vetParaVer, setVetParaVer] = useState<any>(null);
   const [healthParaVer, setHealthParaVer] = useState<any>(null);
 
-  // FILTROS
+  // ✅ FILTROS Y GPS
   const [soloMisPublicaciones, setSoloMisPublicaciones] = useState(false);
   const [soloCercanas, setSoloCercanas] = useState(true);
   const [userCoords, setUserCoords] = useState<{ lat: number, lng: number } | null>(null);
+  const [locationPermissionGranted, setLocationPermissionGranted] = useState(false); // 🛰️ Estado de permiso
 
-  // --- 🛰️ LÓGICA DE GPS NATIVO BLINDADA ---
+  // --- 🛰️ LÓGICA DE GPS NATIVO INTELIGENTE ---
   const obtenerUbicacion = async () => {
     try {
       const permissions = await Geolocation.checkPermissions();
-      
-      if (permissions.location !== 'granted') {
+      let status = permissions.location;
+
+      // Si no tenemos permiso, lo pedimos explícitamente
+      if (status !== 'granted') {
         const request = await Geolocation.requestPermissions();
-        if (request.location !== 'granted') {
-          setSoloCercanas(false);
-          return;
-        }
+        status = request.location;
       }
 
-      const position = await Geolocation.getCurrentPosition({
-        enableHighAccuracy: false, 
-        timeout: 10000
-      });
+      if (status === 'granted') {
+        const position = await Geolocation.getCurrentPosition({
+          enableHighAccuracy: false, 
+          timeout: 10000
+        });
 
-      setUserCoords({
-        lat: position.coords.latitude,
-        lng: position.coords.longitude
-      });
+        setUserCoords({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        });
+        setLocationPermissionGranted(true);
+        console.log("📍 GPS OK:", position.coords.latitude, position.coords.longitude);
+      } else {
+        // Si el usuario deniega, desactivamos el filtro y marcamos que no hay permiso
+        setLocationPermissionGranted(false);
+        setSoloCercanas(false);
+      }
     } catch (error) {
-      console.warn("⚠️ GPS denegado o apagado.");
+      console.warn("⚠️ Error obteniendo ubicación:", error);
+      setLocationPermissionGranted(false);
       setSoloCercanas(false);
     }
   };
@@ -93,10 +102,10 @@ function App() {
     api.getAlertasSistema().then(res => setAlertas(res.data)).catch(() => { });
     api.getMascotasPerdidas().then(res => setPerdidos(res.data)).catch(() => { });
     api.getMascotasAdopcion().then(res => setAdopciones(res.data)).catch(() => { });
-    api.getRefugios().then(res => setRefugios(res.data)).catch(() => { }); // ✅ Carga de refugios
+    api.getRefugios().then(res => setRefugios(res.data)).catch(() => { }); 
   };
 
-  // --- 💰 GESTIÓN DE DONACIONES ---
+  // --- 💰 GESTIÓN DE DONACIONES (COLABORADORES) ---
   const handleSuscripcion = () => {
     if (user?.esColaborador) return;
 
@@ -106,11 +115,7 @@ function App() {
       input: 'number',
       inputLabel: 'Monto en AR$',
       inputValue: 5000,
-      inputAttributes: {
-        min: '100',
-        max: '500000',
-        step: '1'
-      },
+      inputAttributes: { min: '100', max: '500000', step: '1' },
       showCancelButton: true,
       confirmButtonColor: '#f97316',
       cancelButtonColor: '#94a3b8',
@@ -155,25 +160,26 @@ function App() {
     return R * c;
   };
 
-  // --- LÓGICA DE FILTRADO MAESTRO ---
+  // --- ✅ LÓGICA DE FILTRADO MAESTRO (15KM) ---
   const filtrarItems = (lista: any[]) => {
     return (lista || []).filter(item => {
       if (soloMisPublicaciones && item.userId !== user?.id) return false;
-      if (soloCercanas) {
-        if (!userCoords) return false;
+      
+      // Solo filtramos por cercanía si: el usuario quiere, tenemos permiso y tenemos coords
+      if (soloCercanas && locationPermissionGranted && userCoords) {
         const itemLat = Number(item.lat);
         const itemLng = Number(item.lng);
         if (!itemLat || !itemLng || isNaN(itemLat)) return true;
         const dist = calcularDistancia(userCoords.lat, userCoords.lng, itemLat, itemLng);
-        return dist <= 10;
+        return dist <= 15; // ✅ Radio actualizado a 15km
       }
-      return true;
+      return true; // Si no hay GPS o el filtro está apagado, mostramos todo
     });
   };
 
   const perdidosFiltrados = filtrarItems(perdidos);
   const adopcionesFiltradas = filtrarItems(adopciones);
-  const refugiosFiltrados = filtrarItems(refugios); // ✅ Filtro para refugios
+  const refugiosFiltrados = filtrarItems(refugios);
 
   // --- ELIMINACIÓN ---
   const abrirConfirmacionBorrado = (id: string, tipo: 'perdido' | 'adopcion' | 'refugio') => {
@@ -188,7 +194,7 @@ function App() {
       } else if (itemABorrar.tipo === 'adopcion') {
         await api.eliminarMascotaAdopcion(itemABorrar.id);
       } else if (itemABorrar.tipo === 'refugio') {
-        await api.eliminarRefugio(itemABorrar.id); // ✅ Borrar refugio
+        await api.eliminarRefugio(itemABorrar.id);
       }
       refreshData();
       setItemABorrar(null);
@@ -245,13 +251,15 @@ function App() {
             setSoloMisPublicaciones={setSoloMisPublicaciones}
             perdidosFiltrados={perdidosFiltrados}
             adopcionesFiltradas={adopcionesFiltradas}
-            refugiosFiltrados={refugiosFiltrados} // ✅ Prop nueva
+            refugiosFiltrados={refugiosFiltrados}
             setShowLostPetModal={setShowLostPetModal}
             setShowAdoptionModal={setShowAdoptionModal}
-            setShowRefugioModal={setShowRefugioModal} // ✅ Prop nueva
+            setShowRefugioModal={setShowRefugioModal}
             user={user}
             abrirConfirmacionBorrado={abrirConfirmacionBorrado}
             userCoords={userCoords}
+            locationPermissionGranted={locationPermissionGranted} // ✅ Prop nueva
+            obtenerUbicacion={obtenerUbicacion} // ✅ Prop nueva
           />
         )}
 
@@ -262,7 +270,6 @@ function App() {
         {activeTab === 'pets' && <PetProfiles mascotas={mascotas} onUpdate={refreshData} onAddClick={() => setShowPetModal(true)} />}
       </main>
 
-      {/* MODALES */}
       {showPetModal && <PetModal onClose={() => { setShowPetModal(false); refreshData(); }} />}
       {showLostPetModal && <LostPetModal onClose={() => { setShowLostPetModal(false); refreshData(); }} />}
       {showAdoptionModal && <AdoptionModal onClose={() => { setShowAdoptionModal(false); refreshData(); }} />}
