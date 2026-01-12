@@ -13,6 +13,7 @@ import LogoutModal from './components/login/LogoutModal';
 import PetProfiles from './components/PetProfiles';
 import LostPetModal from './components/LostPet/LostPetModal';
 import AdoptionModal from './components/AdoptionPet/AdoptionModal';
+import RefugioModal from './components/Refugio/RefugioModal'; // ✅ Importación de Refugios
 import DeleteConfirmModal from './components/ui/DeleteConfirmModal';
 import Swal from 'sweetalert2';
 import AppHeader from './components/layout/AppHeader';
@@ -30,6 +31,7 @@ function App() {
   const [alertas, setAlertas] = useState<any[]>([]);
   const [perdidos, setPerdidos] = useState<any[]>([]);
   const [adopciones, setAdopciones] = useState<any[]>([]);
+  const [refugios, setRefugios] = useState<any[]>([]); // ✅ Nuevo estado
   const [loadingSuscripcion, setLoadingSuscripcion] = useState(false);
   const [zoomedPhoto, setZoomedPhoto] = useState<string | null>(null);
 
@@ -37,9 +39,10 @@ function App() {
   const [showPetModal, setShowPetModal] = useState(false);
   const [showLostPetModal, setShowLostPetModal] = useState(false);
   const [showAdoptionModal, setShowAdoptionModal] = useState(false);
+  const [showRefugioModal, setShowRefugioModal] = useState(false); // ✅ Nuevo modal
   const [showAlerts, setShowAlerts] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const [itemABorrar, setItemABorrar] = useState<{ id: string, tipo: 'perdido' | 'adopcion' } | null>(null);
+  const [itemABorrar, setItemABorrar] = useState<{ id: string, tipo: 'perdido' | 'adopcion' | 'refugio' } | null>(null);
 
   // Estados de Selección (Historial)
   const [foodParaVer, setFoodParaVer] = useState<any>(null);
@@ -90,9 +93,10 @@ function App() {
     api.getAlertasSistema().then(res => setAlertas(res.data)).catch(() => { });
     api.getMascotasPerdidas().then(res => setPerdidos(res.data)).catch(() => { });
     api.getMascotasAdopcion().then(res => setAdopciones(res.data)).catch(() => { });
+    api.getRefugios().then(res => setRefugios(res.data)).catch(() => { }); // ✅ Carga de refugios
   };
 
-  // --- 💰 GESTIÓN DE DONACIONES (COLABORADORES) ---
+  // --- 💰 GESTIÓN DE DONACIONES ---
   const handleSuscripcion = () => {
     if (user?.esColaborador) return;
 
@@ -102,7 +106,6 @@ function App() {
       input: 'number',
       inputLabel: 'Monto en AR$',
       inputValue: 5000,
-      // 🛡️ Blindaje de atributos del input (Evita negativos en el teclado numérico)
       inputAttributes: {
         min: '100',
         max: '500000',
@@ -114,7 +117,6 @@ function App() {
       confirmButtonText: 'Donar',
       cancelButtonText: 'Ahora no',
       reverseButtons: true,
-      // 🛡️ Blindaje de validación lógica estricta
       inputValidator: (value) => {
         if (!value) return 'Debes ingresar un monto';
         const amount = parseInt(value);
@@ -153,9 +155,9 @@ function App() {
     return R * c;
   };
 
-  // --- LÓGICA DE FILTRADO ---
-  const filtrarPublicaciones = (lista: any[]) => {
-    return lista.filter(item => {
+  // --- LÓGICA DE FILTRADO MAESTRO ---
+  const filtrarItems = (lista: any[]) => {
+    return (lista || []).filter(item => {
       if (soloMisPublicaciones && item.userId !== user?.id) return false;
       if (soloCercanas) {
         if (!userCoords) return false;
@@ -169,11 +171,12 @@ function App() {
     });
   };
 
-  const perdidosFiltrados = filtrarPublicaciones(perdidos);
-  const adopcionesFiltradas = filtrarPublicaciones(adopciones);
+  const perdidosFiltrados = filtrarItems(perdidos);
+  const adopcionesFiltradas = filtrarItems(adopciones);
+  const refugiosFiltrados = filtrarItems(refugios); // ✅ Filtro para refugios
 
   // --- ELIMINACIÓN ---
-  const abrirConfirmacionBorrado = (id: string, tipo: 'perdido' | 'adopcion') => {
+  const abrirConfirmacionBorrado = (id: string, tipo: 'perdido' | 'adopcion' | 'refugio') => {
     setItemABorrar({ id, tipo });
   };
 
@@ -182,8 +185,10 @@ function App() {
     try {
       if (itemABorrar.tipo === 'perdido') {
         await api.eliminarMascotaPerdida(itemABorrar.id);
-      } else {
+      } else if (itemABorrar.tipo === 'adopcion') {
         await api.eliminarMascotaAdopcion(itemABorrar.id);
+      } else if (itemABorrar.tipo === 'refugio') {
+        await api.eliminarRefugio(itemABorrar.id); // ✅ Borrar refugio
       }
       refreshData();
       setItemABorrar(null);
@@ -195,10 +200,7 @@ function App() {
   if (authLoading) return (
     <div 
       className="h-screen flex flex-col items-center justify-center bg-slate-50"
-      style={{ 
-        paddingTop: 'env(safe-area-inset-top)', 
-        paddingBottom: 'env(safe-area-inset-bottom)' 
-      }}
+      style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       <div className="w-12 h-12 border-4 border-orange-600 border-t-transparent rounded-full animate-spin mb-4"></div>
       <p className="font-black text-orange-900 uppercase text-xs tracking-widest">Verificando sesión...</p>
@@ -243,8 +245,10 @@ function App() {
             setSoloMisPublicaciones={setSoloMisPublicaciones}
             perdidosFiltrados={perdidosFiltrados}
             adopcionesFiltradas={adopcionesFiltradas}
+            refugiosFiltrados={refugiosFiltrados} // ✅ Prop nueva
             setShowLostPetModal={setShowLostPetModal}
             setShowAdoptionModal={setShowAdoptionModal}
+            setShowRefugioModal={setShowRefugioModal} // ✅ Prop nueva
             user={user}
             abrirConfirmacionBorrado={abrirConfirmacionBorrado}
             userCoords={userCoords}
@@ -258,10 +262,12 @@ function App() {
         {activeTab === 'pets' && <PetProfiles mascotas={mascotas} onUpdate={refreshData} onAddClick={() => setShowPetModal(true)} />}
       </main>
 
+      {/* MODALES */}
       {showPetModal && <PetModal onClose={() => { setShowPetModal(false); refreshData(); }} />}
       {showLostPetModal && <LostPetModal onClose={() => { setShowLostPetModal(false); refreshData(); }} />}
       {showAdoptionModal && <AdoptionModal onClose={() => { setShowAdoptionModal(false); refreshData(); }} />}
-      
+      {showRefugioModal && <RefugioModal onClose={() => { setShowRefugioModal(false); refreshData(); }} />}
+
       {zoomedPhoto && (
         <div
           className="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300 cursor-zoom-out"
@@ -289,9 +295,11 @@ function App() {
         onClose={() => setItemABorrar(null)}
         onConfirm={ejecutarBorrado}
         titulo="¿Estás seguro?"
-        mensaje={itemABorrar?.tipo === 'perdido'
-          ? "El reporte se eliminará permanentemente."
-          : "La publicación de adopción desaparecerá."}
+        mensaje={
+            itemABorrar?.tipo === 'perdido' ? "El reporte se eliminará permanentemente." :
+            itemABorrar?.tipo === 'adopcion' ? "La publicación de adopción desaparecerá." :
+            "La información del refugio se eliminará del sistema."
+        }
       />
 
       <AppBottomNav activeTab={activeTab} setActiveTab={setActiveTab} />

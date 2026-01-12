@@ -1,8 +1,8 @@
-
 import React from 'react';
-import { Dog, PlusCircle, MapPin, User as UserIcon, Plus, Heart } from 'lucide-react';
+import { Dog, PlusCircle, MapPin, User as UserIcon, Plus, Heart, Globe } from 'lucide-react';
 import LostPetCard from '../LostPet/LostPetCard';
 import AdoptionCard from '../AdoptionPet/AdoptionCard';
+import RefugioCard from '../Refugio/RefugioCard'; // ✅ Asegúrate de que la ruta sea correcta
 
 interface HomeContentProps {
   mascotas: any[];
@@ -14,20 +14,28 @@ interface HomeContentProps {
   setSoloMisPublicaciones: (val: boolean) => void;
   perdidosFiltrados: any[];
   adopcionesFiltradas: any[];
+  refugiosFiltrados?: any[]; // ✅ Nueva prop
   setShowLostPetModal: (val: boolean) => void;
   setShowAdoptionModal: (val: boolean) => void;
+  setShowRefugioModal: (val: boolean) => void; // ✅ Nueva prop
   user: any;
-  abrirConfirmacionBorrado: (id: string, tipo: 'perdido' | 'adopcion') => void;
+  abrirConfirmacionBorrado: (id: string, tipo: any) => void;
   userCoords: { lat: number, lng: number } | null;
 }
 
 export default function HomeContent({
-  mascotas, setActiveTab, setZoomedPhoto,
+  mascotas = [], setActiveTab, setZoomedPhoto,
   soloCercanas, setSoloCercanas, soloMisPublicaciones, setSoloMisPublicaciones,
-  perdidosFiltrados, adopcionesFiltradas,
-  setShowLostPetModal, setShowAdoptionModal,
+  perdidosFiltrados = [], adopcionesFiltradas = [], refugiosFiltrados = [], // ✅ Valor por defecto []
+  setShowLostPetModal, setShowAdoptionModal, setShowRefugioModal,
   user, abrirConfirmacionBorrado, userCoords
 }: HomeContentProps) {
+  
+  // ✅ Cálculo seguro del total de resultados
+  const totalResultados = (perdidosFiltrados?.length || 0) + 
+                         (adopcionesFiltradas?.length || 0) + 
+                         (refugiosFiltrados?.length || 0);
+
   return (
     <div className="space-y-10 animate-in fade-in duration-500">
       {/* 1. MIS MASCOTAS */}
@@ -83,7 +91,7 @@ export default function HomeContent({
         </div>
 
         <p className="text-[10px] font-black text-slate-400 uppercase">
-          {perdidosFiltrados.length + adopcionesFiltradas.length} resultados
+          {totalResultados} resultados
         </p>
       </div>
 
@@ -94,30 +102,19 @@ export default function HomeContent({
             <MapPin size={20} />
             <h2 className="text-lg font-black uppercase tracking-tighter">Perdidos</h2>
           </div>
-          <button
-            onClick={() => setShowLostPetModal(true)}
-            className="p-2 bg-red-50 text-red-600 rounded-xl active:scale-90 transition-all"
-          >
+          <button onClick={() => setShowLostPetModal(true)} className="p-2 bg-red-50 text-red-600 rounded-xl active:scale-90 transition-all">
             <Plus size={20} />
           </button>
         </div>
-
         {perdidosFiltrados.length > 0 ? (
           <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
             {perdidosFiltrados.map(p => (
-              <LostPetCard
-                key={p.id}
-                reporte={p}
-                currentUser={user}
-                onDelete={() => abrirConfirmacionBorrado(p.id, 'perdido')}
-              />
+              <LostPetCard key={p.id} reporte={p} currentUser={user} onDelete={() => abrirConfirmacionBorrado(p.id, 'perdido')} />
             ))}
           </div>
         ) : (
           <div className="h-32 bg-slate-50 rounded-[2.5rem] flex items-center justify-center border-2 border-dashed border-slate-200 text-center px-6">
-            <p className="text-[10px] font-black text-slate-400 uppercase italic tracking-widest">
-              {soloCercanas && !userCoords ? "Obteniendo ubicación..." : "No hay reportes cercanos"}
-            </p>
+            <p className="text-[10px] font-black text-slate-400 uppercase italic tracking-widest">No hay reportes cercanos</p>
           </div>
         )}
       </section>
@@ -129,29 +126,42 @@ export default function HomeContent({
             <Heart size={20} />
             <h2 className="text-lg font-black uppercase tracking-tighter">En adopción</h2>
           </div>
-          <button
-            onClick={() => setShowAdoptionModal(true)}
-            className="p-2 bg-emerald-50 text-emerald-600 rounded-xl active:scale-90 transition-all"
-          >
+          <button onClick={() => setShowAdoptionModal(true)} className="p-2 bg-emerald-50 text-emerald-600 rounded-xl active:scale-90 transition-all">
             <Plus size={20} />
           </button>
         </div>
-
         <div className="flex gap-4 overflow-x-auto pb-6 no-scrollbar">
           {adopcionesFiltradas.length > 0 ? (
             adopcionesFiltradas.map(a => (
-              <AdoptionCard
-                key={a.id}
-                mascota={a}
-                currentUser={user}
-                onDelete={() => abrirConfirmacionBorrado(a.id, 'adopcion')}
-              />
+              <AdoptionCard key={a.id} mascota={a} currentUser={user} onDelete={() => abrirConfirmacionBorrado(a.id, 'adopcion')} />
             ))
           ) : (
             <div className="w-full h-32 bg-emerald-50/30 rounded-[2.5rem] flex items-center justify-center border-2 border-dashed border-emerald-100 text-center px-6">
-              <p className="text-[10px] font-black text-emerald-400 uppercase italic tracking-widest">
-                {soloCercanas && !userCoords ? "Obteniendo ubicación..." : "Sin publicaciones cercanas"}
-              </p>
+              <p className="text-[10px] font-black text-emerald-400 uppercase italic tracking-widest">Sin publicaciones cercanas</p>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* 4. REFUGIOS (NUEVA SECCIÓN) */}
+      <section className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-violet-600">
+            <Globe size={20} />
+            <h2 className="text-lg font-black uppercase tracking-tighter">Refugios</h2>
+          </div>
+          <button onClick={() => setShowRefugioModal(true)} className="p-2 bg-violet-50 text-violet-600 rounded-xl active:scale-90 transition-all">
+            <Plus size={20} />
+          </button>
+        </div>
+        <div className="flex gap-4 overflow-x-auto pb-6 no-scrollbar">
+          {refugiosFiltrados.length > 0 ? (
+            refugiosFiltrados.map(r => (
+              <RefugioCard key={r.id} refugio={r} currentUser={user} onDelete={() => abrirConfirmacionBorrado(r.id, 'refugio')} />
+            ))
+          ) : (
+            <div className="w-full h-32 bg-violet-50/30 rounded-[2.5rem] flex items-center justify-center border-2 border-dashed border-violet-100 text-center px-6">
+              <p className="text-[10px] font-black text-violet-400 uppercase italic tracking-widest">Sin refugios en esta zona</p>
             </div>
           )}
         </div>

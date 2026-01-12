@@ -123,4 +123,16 @@ export const api = {
 
   eliminarMascotaPerdida: (id: string) => apiClient.delete(`/perdidas/${id}`),
   eliminarMascotaAdopcion: (id: string) => apiClient.delete(`/adopciones/${id}`),
+
+  // ==========================================
+  // 🏛️ COMUNIDAD: REFUGIOS (NUEVO)
+  // ==========================================
+  /** Trae la lista de todos los refugios registrados */
+  getRefugios: () => apiClient.get('/refugios/todos'),
+
+  /** Registra un nuevo refugio con hasta 3 fotos (Multipart FormData) */
+  registrarRefugio: (formData: FormData) => apiClient.post('/refugios/registrar', formData),
+
+  /** Elimina un refugio (solo si el usuario es el creador) */
+  eliminarRefugio: (id: string) => apiClient.delete(`/refugios/${id}`),
 };
