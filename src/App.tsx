@@ -263,9 +263,37 @@ function App() {
           />
         )}
 
-        {activeTab === 'scanner' && <FoodScanner mascotas={mascotas} onScanComplete={refreshData} initialData={foodParaVer} onReset={() => setFoodParaVer(null)} />}
-        {activeTab === 'vet' && <VetScanner mascotas={mascotas} onScanComplete={refreshData} initialData={vetParaVer} onReset={() => setVetParaVer(null)} />}
-        {activeTab === 'health' && <SaludScanner mascotas={mascotas} onScanComplete={refreshData} initialData={healthParaVer} onReset={() => setHealthParaVer(null)} />}
+        {/* 🛡️ SECCIONES DE ESCÁNER ACTUALIZADAS CON handleSuscripcion */}
+        {activeTab === 'scanner' && (
+          <FoodScanner 
+            mascotas={mascotas} 
+            onScanComplete={refreshData} 
+            initialData={foodParaVer} 
+            onReset={() => setFoodParaVer(null)} 
+            handleSuscripcion={handleSuscripcion}
+          />
+        )}
+        
+        {activeTab === 'vet' && (
+          <VetScanner 
+            mascotas={mascotas} 
+            onScanComplete={refreshData} 
+            initialData={vetParaVer} 
+            onReset={() => setVetParaVer(null)} 
+            handleSuscripcion={handleSuscripcion}
+          />
+        )}
+        
+        {activeTab === 'health' && (
+          <SaludScanner 
+            mascotas={mascotas} 
+            onScanComplete={refreshData} 
+            initialData={healthParaVer} 
+            onReset={() => setHealthParaVer(null)} 
+            handleSuscripcion={handleSuscripcion}
+          />
+        )}
+        
         {activeTab === 'stats' && <ReportsManager onVerDetalle={verDetalle} />}
         {activeTab === 'pets' && <PetProfiles mascotas={mascotas} onUpdate={refreshData} onAddClick={() => setShowPetModal(true)} />}
       </main>

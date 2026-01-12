@@ -10,7 +10,7 @@ import Swal from 'sweetalert2';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { useCameraPermissions } from '../../../hooks/useCameraPermissions';
 
-const SymptomScanner = ({ mascotas, initialData, onScanComplete, handleSuscripcion }: any) => {
+const SymptomScanner = ({ mascotas, initialData, onScanComplete }: any) => {
   const { user, refreshUser } = useAuth(); // 🛡️ Obtenemos datos y función de refresco
   const [selectedPet, setSelectedPet] = useState("");
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
