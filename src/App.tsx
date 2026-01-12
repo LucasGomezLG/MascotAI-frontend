@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { api } from './services/api';
 import { useAuth } from './context/AuthContext';
-import { Geolocation } from '@capacitor/geolocation'; 
+import { Geolocation } from '@capacitor/geolocation';
 import LoginView from './components/login/LoginView';
 import FoodScanner from './components/scanner/FoodScanner';
 import VetScanner from './components/scanner/vet/VetScanner';
@@ -13,7 +13,7 @@ import LogoutModal from './components/login/LogoutModal';
 import PetProfiles from './components/PetProfiles';
 import LostPetModal from './components/LostPet/LostPetModal';
 import AdoptionModal from './components/AdoptionPet/AdoptionModal';
-import RefugioModal from './components/Refugio/RefugioModal'; 
+import RefugioModal from './components/Refugio/RefugioModal';
 import DeleteConfirmModal from './components/ui/DeleteConfirmModal';
 import Swal from 'sweetalert2';
 import AppHeader from './components/layout/AppHeader';
@@ -31,7 +31,7 @@ function App() {
   const [alertas, setAlertas] = useState<any[]>([]);
   const [perdidos, setPerdidos] = useState<any[]>([]);
   const [adopciones, setAdopciones] = useState<any[]>([]);
-  const [refugios, setRefugios] = useState<any[]>([]); 
+  const [refugios, setRefugios] = useState<any[]>([]);
   const [loadingSuscripcion, setLoadingSuscripcion] = useState(false);
   const [zoomedPhoto, setZoomedPhoto] = useState<string | null>(null);
 
@@ -39,7 +39,7 @@ function App() {
   const [showPetModal, setShowPetModal] = useState(false);
   const [showLostPetModal, setShowLostPetModal] = useState(false);
   const [showAdoptionModal, setShowAdoptionModal] = useState(false);
-  const [showRefugioModal, setShowRefugioModal] = useState(false); 
+  const [showRefugioModal, setShowRefugioModal] = useState(false);
   const [showAlerts, setShowAlerts] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [itemABorrar, setItemABorrar] = useState<{ id: string, tipo: 'perdido' | 'adopcion' | 'refugio' } | null>(null);
@@ -69,7 +69,7 @@ function App() {
 
       if (status === 'granted') {
         const position = await Geolocation.getCurrentPosition({
-          enableHighAccuracy: false, 
+          enableHighAccuracy: false,
           timeout: 10000
         });
 
@@ -102,7 +102,7 @@ function App() {
     api.getAlertasSistema().then(res => setAlertas(res.data)).catch(() => { });
     api.getMascotasPerdidas().then(res => setPerdidos(res.data)).catch(() => { });
     api.getMascotasAdopcion().then(res => setAdopciones(res.data)).catch(() => { });
-    api.getRefugios().then(res => setRefugios(res.data)).catch(() => { }); 
+    api.getRefugios().then(res => setRefugios(res.data)).catch(() => { });
   };
 
   // --- 💰 GESTIÓN DE DONACIONES (COLABORADORES) ---
@@ -164,7 +164,7 @@ function App() {
   const filtrarItems = (lista: any[]) => {
     return (lista || []).filter(item => {
       if (soloMisPublicaciones && item.userId !== user?.id) return false;
-      
+
       // Solo filtramos por cercanía si: el usuario quiere, tenemos permiso y tenemos coords
       if (soloCercanas && locationPermissionGranted && userCoords) {
         const itemLat = Number(item.lat);
@@ -204,7 +204,7 @@ function App() {
   };
 
   if (authLoading) return (
-    <div 
+    <div
       className="h-screen flex flex-col items-center justify-center bg-slate-50"
       style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
@@ -222,15 +222,13 @@ function App() {
   };
 
   return (
-    <div 
+    <div
       className="min-h-screen bg-slate-50 font-sans text-slate-900 text-left"
       style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom))' }}
     >
       <AppHeader
         user={user}
         setActiveTab={setActiveTab}
-        handleSuscripcion={handleSuscripcion}
-        loadingSuscripcion={loadingSuscripcion}
         alertas={alertas}
         showAlerts={showAlerts}
         setShowAlerts={setShowAlerts}
@@ -265,35 +263,35 @@ function App() {
 
         {/* 🛡️ SECCIONES DE ESCÁNER ACTUALIZADAS CON handleSuscripcion */}
         {activeTab === 'scanner' && (
-          <FoodScanner 
-            mascotas={mascotas} 
-            onScanComplete={refreshData} 
-            initialData={foodParaVer} 
-            onReset={() => setFoodParaVer(null)} 
+          <FoodScanner
+            mascotas={mascotas}
+            onScanComplete={refreshData}
+            initialData={foodParaVer}
+            onReset={() => setFoodParaVer(null)}
             handleSuscripcion={handleSuscripcion}
           />
         )}
-        
+
         {activeTab === 'vet' && (
-          <VetScanner 
-            mascotas={mascotas} 
-            onScanComplete={refreshData} 
-            initialData={vetParaVer} 
-            onReset={() => setVetParaVer(null)} 
+          <VetScanner
+            mascotas={mascotas}
+            onScanComplete={refreshData}
+            initialData={vetParaVer}
+            onReset={() => setVetParaVer(null)}
             handleSuscripcion={handleSuscripcion}
           />
         )}
-        
+
         {activeTab === 'health' && (
-          <SaludScanner 
-            mascotas={mascotas} 
-            onScanComplete={refreshData} 
-            initialData={healthParaVer} 
-            onReset={() => setHealthParaVer(null)} 
+          <SaludScanner
+            mascotas={mascotas}
+            onScanComplete={refreshData}
+            initialData={healthParaVer}
+            onReset={() => setHealthParaVer(null)}
             handleSuscripcion={handleSuscripcion}
           />
         )}
-        
+
         {activeTab === 'stats' && <ReportsManager onVerDetalle={verDetalle} />}
         {activeTab === 'pets' && <PetProfiles mascotas={mascotas} onUpdate={refreshData} onAddClick={() => setShowPetModal(true)} />}
       </main>
@@ -308,7 +306,7 @@ function App() {
           className="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300 cursor-zoom-out"
           onClick={() => setZoomedPhoto(null)}
         >
-          <button 
+          <button
             className="absolute right-6 text-white/70 hover:text-white p-2 bg-white/10 rounded-full transition-colors shadow-lg"
             style={{ top: 'calc(1.5rem + env(safe-area-inset-top))' }}
           >
@@ -323,17 +321,23 @@ function App() {
         </div>
       )}
 
-      <LogoutModal isOpen={showLogoutModal} onClose={() => setShowLogoutModal(false)} onConfirm={logout} />
-
+      <LogoutModal
+        isOpen={showLogoutModal}
+        onClose={() => setShowLogoutModal(false)}
+        onConfirm={logout}
+        // 🛡️ ESTA ES LA LÍNEA QUE FALTA O ESTÁ MAL:
+        handleSuscripcion={handleSuscripcion}
+      />
+      
       <DeleteConfirmModal
         isOpen={!!itemABorrar}
         onClose={() => setItemABorrar(null)}
         onConfirm={ejecutarBorrado}
         titulo="¿Estás seguro?"
         mensaje={
-            itemABorrar?.tipo === 'perdido' ? "El reporte se eliminará permanentemente." :
+          itemABorrar?.tipo === 'perdido' ? "El reporte se eliminará permanentemente." :
             itemABorrar?.tipo === 'adopcion' ? "La publicación de adopción desaparecerá." :
-            "La información del refugio se eliminará del sistema."
+              "La información del refugio se eliminará del sistema."
         }
       />
 

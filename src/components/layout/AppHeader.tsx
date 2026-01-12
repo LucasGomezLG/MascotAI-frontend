@@ -1,12 +1,10 @@
 import React from 'react';
-import { Dog, Loader2, Sparkles, Heart, Bell, User as UserIcon, PawPrint, Zap } from 'lucide-react';
+import { Dog, Bell, User as UserIcon, PawPrint, Heart } from 'lucide-react';
 import NotificationsCenter from '../ui/NotificationsCenter';
 
 interface AppHeaderProps {
   user: any;
   setActiveTab: (tab: any) => void;
-  handleSuscripcion: () => void;
-  loadingSuscripcion: boolean;
   alertas: any[];
   showAlerts: boolean;
   setShowAlerts: (show: boolean) => void;
@@ -16,29 +14,22 @@ interface AppHeaderProps {
 }
 
 export default function AppHeader({
-  user, setActiveTab, handleSuscripcion, loadingSuscripcion,
-  alertas, showAlerts, setShowAlerts, onMarkRead, setShowLogoutModal, activeTab
+  user, setActiveTab, alertas, showAlerts, 
+  setShowAlerts, onMarkRead, setShowLogoutModal, activeTab
 }: AppHeaderProps) {
 
-  // ✅ Buscamos el nombre en todas las propiedades posibles que genera el Context
   const nombreRaw = user?.nombre || user?.name || user?.displayName || 'Usuario';
   const firstName = nombreRaw.split(' ')[0];
-
-  // ✅ Buscamos la imagen evitando cualquier placeholder externo
   const profileImage = user?.picture || user?.foto || null;
-
-  // ✅ Lógica de Créditos de IA
-  const intentosIA = user?.intentosIA || 0;
-  const creditosRestantes = Math.max(0, 10 - intentosIA);
 
   return (
     <header 
       className="bg-white p-4 border-b sticky top-0 z-40 flex items-center justify-between shadow-sm"
       style={{ 
-        // 🛡️ Ajuste Híbrido: En Web es 16px, en Móvil es 16px + Barra de Estado
         paddingTop: 'calc(1rem + env(safe-area-inset-top))' 
       }}
     >
+      {/* LOGO E IDENTIFICACIÓN */}
       <div className="flex items-center gap-2 cursor-pointer" onClick={() => setActiveTab('home')}>
         <div className="bg-orange-600 p-2 rounded-xl shadow-lg rotate-3">
           <Dog size={24} className="text-white" />
@@ -51,52 +42,18 @@ export default function AppHeader({
         </div>
       </div>
 
+      {/* BOTONES DE ACCIÓN */}
       <div className="flex items-center gap-2">
         
-        {/* ⚡ CONTADOR DE IA CREDITS */}
-        <div className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border transition-all duration-300 ${
-          user?.esColaborador 
-            ? 'bg-emerald-50 border-emerald-100 text-emerald-600 shadow-sm' 
-            : 'bg-slate-50 border-slate-100 text-slate-500'
-        }`}>
-          {user?.esColaborador ? (
-            <Sparkles size={12} className="text-emerald-500" fill="currentColor" />
-          ) : (
-            <Zap size={12} className={creditosRestantes > 0 ? "text-orange-500" : "text-slate-300"} fill="currentColor" />
-          )}
-          <div className="flex flex-col leading-none">
-            <span className="text-[8px] font-black uppercase opacity-60">IA Credits</span>
-            <span className="text-[10px] font-black uppercase tracking-tight">
-              {user?.esColaborador ? 'Ilimitado' : `${creditosRestantes}/10`}
-            </span>
-          </div>
-        </div>
-
-        <button
-          onClick={handleSuscripcion}
-          disabled={loadingSuscripcion}
-          className={`p-2 rounded-xl transition-all shadow-sm active:scale-90 ${user?.esColaborador
-            ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
-            : 'bg-gradient-to-tr from-orange-500 to-amber-400 text-white'
-            }`}
-        >
-          {loadingSuscripcion ? (
-            <Loader2 size={20} className="animate-spin" />
-          ) : user?.esColaborador ? (
-            <Sparkles size={20} />
-          ) : (
-            <Heart size={20} fill="currentColor" />
-          )}
-        </button>
-
+        {/* NOTIFICACIONES */}
         <div className="relative">
           <button 
             onClick={() => setShowAlerts(!showAlerts)} 
-            className={`p-2 rounded-xl transition-all ${alertas.length > 0 ? 'bg-orange-50 text-orange-600' : 'bg-slate-50 text-slate-400'}`}
+            className={`p-2.5 rounded-xl transition-all ${alertas.length > 0 ? 'bg-orange-50 text-orange-600' : 'bg-slate-50 text-slate-400'}`}
           >
             <Bell size={20} />
             {alertas.length > 0 && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 border-2 border-white rounded-full"></span>
+              <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 border-2 border-white rounded-full"></span>
             )}
           </button>
           {showAlerts && (
@@ -108,28 +65,34 @@ export default function AppHeader({
           )}
         </div>
 
+        {/* LISTADO DE MASCOTAS */}
         <button 
           onClick={() => setActiveTab('pets')} 
-          className={`p-2 rounded-xl transition-all ${activeTab === 'pets' ? 'bg-orange-600 text-white shadow-lg' : 'bg-slate-50 text-slate-400'}`}
+          className={`p-2.5 rounded-xl transition-all ${activeTab === 'pets' ? 'bg-orange-600 text-white shadow-lg' : 'bg-slate-50 text-slate-400'}`}
         >
           <PawPrint size={20} />
         </button>
 
+        {/* AVATAR / PERFIL (Dispara el nuevo LogoutModal con créditos) */}
         <button
           onClick={() => setShowLogoutModal(true)}
-          className="w-10 h-10 rounded-xl overflow-hidden border-2 border-orange-100 bg-slate-100 flex items-center justify-center shadow-sm active:scale-90 transition-transform"
+          className="relative w-10 h-10 rounded-xl overflow-hidden border-2 border-orange-100 bg-slate-100 flex items-center justify-center shadow-sm active:scale-90 transition-transform ml-1"
         >
           {profileImage ? (
             <img 
               src={profileImage} 
               alt="profile" 
               className="w-full h-full object-cover"
-              onError={(e) => {
-                e.currentTarget.style.display = 'none';
-              }}
             />
           ) : (
             <UserIcon size={20} className="text-slate-400" />
+          )}
+          
+          {/* Indicador visual de Colaborador en el avatar */}
+          {user?.esColaborador && (
+            <div className="absolute -top-1 -right-1 bg-orange-500 rounded-full border-2 border-white p-0.5">
+              <Heart size={8} className="text-white fill-white" />
+            </div>
           )}
         </button>
       </div>

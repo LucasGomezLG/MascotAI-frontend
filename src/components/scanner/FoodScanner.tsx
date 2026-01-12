@@ -55,8 +55,8 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
       inputValidator: (value) => {
         if (!value) return 'Debes ingresar un monto';
         const amount = parseInt(value);
-        if (amount < 100) return 'El monto mínimo es ';
-        if (amount > 500000) return 'El monto máximo permitido es .000';
+        if (amount < 100) return 'El monto mínimo es $100';
+        if (amount > 500000) return 'El monto máximo permitido es $500.000';
       },
       customClass: { popup: 'rounded-[2rem]' }
     }).then(async (result) => {
@@ -153,6 +153,7 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
   };
 
   const handleScan = async () => {
+    // 🛡️ VALIDACIÓN DE CRÉDITOS
     if (!tieneEnergia) {
       mostrarModalLimite();
       return;
@@ -162,7 +163,10 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
     setLoading(true);
     try {
       const res = await api.analizarAlimento(selectedImage, selectedPet || "");
+      
+      // ✅ IMPORTANTE PARA MOBILE: Refrescar antes de cambiar el estado de la UI
       await refreshUser();
+      
       setResult(res.data);
       if (res.data.error === "NO_ES_ALIMENTO") return;
       if (res.data.alimento) {
@@ -172,6 +176,7 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
       }
     } catch (e: any) {
       if (e.response?.status === 403 || e.toString().includes("LIMITE_IA_ALCANZADO")) {
+        await refreshUser(); // Sincronizar incluso en error 403
         mostrarModalLimite();
       } else {
         Toast.fire({ icon: 'error', title: 'Error de conexión' });
@@ -237,7 +242,7 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
     setLoadingBusqueda(true);
     try {
       const res = await api.buscarPrecios(marca);
-      await refreshUser();
+      await refreshUser(); // ✅ Sincronizar créditos tras búsqueda
       setBusquedaResult(res.data || []);
       setShowPriceModal(true);
     } catch (e: any) {
@@ -260,7 +265,7 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
     setLoadingResenas(true);
     try {
       const res = await api.buscarResenas(marca);
-      await refreshUser();
+      await refreshUser(); // ✅ Sincronizar créditos tras búsqueda
 
       const textoResenas = res.data.resenas || res.data;
       const lineas = typeof textoResenas === 'string' ? textoResenas.split('\n') : [];

@@ -11,7 +11,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const SERVER_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
 
-  // ✅ Función Maestra de Formateo: Mantenida exactamente igual
   const formatUserData = (data: any) => {
     if (!data) return null;
     const raw = data.data || data.user || data;
@@ -23,26 +22,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       picture: esFotoGenerica ? null : (raw.foto || raw.picture || raw.imageUrl),
       nombre: raw.nombre || raw.name,
       foto: raw.foto || raw.picture,
-      // Aseguramos que los nuevos campos de IA estén presentes
       intentosIA: raw.intentosIA || 0,
       esColaborador: raw.esColaborador || false
     };
   };
 
-  // 🛡️ INTERCEPTOR GLOBAL DE AUTENTICACIÓN (401)
   useEffect(() => {
     const interceptor = apiClient.interceptors.response.use(
       (response) => response,
       (error) => {
         if (error.response && error.response.status === 401) {
-          console.warn("⚠️ Sesión inválida detectada por el centinela. Limpiando estado...");
           localStorage.removeItem('mascotai_logged_in');
           setUser(null);
         }
         return Promise.reject(error);
       }
     );
-
     return () => apiClient.interceptors.response.eject(interceptor);
   }, []);
 
@@ -54,22 +49,28 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   /**
-   * 🔄 NUEVA FUNCIÓN: Refresca los datos del usuario desde el servidor.
-   * Úsala después de cada escaneo exitoso o pago de suscripción.
+   * 🔄 refreshUser: Versión final para Mobile
    */
-  // Dentro de AuthContext.tsx
   const refreshUser = async () => {
-    console.log("🔄 Sincronizando créditos IA..."); // Debug para ver en consola de Android/Xcode
+    // 1. Esperamos un segundo para asegurar que el backend terminó de procesar
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
     try {
+      // 2. Llamamos a la API (que ahora tiene el truco del timestamp en api.ts)
       const res = await api.getUserProfile();
+      
       if (res && res.data) {
         const formatted = formatUserData(res.data);
-        setUser({ ...formatted }); // 🛡️ Usamos el spread {...} para forzar un nuevo objeto y que React lo detecte
-        console.log("✅ Créditos actualizados:", formatted.intentosIA);
+        
+        // 3. Limpiamos y seteamos (Doble paso para forzar renderizado en Mobile)
+        setUser(null); // Pequeño reset flash
+        setUser({ ...formatted }); 
+        
+        console.log("📱 Créditos actualizados en Celular:", formatted.intentosIA);
         return formatted;
       }
     } catch (error) {
-      console.error("❌ Falló el refresco de usuario en mobile:", error);
+      console.error("❌ Error refrescando usuario:", error);
     }
     return null;
   };
@@ -80,18 +81,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setLoading(false);
       return;
     }
-
     try {
       const res = await api.getUserProfile();
       if (res && res.data) {
-        const formatted = formatUserData(res.data);
-        console.log("👤 Usuario cargado con éxito:", formatted);
-        setUser(formatted);
-      } else {
-        setUser(null);
+        setUser(formatUserData(res.data));
       }
     } catch (error) {
-      console.error("❌ Error en carga inicial de usuario:", error);
+      setUser(null);
     } finally {
       setLoading(false);
     }
@@ -106,9 +102,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           setUser(formatUserData(res.data));
           localStorage.setItem('mascotai_logged_in', 'true');
         }
-      } catch (error) {
-        console.error("Error Login Nativo:", error);
-      }
+      } catch (error) { console.error("Error Login:", error); }
     } else {
       localStorage.setItem('mascotai_logged_in', 'true');
       window.location.href = `${SERVER_URL}/oauth2/authorization/google`;
@@ -119,13 +113,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       localStorage.clear();
       await api.logout();
-    } catch (error) {
-      console.warn("Error enviando petición de logout al servidor");
     } finally {
       setUser(null);
-      if (!Capacitor.isNativePlatform()) {
-        window.location.href = window.location.origin;
-      }
+      if (!Capacitor.isNativePlatform()) window.location.href = window.location.origin;
     }
   };
 
