@@ -28,7 +28,7 @@ export default function HomeContent({
   soloCercanas, setSoloCercanas, soloMisPublicaciones, setSoloMisPublicaciones,
   perdidosFiltrados = [], adopcionesFiltradas = [], refugiosFiltrados = [], // ✅ Valor por defecto []
   setShowLostPetModal, setShowAdoptionModal, setShowRefugioModal,
-  user, abrirConfirmacionBorrado, userCoords
+  user, abrirConfirmacionBorrado
 }: HomeContentProps) {
   
   // ✅ Cálculo seguro del total de resultados
