@@ -123,36 +123,46 @@ const AdoptionModal = ({ onClose }: { onClose: () => void }) => {
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 text-left">
       <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-6 shadow-2xl relative max-h-[95vh] overflow-y-auto animate-in zoom-in-95">
-        <button onClick={onClose} className="absolute top-6 right-6 text-slate-400 hover:text-slate-900 transition-colors z-10"><X size={24} /></button>
+        {/* Botón Cerrar con Safe Area Superior */}
+        <button 
+          onClick={onClose} 
+          className="absolute right-6 text-slate-400 hover:text-slate-900 transition-colors z-10"
+          style={{ top: 'calc(1.5rem + env(safe-area-inset-top))' }}
+        >
+          <X size={24} />
+        </button>
 
         <h3 className="text-2xl font-black text-slate-800 mb-6 tracking-tight flex items-center gap-2">
           <Heart className="text-emerald-500" fill="currentColor" size={24} /> Dar en Adopción
         </h3>
 
         <div className="space-y-4">
-          {/* SECCIÓN DE FOTOS NATIVAS */}
+          {/* ✅ SECCIÓN DE FOTOS CON BOTONES HORIZONTALES */}
           <div className="grid grid-cols-4 gap-2">
             {previews.map((p, i: number) => (
               <div key={i} className="relative h-20 group">
-                <img src={p} className="w-full h-full object-cover rounded-xl border-2 border-slate-100 shadow-sm" alt="Preview" />
-                <button onClick={() => removeFile(i)} className="absolute -top-1.5 -right-1.5 bg-red-500 text-white p-1 rounded-full shadow-md active:scale-90 transition-transform">
+                <img src={p} className="w-full h-full object-cover rounded-xl border-2 border-emerald-100 shadow-sm" alt="Preview" />
+                <button onClick={() => removeFile(i)} className="absolute -top-1.5 -right-1.5 bg-emerald-500 text-white p-1 rounded-full shadow-md active:scale-90 transition-transform">
                   <Trash2 size={10} />
                 </button>
               </div>
             ))}
             {previews.length < 4 && (
-              <div className="col-span-1 flex flex-col gap-1">
+              // ✅ CORRECCIÓN AQUÍ: Cambiado flex-col por flex y ajustada la altura
+              <div className="flex gap-2 h-20 col-span-2"> 
                 <button 
                   onClick={handleNativeCamera} 
-                  className="flex-1 bg-emerald-50 border-2 border-emerald-100 rounded-xl flex items-center justify-center text-emerald-600 hover:bg-emerald-100 active:scale-95 transition-all"
+                  className="flex-1 bg-emerald-50 border-2 border-dashed border-emerald-200 rounded-xl flex flex-col items-center justify-center text-emerald-600 hover:bg-emerald-100 active:scale-95 transition-all"
                 >
-                  <CameraIcon size={20} />
+                  <CameraIcon size={18} />
+                  <span className="text-[7px] font-black uppercase mt-0.5">Cámara</span>
                 </button>
                 <button 
                   onClick={handleNativeGallery} 
-                  className="flex-1 bg-slate-50 border-2 border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:bg-slate-100 active:scale-95 transition-all"
+                  className="flex-1 bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center text-slate-500 hover:bg-slate-100 active:scale-95 transition-all"
                 >
-                  <ImageIcon size={20} />
+                  <ImageIcon size={18} />
+                  <span className="text-[7px] font-black uppercase mt-0.5">Galería</span>
                 </button>
               </div>
             )}
