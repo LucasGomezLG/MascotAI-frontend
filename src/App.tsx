@@ -92,6 +92,7 @@ function App() {
     api.getMascotasAdopcion().then(res => setAdopciones(res.data)).catch(() => { });
   };
 
+  // --- 💰 GESTIÓN DE DONACIONES (COLABORADORES) ---
   const handleSuscripcion = () => {
     if (user?.esColaborador) return;
 
@@ -100,17 +101,25 @@ function App() {
       text: "Ingresa el monto que desees donar para mantener MascotAI",
       input: 'number',
       inputLabel: 'Monto en AR$',
-      inputValue: 2000,
+      inputValue: 5000,
+      // 🛡️ Blindaje de atributos del input para móviles
+      inputAttributes: {
+        min: '100',
+        max: '500000',
+        step: '1'
+      },
       showCancelButton: true,
       confirmButtonColor: '#f97316',
       cancelButtonColor: '#94a3b8',
       confirmButtonText: 'Donar',
       cancelButtonText: 'Ahora no',
       reverseButtons: true,
+      // 🛡️ Blindaje de validación lógica
       inputValidator: (value) => {
-        if (!value || parseInt(value) < 100) {
-          return 'El monto mínimo es $100'
-        }
+        if (!value) return 'Debes ingresar un monto';
+        const amount = parseInt(value);
+        if (amount < 100) return 'El monto mínimo es $100';
+        if (amount > 500000) return 'El monto máximo permitido es $500.000';
       },
       customClass: { popup: 'rounded-[2rem]' }
     }).then(async (result) => {
@@ -121,7 +130,7 @@ function App() {
           const response = await api.crearSuscripcion(montoElegido);
           window.location.href = response.data.url;
         } catch (error) {
-          Swal.fire('Error', 'No se pudo generar el link.', 'error');
+          Swal.fire('Error', 'No se pudo generar el link de pago.', 'error');
         } finally {
           setLoadingSuscripcion(false);
         }
@@ -207,7 +216,6 @@ function App() {
   return (
     <div 
       className="min-h-screen bg-slate-50 font-sans text-slate-900 text-left"
-      // 🛡️ Ajuste Safe Area Inferior para el Nav
       style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom))' }}
     >
       <AppHeader
@@ -261,7 +269,6 @@ function App() {
         >
           <button 
             className="absolute right-6 text-white/70 hover:text-white p-2 bg-white/10 rounded-full transition-colors shadow-lg"
-            // 🛡️ Safe Area Superior para el botón de cierre del zoom
             style={{ top: 'calc(1.5rem + env(safe-area-inset-top))' }}
           >
             <X size={24} />
