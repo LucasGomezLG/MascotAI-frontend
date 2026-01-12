@@ -7,6 +7,7 @@ import {
   Info
 } from 'lucide-react';
 import { api } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 import { Toast } from '../../utils/alerts';
 import Swal from 'sweetalert2';
 
@@ -15,10 +16,12 @@ import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { useCameraPermissions } from '../../hooks/useCameraPermissions';
 
 const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) => {
+  const { user, refreshUser } = useAuth();
   const [selectedPet, setSelectedPet] = useState("");
   const [loading, setLoading] = useState(false);
   const [loadingBusqueda, setLoadingBusqueda] = useState(false);
   const [loadingResenas, setLoadingResenas] = useState(false);
+  const [loadingSuscripcion, setLoadingSuscripcion] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [porcion, setPorcion] = useState<number | null>(null);
   const [precioInput, setPrecioInput] = useState("");
@@ -30,8 +33,68 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
   const [showBrandWarning, setShowBrandWarning] = useState(false);
   const [alertasSalud, setAlertasSalud] = useState<any[]>([]);
 
-  // 🛡️ HOOK DE PERMISOS (Funciones separadas)
   const { validarCamara, validarGaleria } = useCameraPermissions();
+
+  const restantes = Math.max(0, 10 - (user?.intentosIA || 0));
+  const tieneEnergia = user?.esColaborador || restantes > 0;
+
+  // 🛡️ MODAL DE DONACIÓN
+  const ejecutarFlujoDonacion = () => {
+    Swal.fire({
+      title: '¿Quieres colaborar?',
+      text: "Ingresa el monto que desees donar para mantener MascotAI",
+      input: 'number',
+      inputLabel: 'Monto en AR$',
+      inputValue: 5000,
+      inputAttributes: { min: '100', max: '500000', step: '1' },
+      showCancelButton: true,
+      confirmButtonColor: '#f97316',
+      cancelButtonColor: '#94a3b8',
+      confirmButtonText: 'Donar',
+      cancelButtonText: 'Ahora no',
+      reverseButtons: true,
+      inputValidator: (value) => {
+        if (!value) return 'Debes ingresar un monto';
+        const amount = parseInt(value);
+        if (amount < 100) return 'El monto mínimo es $100';
+        if (amount > 500000) return 'El monto máximo permitido es $500.000';
+      },
+      customClass: { popup: 'rounded-[2rem]' }
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        const montoElegido = result.value;
+        setLoadingSuscripcion(true);
+        try {
+          const response = await api.crearSuscripcion(montoElegido);
+          window.location.href = response.data.url;
+        } catch (error) {
+          Swal.fire('Error', 'No se pudo generar el link de pago.', 'error');
+        } finally {
+          setLoadingSuscripcion(false);
+        }
+      }
+    });
+  };
+
+  // 🛡️ MODAL DE LÍMITE AGOTADO
+  const mostrarModalLimite = () => {
+    Swal.fire({
+      title: '¡Energía de IA Agotada! ⚡',
+      text: 'Has alcanzado el límite de 10 escaneos gratuitos este mes. Colaborá para tener análisis ilimitados.',
+      icon: 'info',
+      showCancelButton: true,
+      confirmButtonText: 'Ser Colaborador ❤️',
+      cancelButtonText: 'Más tarde',
+      confirmButtonColor: '#f97316',
+      cancelButtonColor: '#94a3b8',
+      reverseButtons: true,
+      customClass: { popup: 'rounded-[2.5rem]' }
+    }).then((res) => {
+      if (res.isConfirmed) {
+        ejecutarFlujoDonacion();
+      }
+    });
+  };
 
   const petData = useMemo(() =>
     mascotas.find((p: any) => p.id === selectedPet),
@@ -66,50 +129,34 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
     }
   }, [initialData]);
 
-  // 📸 FUNCIÓN NATIVA: CAPTURAR FOTO (Solo pide cámara)
   const handleNativeCamera = async () => {
     const ok = await validarCamara();
     if (!ok) return;
-
     try {
       const image = await Camera.getPhoto({
-        quality: 90,
-        allowEditing: false,
-        resultType: CameraResultType.Base64,
-        source: CameraSource.Camera
+        quality: 90, allowEditing: false, resultType: CameraResultType.Base64, source: CameraSource.Camera
       });
-
       if (image.base64String) {
         setSelectedImage(`data:image/jpeg;base64,${image.base64String}`);
         setResult(null);
         setPorcion(null);
         setResenas([]);
       }
-    } catch (error) {
-      console.log("Cámara cancelada");
-    }
+    } catch (error) { console.log("Cámara cancelada"); }
   };
 
-  // 🖼️ FUNCIÓN NATIVA: GALERÍA (Solo pide fotos)
   const handleNativeGallery = async () => {
     const ok = await validarGaleria();
     if (!ok) return;
-
     try {
       const image = await Camera.getPhoto({
-        quality: 90,
-        allowEditing: false,
-        resultType: CameraResultType.Base64,
-        source: CameraSource.Photos
+        quality: 90, allowEditing: false, resultType: CameraResultType.Base64, source: CameraSource.Photos
       });
-
       if (image.base64String) {
         setSelectedImage(`data:image/jpeg;base64,${image.base64String}`);
         setResult(null);
       }
-    } catch (error) {
-      console.log("Galería cancelada");
-    }
+    } catch (error) { console.log("Galería cancelada"); }
   };
 
   const handleBorrarFoto = (e: React.MouseEvent) => {
@@ -118,25 +165,31 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
   };
 
   const handleScan = async () => {
+    // 🛡️ VALIDACIÓN DE CRÉDITOS AL TOCAR EL BOTÓN
+    if (!tieneEnergia) {
+      mostrarModalLimite();
+      return;
+    }
+
     if (!selectedImage) return;
     setLoading(true);
     try {
       const res = await api.analizarAlimento(selectedImage, selectedPet || "");
+      await refreshUser();
       setResult(res.data);
-
       if (res.data.error === "NO_ES_ALIMENTO") return;
-
       if (res.data.alimento) {
         setPorcion(res.data.porcionSugerida || res.data.alimento.porcionRecomendada);
         if (res.data.alimento.precioComprado) setPrecioInput(res.data.alimento.precioComprado.toString());
         if (onScanComplete) onScanComplete();
       }
-    } catch (e) {
-      console.error("Error en escaneo:", e);
-      Toast.fire({ icon: 'error', title: 'Error de conexión' });
-    } finally {
-      setLoading(false);
-    }
+    } catch (e: any) {
+      if (e.response?.status === 403 || e.toString().includes("LIMITE_IA_ALCANZADO")) {
+        mostrarModalLimite();
+      } else {
+        Toast.fire({ icon: 'error', title: 'Error de conexión' });
+      }
+    } finally { setLoading(false); }
   };
 
   const getGamaColor = (calidad: string) => {
@@ -159,7 +212,6 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
     if (!result?.alimento?.id || !precioInput || !pesoBolsaInput) return;
     const p = parseFloat(precioInput);
     const w = parseFloat(pesoBolsaInput);
-
     if (p < w) {
       Swal.fire({
         title: '¿Valores invertidos?',
@@ -169,9 +221,7 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
         showCancelButton: true,
         confirmButtonText: 'Sí',
         cancelButtonText: 'Corregir'
-      }).then((res) => {
-        if (res.isConfirmed) enviarFinanzas(p, w);
-      });
+      }).then((res) => { if (res.isConfirmed) enviarFinanzas(p, w); });
       return;
     }
     enviarFinanzas(p, w);
@@ -180,12 +230,8 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
   const enviarFinanzas = async (p: number, w: number) => {
     try {
       await api.guardarFinanzas({
-        id: result.alimento.id,
-        precio: p.toString(),
-        peso: w.toString(),
-        costoDiario: calcularCostoDiario(),
-        busquedaIA: busquedaResult,
-        porcionRecomendada: porcion
+        id: result.alimento.id, precio: p.toString(), peso: w.toString(),
+        costoDiario: calcularCostoDiario(), busquedaIA: busquedaResult, porcionRecomendada: porcion
       });
     } catch (e) { console.error(e); }
   };
@@ -194,47 +240,66 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
     if (!result?.alimento?.id) return;
     try {
       await api.activarStock(result.alimento.id, {
-        precioComprado: precioInput,
-        pesoBolsaKg: pesoBolsaInput,
-        costoDiario: calcularCostoDiario()
+        precioComprado: precioInput, pesoBolsaKg: pesoBolsaInput, costoDiario: calcularCostoDiario()
       });
-      setResult({
-        ...result,
-        alimento: { ...result.alimento, stockActivo: true }
-      });
+      setResult({ ...result, alimento: { ...result.alimento, stockActivo: true } });
       Swal.fire({ title: '¡Bolsa activada!', icon: 'success', confirmButtonColor: '#f27121' });
     } catch (e) { console.error(e); }
   };
 
   const handleBuscarPrecios = async () => {
+    if (!tieneEnergia) { mostrarModalLimite(); return; }
+
     const marca = result?.alimento?.marca;
     if (!marca || marca.toLowerCase().includes("desconocida")) {
       setShowBrandWarning(true);
       return;
     }
+
     setLoadingBusqueda(true);
     try {
+      // ✅ La llamada ahora es limpia, Axios se encarga de la marca
       const res = await api.buscarPrecios(marca);
+      await refreshUser();
       setBusquedaResult(res.data || []);
       setShowPriceModal(true);
-    } catch (e) { console.error(e); } finally { setLoadingBusqueda(false); }
+    } catch (e: any) {
+      if (e.response?.status === 403) mostrarModalLimite();
+      console.error("Error buscando precios:", e);
+    } finally {
+      setLoadingBusqueda(false);
+    }
   };
 
   const handleBuscarResenas = async () => {
+    if (!tieneEnergia) { mostrarModalLimite(); return; }
+
     const marca = result?.alimento?.marca;
     if (!marca || marca.toLowerCase().includes("desconocida")) {
       setShowBrandWarning(true);
       return;
     }
+
     setLoadingResenas(true);
     try {
       const res = await api.buscarResenas(marca);
-      const lineas = res.data.split('\n');
+      await refreshUser();
+
+      // ✅ Manejo robusto de la respuesta
+      const textoResenas = res.data.resenas || res.data;
+      const lineas = typeof textoResenas === 'string' ? textoResenas.split('\n') : [];
+
       const lista = lineas.find((l: string) => l.includes('|'))?.split('|')
         .map((s: string) => s.trim())
         .filter((s: string) => s.toUpperCase().includes("BUENO:") || s.toUpperCase().includes("MALO:")) || [];
+
       setResenas(lista);
-    } catch (e) { console.error(e); } finally { setLoadingResenas(false); }
+    } catch (e: any) {
+      if (e.response?.status === 403) mostrarModalLimite();
+      console.error("Error buscando reseñas:", e);
+    } finally {
+      setLoadingResenas(false);
+    }
   };
 
   const cleanMarkdown = (text: any) => (text && typeof text === 'string') ? text.replace(/\*\*/g, '') : "---";
@@ -264,7 +329,7 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
             <select
               value={selectedPet}
               onChange={(e) => setSelectedPet(e.target.value)}
-              className="w-full p-4 rounded-2xl border-2 border-orange-50 bg-orange-50/50 font-bold outline-none text-slate-700 focus:border-orange-500"
+              className="w-full p-4 rounded-2xl border-2 border-orange-50 bg-orange-50/50 font-bold outline-none text-slate-700 focus:border-orange-500 transition-all"
             >
               <option value="">Análisis Genérico</option>
               {mascotas.map((p: any) => (
@@ -274,17 +339,13 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
           </div>
 
           <div
-            onClick={handleNativeCamera} // 📸 Pide solo cámara
+            onClick={handleNativeCamera}
             className="bg-white h-64 border-4 border-dashed border-orange-100 rounded-[2.5rem] flex flex-col items-center justify-center cursor-pointer hover:border-orange-300 transition-all active:scale-95 group relative overflow-hidden shadow-inner"
           >
             {selectedImage ? (
               <>
                 <img src={selectedImage} alt="Preview" className="w-full h-full object-cover" />
                 <button onClick={handleBorrarFoto} className="absolute top-4 right-4 bg-white/90 p-2 rounded-full shadow-lg text-orange-600 z-10"><X size={20} /></button>
-                <div className="absolute inset-0 bg-black/20 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                  <RefreshCw className="text-white mb-2" />
-                  <span className="text-white font-black text-xs uppercase">Cambiar Foto</span>
-                </div>
               </>
             ) : (
               <>
@@ -296,8 +357,8 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
 
           <button
             type="button"
-            onClick={handleNativeGallery} // 🖼️ Pide solo fotos
-            className="w-full py-3 rounded-2xl font-black text-xs uppercase bg-slate-100 text-slate-500 border-2 border-slate-200 hover:bg-slate-200 transition-all flex items-center justify-center gap-2 active:scale-95"
+            onClick={handleNativeGallery}
+            className="w-full py-3 rounded-2xl font-black text-xs uppercase bg-slate-100 text-slate-500 border-2 border-slate-200 flex items-center justify-center gap-2 active:scale-95 transition-all"
           >
             <ImageIcon size={16} /> Cargar desde Galería
           </button>
@@ -305,15 +366,26 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
           <div className="w-full">
             <button
               type="button"
-              onClick={selectedImage ? handleScan : handleNativeCamera}
-              disabled={loading}
-              className={`w-full flex items-center justify-center gap-3 py-6 rounded-2xl font-black text-xl shadow-xl transition-all active:scale-95 ${loading ? 'bg-orange-200' : 'bg-orange-600 text-white shadow-orange-200 hover:bg-orange-700'}`}
+              onClick={handleScan}
+              disabled={loading || !selectedImage}
+              className={`w-full flex items-center justify-center gap-3 py-6 rounded-2xl font-black text-xl shadow-xl transition-all active:scale-95 ${loading || !selectedImage
+                ? 'bg-orange-200 text-orange-400 cursor-not-allowed shadow-none'
+                : 'bg-orange-600 text-white hover:bg-orange-700 shadow-orange-200'
+                }`}
             >
-              {loading ? <Loader2 className="animate-spin" /> : selectedImage ? <><Sparkles size={22} className="text-orange-200" /> ESCANEAR AHORA</> : "ABRIR CÁMARA"}
+              {loading ? (
+                <Loader2 className="animate-spin" />
+              ) : (
+                <>
+                  <Sparkles size={22} className={selectedImage ? "text-orange-200" : "text-orange-300"} />
+                  ESCANEAR AHORA
+                </>
+              )}
             </button>
           </div>
         </div>
       ) : (
+        /* VISTA DE RESULTADO (Sin cambios para no borrar nada) */
         <div className="bg-white rounded-[2.5rem] shadow-2xl p-8 border-2 border-orange-50 text-left animate-in zoom-in-95">
           {result.error === "NO_ES_ALIMENTO" ? (
             <div className="bg-red-50 border-2 border-red-100 p-8 rounded-3xl text-center">
@@ -356,22 +428,8 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
                 <div className="bg-blue-50 p-6 rounded-3xl border border-blue-100 space-y-4">
                   <div className="flex items-center gap-2 text-blue-900 font-black text-xs uppercase tracking-widest"><Wallet size={16} /> Pet Finance</div>
                   <div className="flex gap-2">
-                    <input
-                      type="number"
-                      placeholder="Precio ($)"
-                      className="w-1/2 p-3 rounded-xl border border-blue-200 font-bold"
-                      value={precioInput}
-                      onChange={e => e.target.value.length <= 6 && setPrecioInput(e.target.value)}
-                      onBlur={sincronizarFinanzas}
-                    />
-                    <input
-                      type="number"
-                      placeholder="Bolsa (kg)"
-                      className="w-1/2 p-3 rounded-xl border border-blue-200 font-bold"
-                      value={pesoBolsaInput}
-                      onChange={e => e.target.value.length <= 6 && setPesoBolsaInput(e.target.value)}
-                      onBlur={sincronizarFinanzas}
-                    />
+                    <input type="number" placeholder="Precio ($)" className="w-1/2 p-3 rounded-xl border border-blue-200 font-bold" value={precioInput} onChange={e => e.target.value.length <= 6 && setPrecioInput(e.target.value)} onBlur={sincronizarFinanzas} />
+                    <input type="number" placeholder="Bolsa (kg)" className="w-1/2 p-3 rounded-xl border border-blue-200 font-bold" value={pesoBolsaInput} onChange={e => e.target.value.length <= 6 && setPesoBolsaInput(e.target.value)} onBlur={sincronizarFinanzas} />
                   </div>
                   {calcularCostoDiario() && (
                     <div className="bg-white p-3 rounded-xl border-2 border-blue-100 text-center">
@@ -430,17 +488,17 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
               </div>
             </>
           )}
-          <button onClick={() => { setResult(null); setSelectedImage(null); onReset(); }} className="w-full py-4 bg-slate-900 text-white font-black text-xs uppercase tracking-widest rounded-2xl mt-6">FINALIZAR</button>
+          <button onClick={() => { setResult(null); setSelectedImage(null); onReset(); }} className="w-full py-4 bg-slate-900 text-white font-black text-xs uppercase tracking-widest rounded-2xl mt-6 active:scale-95 transition-all">FINALIZAR</button>
         </div>
       )}
 
       {showPriceModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-6">
-          <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 relative animate-in zoom-in-95 text-left">
+          <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 relative animate-in zoom-in-95 text-left shadow-2xl">
             <button onClick={() => setShowPriceModal(false)} className="absolute top-6 right-6 text-slate-400"><X size={24} /></button>
             <div className="flex items-center gap-4 mb-6">
               <div className="bg-blue-100 p-3 rounded-2xl text-blue-600"><ShoppingBag size={24} /></div>
-              <div><h3 className="text-xl font-black text-slate-800 leading-none">Ofertas Hoy</h3><p className="text-blue-500 font-bold text-[10px] uppercase mt-1">Argentina</p></div>
+              <div><h3 className="text-xl font-black text-slate-800 leading-none">Ofertas Hoy</h3><p className="text-blue-500 font-bold text-[10px] uppercase mt-1 tracking-widest">Argentina</p></div>
             </div>
             <div className="space-y-3 mb-8 max-h-[350px] overflow-y-auto pr-2">
               {busquedaResult.map((o, i) => (
@@ -450,17 +508,17 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: any) =>
                 </div>
               ))}
             </div>
-            <button onClick={() => setShowPriceModal(false)} className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black">ENTENDIDO</button>
+            <button onClick={() => setShowPriceModal(false)} className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black shadow-lg">ENTENDIDO</button>
           </div>
         </div>
       )}
 
-      <div className="mt-10 bg-amber-50/80 border border-amber-200 p-6 rounded-[2.5rem] shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-700">
-        <div className="flex items-center gap-3 mb-3 text-left">
+      <div className="mt-10 bg-amber-50/80 border border-amber-200 p-6 rounded-[2.5rem] shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-700 text-left">
+        <div className="flex items-center gap-3 mb-3">
           <div className="bg-amber-100 p-2 rounded-xl text-amber-600"><Info size={20} /></div>
           <h4 className="font-black text-amber-900 uppercase text-xs tracking-widest">¿Cómo funciona?</h4>
         </div>
-        <div className="space-y-3 text-left">
+        <div className="space-y-3">
           <p className="text-[11px] font-bold text-amber-800/90 leading-relaxed"><span className="text-amber-900 font-black uppercase text-[9px]">IA Nutricional:</span> Analiza la etiqueta para darte la gama y calidad.</p>
           <p className="text-[11px] font-bold text-amber-800/90 leading-relaxed"><span className="text-amber-900 font-black uppercase text-[9px]">Raciones:</span> Calcula gramos exactos según la salud de tu mascota.</p>
           <p className="text-[11px] font-bold text-amber-800/90 leading-relaxed"><span className="text-amber-900 font-black uppercase text-[9px]">Finanzas:</span> Seguimiento de costo diario y ofertas online.</p>

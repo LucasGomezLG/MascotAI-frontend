@@ -1,6 +1,5 @@
 import React from 'react';
 import { Camera as CameraIcon } from 'lucide-react';
-// 🛡️ IMPORTACIONES NATIVAS
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { useCameraPermissions } from '../../hooks/useCameraPermissions';
 
@@ -8,15 +7,16 @@ interface Props {
   onImageReady: (base64: string) => void;
   label: string;
   className?: string;
+  disabled?: boolean; // ✅ Agregamos disabled por si se acaba la energía
 }
 
-const ImageScanner = ({ onImageReady, label, className }: Props) => {
-  // 🛡️ HOOK DE PERMISOS (Usando las nuevas funciones separadas)
+const ImageScanner = ({ onImageReady, label, className, disabled }: Props) => {
   const { validarCamara, validarGaleria } = useCameraPermissions();
 
   const handleCapture = async () => {
-    // 1. Para usar el 'Prompt' (menú de selección), validamos ambos permisos
-    // Esto asegura que el usuario no tenga problemas elija la opción que elija.
+    if (disabled) return;
+
+    // 1. Validaciones de permisos nativos
     const camOk = await validarCamara();
     if (!camOk) return;
 
@@ -24,7 +24,7 @@ const ImageScanner = ({ onImageReady, label, className }: Props) => {
     if (!galOk) return;
 
     try {
-      // 2. Abrir la interfaz nativa con el menú de selección
+      // 2. Ejecución de la interfaz nativa
       const image = await Camera.getPhoto({
         quality: 90,
         allowEditing: false,
@@ -36,7 +36,6 @@ const ImageScanner = ({ onImageReady, label, className }: Props) => {
       });
 
       if (image.base64String) {
-        // Devolvemos el string base64 con el prefijo correcto
         onImageReady(`data:image/jpeg;base64,${image.base64String}`);
       }
     } catch (error) {
@@ -48,9 +47,11 @@ const ImageScanner = ({ onImageReady, label, className }: Props) => {
     <button 
       type="button" 
       onClick={handleCapture}
-      className={className || "bg-orange-600 text-white p-4 rounded-xl flex items-center justify-center gap-2 font-black uppercase text-[10px] shadow-lg active:scale-95 transition-all"}
+      disabled={disabled}
+      className={className || `bg-orange-600 text-white p-4 rounded-2xl flex items-center justify-center gap-2 font-black uppercase text-[10px] shadow-lg active:scale-95 transition-all disabled:opacity-50 disabled:bg-slate-300 disabled:scale-100`}
     >
-      <CameraIcon size={16} /> {label}
+      <CameraIcon size={16} /> 
+      {disabled ? "Sin Energía" : label}
     </button>
   );
 };

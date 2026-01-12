@@ -8,9 +8,10 @@ interface VetScannerProps {
   onScanComplete: () => void;
   initialData?: any;
   onReset: () => void;
+  handleSuscripcion: () => void; // 🛡️ Prop añadida para el flujo de créditos
 }
 
-const VetScanner = ({ mascotas, onScanComplete, initialData, onReset }: VetScannerProps) => {
+const VetScanner = ({ mascotas, onScanComplete, initialData, onReset, handleSuscripcion }: VetScannerProps) => {
   const [activeTab, setActiveTab] = useState<'triaje' | 'consultas'>('triaje');
 
   useEffect(() => {
@@ -23,11 +24,11 @@ const VetScanner = ({ mascotas, onScanComplete, initialData, onReset }: VetScann
       }
     }
   }, [initialData]);
+
   return (
     <div className="space-y-6 pb-20 w-full animate-in fade-in duration-500">
       {/* 🛡️ Cartel de Advertencia Amigable */}
       <div className="bg-red-50/80 border border-red-200 p-5 rounded-[2rem] flex items-start gap-4 mb-6 shadow-sm">
-        {/* Ícono de Advertencia (Triángulo) */}
         <div className="bg-red-100 p-2.5 rounded-xl text-red-600 shrink-0 shadow-sm">
           <AlertTriangle size={20} />
         </div>
@@ -36,9 +37,9 @@ const VetScanner = ({ mascotas, onScanComplete, initialData, onReset }: VetScann
           <p className="text-[10px] font-black uppercase text-red-900 tracking-widest leading-none">
             Advertencia Importante
           </p>
-          <p className="text-[11px] font-bold text-red-800/80 leading-tight">
+          <p className="text-[11px] font-bold text-red-800/80 leading-tight text-left">
             ¡Cuidemos la salud de nuestras mascotas! MascotAI es una guía orientativa.
-            <span className="text-red-900 font-black"> consultá siempre a tu veterinario </span> de confianza.
+            <span className="text-red-900 font-black"> Consultá siempre a tu veterinario </span> de confianza.
           </p>
         </div>
       </div>
@@ -66,19 +67,22 @@ const VetScanner = ({ mascotas, onScanComplete, initialData, onReset }: VetScann
             onScanComplete={onScanComplete}
             initialData={initialData}
             onReset={onReset}
+            handleSuscripcion={handleSuscripcion} // 🛡️ Pasamos la función de suscripción
           />
         ) : (
           <ConsultationScanner
             mascotas={mascotas}
             onScanComplete={onScanComplete}
-            initialData={initialData} // ✅ AHORA SÍ: Le pasamos la receta para que la muestre
+            initialData={initialData}
             onReset={onReset}
+            handleSuscripcion={handleSuscripcion} // 🛡️ Pasamos la función de suscripción
           />
         )}
       </div>
+
       {/* CARTEL INFORMATIVO AL FINAL DE VETE */}
       <div className="mt-10 bg-amber-50/80 border border-amber-200 p-6 rounded-[2.5rem] shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-700">
-        <div className="flex items-center gap-3 mb-3">
+        <div className="flex items-center gap-3 mb-3 text-left">
           <div className="bg-amber-100 p-2 rounded-xl text-amber-600">
             <Info size={20} />
           </div>

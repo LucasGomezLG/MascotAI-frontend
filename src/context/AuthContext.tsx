@@ -22,7 +22,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       name: raw.nombre || raw.name || raw.displayName || 'Usuario',
       picture: esFotoGenerica ? null : (raw.foto || raw.picture || raw.imageUrl),
       nombre: raw.nombre || raw.name,
-      foto: raw.foto || raw.picture
+      foto: raw.foto || raw.picture,
+      // Aseguramos que los nuevos campos de IA estén presentes
+      intentosIA: raw.intentosIA || 0,
+      esColaborador: raw.esColaborador || false
     };
   };
 
@@ -31,12 +34,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const interceptor = apiClient.interceptors.response.use(
       (response) => response,
       (error) => {
-        // Si el servidor nos dice que no estamos autorizados (Token vencido o sesión cerrada)
         if (error.response && error.response.status === 401) {
           console.warn("⚠️ Sesión inválida detectada por el centinela. Limpiando estado...");
           localStorage.removeItem('mascotai_logged_in');
           setUser(null);
-          // Opcional: window.location.href = window.location.origin; (Para limpiar la URL en web)
         }
         return Promise.reject(error);
       }
@@ -52,6 +53,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     initAuth();
   }, []);
 
+  /**
+   * 🔄 NUEVA FUNCIÓN: Refresca los datos del usuario desde el servidor.
+   * Úsala después de cada escaneo exitoso o pago de suscripción.
+   */
+  const refreshUser = async () => {
+    try {
+      const res = await api.getUserProfile();
+      if (res && res.data) {
+        const formatted = formatUserData(res.data);
+        setUser(formatted);
+        return formatted;
+      }
+    } catch (error) {
+      console.error("❌ Error al refrescar datos del usuario:", error);
+    }
+    return null;
+  };
+
   const initAuth = async () => {
     const wasLoggedIn = localStorage.getItem('mascotai_logged_in') === 'true';
     if (!wasLoggedIn) {
@@ -66,12 +85,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         console.log("👤 Usuario cargado con éxito:", formatted);
         setUser(formatted);
       } else {
-        // Si la respuesta llega vacía pero el interceptor no saltó
         setUser(null);
       }
     } catch (error) {
       console.error("❌ Error en carga inicial de usuario:", error);
-      // El interceptor 401 ya se encarga de limpiar el estado si es error de auth
     } finally {
       setLoading(false);
     }
@@ -103,7 +120,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       console.warn("Error enviando petición de logout al servidor");
     } finally {
       setUser(null);
-      // En Web volvemos al origen para limpiar estados de OAuth2
       if (!Capacitor.isNativePlatform()) {
         window.location.href = window.location.origin;
       }
@@ -111,7 +127,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, setUser }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, setUser, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

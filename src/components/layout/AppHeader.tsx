@@ -1,5 +1,5 @@
 import React from 'react';
-import { Dog, Loader2, Sparkles, Heart, Bell, User as UserIcon, PawPrint } from 'lucide-react';
+import { Dog, Loader2, Sparkles, Heart, Bell, User as UserIcon, PawPrint, Zap } from 'lucide-react';
 import NotificationsCenter from '../ui/NotificationsCenter';
 
 interface AppHeaderProps {
@@ -27,6 +27,10 @@ export default function AppHeader({
   // ✅ Buscamos la imagen evitando cualquier placeholder externo
   const profileImage = user?.picture || user?.foto || null;
 
+  // ✅ Lógica de Créditos de IA
+  const intentosIA = user?.intentosIA || 0;
+  const creditosRestantes = Math.max(0, 10 - intentosIA);
+
   return (
     <header 
       className="bg-white p-4 border-b sticky top-0 z-40 flex items-center justify-between shadow-sm"
@@ -48,6 +52,26 @@ export default function AppHeader({
       </div>
 
       <div className="flex items-center gap-2">
+        
+        {/* ⚡ CONTADOR DE IA CREDITS */}
+        <div className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border transition-all duration-300 ${
+          user?.esColaborador 
+            ? 'bg-emerald-50 border-emerald-100 text-emerald-600 shadow-sm' 
+            : 'bg-slate-50 border-slate-100 text-slate-500'
+        }`}>
+          {user?.esColaborador ? (
+            <Sparkles size={12} className="text-emerald-500" fill="currentColor" />
+          ) : (
+            <Zap size={12} className={creditosRestantes > 0 ? "text-orange-500" : "text-slate-300"} fill="currentColor" />
+          )}
+          <div className="flex flex-col leading-none">
+            <span className="text-[8px] font-black uppercase opacity-60">IA Credits</span>
+            <span className="text-[10px] font-black uppercase tracking-tight">
+              {user?.esColaborador ? 'Ilimitado' : `${creditosRestantes}/10`}
+            </span>
+          </div>
+        </div>
+
         <button
           onClick={handleSuscripcion}
           disabled={loadingSuscripcion}

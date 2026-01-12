@@ -5,7 +5,7 @@ import {
   Info, Camera as CameraIcon
 } from 'lucide-react';
 import { api } from '../../services/api';
-import { Toast } from '../../utils/alerts';
+import { useAuth } from '../../context/AuthContext'; // 🛡️ Importamos el contexto
 import Swal from 'sweetalert2';
 
 // 🛡️ IMPORTACIONES NATIVAS
@@ -13,19 +13,80 @@ import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { useCameraPermissions } from '../../hooks/useCameraPermissions';
 
 const SaludScanner = ({ mascotas, onScanComplete }: any) => {
+  const { user, refreshUser } = useAuth(); // 🛡️ Obtenemos datos y función de refresco
   const [selectedPet, setSelectedPet] = useState("");
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadingSuscripcion, setLoadingSuscripcion] = useState(false);
   const [editData, setEditData] = useState<any>(null);
 
-  // 🛡️ HOOK DE PERMISOS (Funciones separadas)
   const { validarCamara, validarGaleria } = useCameraPermissions();
-
-  // 🛡️ Fecha de hoy para validaciones
   const hoy = new Date().toISOString().split("T")[0];
 
-  // 📸 FUNCIÓN NATIVA: CÁMARA (Solo permiso de cámara)
+  // 🛡️ Cálculo de energía
+  const restantes = Math.max(0, 10 - (user?.intentosIA || 0));
+  const tieneEnergia = user?.esColaborador || restantes > 0;
+
+  // 🛡️ MODAL DE DONACIÓN (Integrado)
+  const ejecutarFlujoDonacion = () => {
+    Swal.fire({
+      title: '¿Quieres colaborar?',
+      text: "Ingresa el monto que desees donar para mantener MascotAI",
+      input: 'number',
+      inputLabel: 'Monto en AR$',
+      inputValue: 5000,
+      inputAttributes: { min: '100', max: '500000', step: '1' },
+      showCancelButton: true,
+      confirmButtonColor: '#f97316',
+      cancelButtonColor: '#94a3b8',
+      confirmButtonText: 'Donar',
+      cancelButtonText: 'Ahora no',
+      reverseButtons: true,
+      inputValidator: (value) => {
+        if (!value) return 'Debes ingresar un monto';
+        const amount = parseInt(value);
+        if (amount < 100) return 'El monto mínimo es $100';
+        if (amount > 500000) return 'El monto máximo permitido es $500.000';
+      },
+      customClass: { popup: 'rounded-[2rem]' }
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        const montoElegido = result.value;
+        setLoadingSuscripcion(true);
+        try {
+          const response = await api.crearSuscripcion(montoElegido);
+          window.location.href = response.data.url;
+        } catch (error) {
+          Swal.fire('Error', 'No se pudo generar el link de pago.', 'error');
+        } finally {
+          setLoadingSuscripcion(false);
+        }
+      }
+    });
+  };
+
+  // 🛡️ MODAL DE LÍMITE AGOTADO
+  const mostrarModalLimite = () => {
+    Swal.fire({
+      title: '¡Energía de IA Agotada! ⚡',
+      text: 'Has alcanzado el límite de 10 escaneos gratuitos este mes. Colaborá para tener análisis ilimitados y seguir cuidando a tu mascota.',
+      icon: 'info',
+      showCancelButton: true,
+      confirmButtonText: 'Ser Colaborador ❤️',
+      cancelButtonText: 'Más tarde',
+      confirmButtonColor: '#f97316',
+      cancelButtonColor: '#94a3b8',
+      reverseButtons: true,
+      customClass: { popup: 'rounded-[2.5rem]' }
+    }).then((res) => {
+      if (res.isConfirmed) {
+        ejecutarFlujoDonacion();
+      }
+    });
+  };
+
   const handleNativeCamera = async () => {
+    // 📸 Ahora abrimos la cámara sin validar créditos primero
     const ok = await validarCamara();
     if (!ok) return;
 
@@ -34,7 +95,7 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
         quality: 90,
         allowEditing: false,
         resultType: CameraResultType.Base64,
-        source: CameraSource.Camera // Usa la lente del dispositivo
+        source: CameraSource.Camera
       });
 
       if (image.base64String) {
@@ -46,8 +107,8 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
     }
   };
 
-  // 🖼️ FUNCIÓN NATIVA: GALERÍA (Solo permiso de fotos)
   const handleNativeGallery = async () => {
+    // 🖼️ Ahora abrimos la galería sin validar créditos primero
     const ok = await validarGaleria();
     if (!ok) return;
 
@@ -56,7 +117,7 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
         quality: 90,
         allowEditing: false,
         resultType: CameraResultType.Base64,
-        source: CameraSource.Photos // Abre el carrete
+        source: CameraSource.Photos
       });
 
       if (image.base64String) {
@@ -75,12 +136,14 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
   };
 
   const handleAnalizarSalud = async () => {
+    // 🛡️ ÚNICO PUNTO DE VALIDACIÓN DE CRÉDITOS: Al presionar "ESCANEAR AHORA"
+    if (!tieneEnergia) {
+      mostrarModalLimite();
+      return;
+    }
+
     if (!selectedPet) {
-      Swal.fire({
-        text: 'Seleccioná a qué mascota le pertenece este producto.',
-        icon: 'info',
-        confirmButtonColor: '#10b981'
-      });
+      Swal.fire({ text: 'Seleccioná a qué mascota le pertenece este producto.', icon: 'info', confirmButtonColor: '#10b981' });
       return;
     }
 
@@ -92,23 +155,16 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
     try {
       const res = await api.analizarSalud(selectedImage, selectedPet);
 
+      // ✅ ACTUALIZACIÓN DE CRÉDITOS EN EL HEADER
+      await refreshUser(); 
+
       if (res.data.error === "PRODUCTO_NO_VALIDO") {
-        Swal.fire({
-          title: 'Imagen no reconocida',
-          text: 'MascotAI no detectó un producto médico. Intentá con más luz.',
-          icon: 'error',
-          confirmButtonColor: '#10b981'
-        });
+        Swal.fire({ title: 'Imagen no reconocida', text: 'MascotAI no detectó un producto médico.', icon: 'error', confirmButtonColor: '#10b981' });
         return;
       }
 
       if (res.data.error === "ESPECIE_INCORRECTA") {
-        Swal.fire({
-          title: '⚠️ ¡ALERTA DE SEGURIDAD!',
-          text: 'Este producto no parece ser apto para tu mascota. ¡Verificá antes de usar!',
-          icon: 'warning',
-          confirmButtonColor: '#ef4444'
-        });
+        Swal.fire({ title: '⚠️ ¡ALERTA DE SEGURIDAD!', text: 'Este producto no parece ser apto para tu mascota.', icon: 'warning', confirmButtonColor: '#ef4444' });
         return;
       }
 
@@ -116,9 +172,7 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
         nombre: res.data.nombre || "Producto desconocido",
         tipo: res.data.tipo || "MEDICAMENTO",
         fechaAplicacion: hoy,
-        proximaFecha: (res.data.proximaFecha && res.data.proximaFecha > hoy)
-          ? res.data.proximaFecha
-          : "",
+        proximaFecha: (res.data.proximaFecha && res.data.proximaFecha > hoy) ? res.data.proximaFecha : "",
         precio: res.data.precio || 0,
         dosis: res.data.notas || res.data.dosis || "Dosis no detectada",
         completado: true,
@@ -127,13 +181,11 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
 
     } catch (e: any) {
       console.error("Error en análisis de salud:", e);
-      const errorMsg = e.response?.data || 'Error al procesar el producto';
-      Swal.fire({
-        title: 'Error de Análisis',
-        text: typeof errorMsg === 'string' ? errorMsg : 'Revisá la conexión con el servidor.',
-        icon: 'error',
-        confirmButtonColor: '#10b981'
-      });
+      if (e.response?.status === 403 || e.toString().includes("LIMITE_IA_ALCANZADO")) {
+        mostrarModalLimite();
+      } else {
+        Swal.fire({ title: 'Error de Análisis', text: 'Revisá la conexión con el servidor.', icon: 'error', confirmButtonColor: '#10b981' });
+      }
     } finally {
       setLoading(false);
     }
@@ -142,26 +194,6 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
   const handleGuardar = async () => {
     if (!editData.nombre.trim()) {
       Swal.fire({ text: 'El nombre del producto es obligatorio.', icon: 'warning' });
-      return;
-    }
-
-    if (editData.fechaAplicacion > hoy) {
-      Swal.fire({ text: 'La fecha de aplicación no puede ser futura.', icon: 'error', confirmButtonColor: '#10b981' });
-      return;
-    }
-
-    if (editData.proximaFecha && editData.proximaFecha <= hoy) {
-      Swal.fire({
-        title: 'Fecha de refuerzo inválida',
-        text: 'La fecha del próximo refuerzo debe ser posterior al día de hoy.',
-        icon: 'warning',
-        confirmButtonColor: '#f27121'
-      });
-      return;
-    }
-
-    if (editData.precio < 0 || editData.precio > 999999) {
-      Swal.fire({ text: 'Ingresá un costo válido (máx 6 cifras).', icon: 'warning' });
       return;
     }
 
@@ -179,15 +211,7 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
       };
 
       await api.guardarEventoSalud(dataParaEnviar);
-
-      Swal.fire({
-        title: '¡Salud Registrada!',
-        text: `${editData.nombre} se agregó a la cartilla.`,
-        icon: 'success',
-        timer: 2000,
-        showConfirmButton: false
-      });
-
+      Swal.fire({ title: '¡Salud Registrada!', text: `${editData.nombre} se agregó a la cartilla.`, icon: 'success', timer: 2000, showConfirmButton: false });
       setEditData(null);
       setSelectedImage(null);
       if (onScanComplete) onScanComplete();
@@ -217,7 +241,7 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
             </select>
           </div>
 
-          {/* Recuadro de Captura (CÁMARA) */}
+          {/* Recuadro de Captura */}
           <div
             onClick={handleNativeCamera}
             className="bg-white h-64 border-4 border-dashed border-emerald-100 rounded-[2.5rem] flex flex-col items-center justify-center cursor-pointer hover:border-emerald-300 transition-all active:scale-[0.98] group relative overflow-hidden shadow-inner"
@@ -228,10 +252,6 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
                 <button onClick={handleBorrarFoto} className="absolute top-4 right-4 bg-white/90 p-2 rounded-full shadow-lg text-emerald-600 z-10">
                     <X size={20} />
                 </button>
-                <div className="absolute inset-0 bg-black/20 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                   <RefreshCw className="text-white mb-2" />
-                   <span className="text-white font-black text-xs uppercase">Capturar de Nuevo</span>
-                </div>
               </>
             ) : (
               <div className="text-center px-6">
@@ -245,7 +265,6 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
             )}
           </div>
 
-          {/* Botón de Galería */}
           <button
             type="button"
             onClick={handleNativeGallery}
@@ -255,16 +274,26 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
           </button>
 
           <button
-            onClick={selectedImage ? handleAnalizarSalud : handleNativeCamera}
-            disabled={loading}
-            className={`w-full flex items-center justify-center gap-3 py-6 rounded-[2rem] font-black text-xl shadow-xl transition-all active:scale-95 ${loading || !selectedImage ? 'bg-emerald-50 text-emerald-300' : 'bg-emerald-600 text-white shadow-emerald-200 hover:bg-emerald-700'
-              }`}
+            onClick={handleAnalizarSalud}
+            disabled={loading || !selectedImage}
+            className={`w-full flex items-center justify-center gap-3 py-6 rounded-[2rem] font-black text-xl shadow-xl transition-all active:scale-95 ${
+              loading || !selectedImage 
+                ? 'bg-emerald-50 text-emerald-200 cursor-not-allowed shadow-none' 
+                : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-200'
+            }`}
           >
-            {loading ? <Loader2 className="animate-spin" /> : <><Sparkles size={22} /> {selectedImage ? "ANALIZAR PRODUCTO" : "ABRIR CÁMARA"}</>}
+            {loading ? (
+              <Loader2 className="animate-spin" />
+            ) : (
+              <>
+                <Sparkles size={22} className={selectedImage ? "text-emerald-200" : "text-emerald-300"} />
+                ESCANEAR AHORA
+              </>
+            )}
           </button>
         </div>
       ) : (
-        /* VISTA DE CONFIRMACIÓN (Intacta) */
+        /* VISTA DE CONFIRMACIÓN - Sin cambios */
         <div className="bg-white rounded-[2.5rem] shadow-2xl p-8 border-2 border-emerald-50 text-left animate-in zoom-in-95">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
@@ -329,7 +358,7 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
                 type="number"
                 className="w-full bg-transparent font-black text-lg text-slate-800 border-b-2 border-slate-100 focus:border-blue-500 outline-none"
                 value={editData.precio ?? ""}
-                onChange={(e) => e.target.value.length <= 6 && setEditData({ ...editData, precio: parseFloat(e.target.value) || 0 })}
+                onChange={(e) => setEditData({ ...editData, precio: parseFloat(e.target.value) || 0 })}
               />
             </div>
 
@@ -353,8 +382,8 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
         </div>
       )}
 
-      {/* Info Footer (Intacto) */}
-      <div className="mt-10 bg-amber-50/80 border border-amber-200 p-6 rounded-[2.5rem] shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-700 text-left">
+      {/* Info Footer */}
+      <div className="mt-10 bg-amber-50/80 border border-amber-200 p-6 rounded-[2.5rem] shadow-sm text-left">
         <div className="flex items-center gap-3 mb-3">
           <div className="bg-amber-100 p-2 rounded-xl text-amber-600"><Info size={20} /></div>
           <h4 className="font-black text-amber-900 uppercase text-xs tracking-widest">¿Cómo funciona?</h4>

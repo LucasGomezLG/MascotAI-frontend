@@ -1,9 +1,29 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Heart, Sparkles, Loader2 } from 'lucide-react';
 import { api } from '../services/api';
 
+// 🛡️ Declaramos MercadoPago para que TypeScript reconozca el script del index.html
+declare var MercadoPago: any;
+
 const SubscriptionCard = ({ user }: { user: any }) => {
   const [loading, setLoading] = useState(false);
+
+  // ✅ Inicialización del SDK de Mercado Pago para seguridad y métricas
+  useEffect(() => {
+    const publicKey = import.meta.env.VITE_MP_PUBLIC_KEY;
+
+    if (typeof MercadoPago !== 'undefined' && publicKey) {
+      try {
+        // Esto inicializa el "Device Fingerprinting" de MP, mejorando la aprobación de pagos
+        new MercadoPago(publicKey, {
+          locale: 'es-AR'
+        });
+        console.log("💳 SDK de Mercado Pago inicializado correctamente");
+      } catch (error) {
+        console.error("❌ Error al inicializar MP SDK:", error);
+      }
+    }
+  }, []);
 
   // Si el usuario ya es colaborador, le mostramos un mensaje de agradecimiento
   if (user?.esColaborador) {
@@ -20,18 +40,33 @@ const SubscriptionCard = ({ user }: { user: any }) => {
     );
   }
 
-  // SubscriptionCard.tsx (Aproximadamente línea 26)
-
   const handleSuscripcion = async () => {
+    console.log("🚀 [DONACIÓN] Iniciando proceso de suscripción...");
     setLoading(true);
-    try {
-      // ✅ Agregamos el monto (2000) exigido por la definición de tu API
-      const response = await api.crearSuscripcion(2000);
 
-      // Redirigimos a la URL de Mercado Pago
-      window.location.href = response.data.url;
-    } catch (error) {
-      alert("No se pudo generar el link de pago. Reintentá en unos minutos.");
+    try {
+      const monto = 2000;
+      console.log("📡 [DONACIÓN] Llamando a la API con monto:", monto);
+
+      const response = await api.crearSuscripcion(monto);
+      console.log("📥 [DONACIÓN] Respuesta del servidor:", response.data);
+
+      if (response.data && response.data.url) {
+        const urlPago = response.data.url;
+        console.log("🔗 [DONACIÓN] Redirigiendo a Mercado Pago:", urlPago);
+
+        // LOG DE SEGURIDAD: Verificar si la URL contiene "sandbox"
+        if (urlPago.includes("sandbox")) {
+          console.warn("⚠️ [MODO TEST] Estás usando un link de SANDBOX. Recordá usar ventana de Incógnito.");
+        }
+
+        window.location.href = urlPago;
+      } else {
+        console.error("❌ [DONACIÓN] El servidor no devolvió una URL válida.");
+      }
+    } catch (error: any) {
+      console.error("❌ [DONACIÓN] Error en la petición:", error.response?.data || error.message);
+      alert("Error al generar el link. Mirá la consola para más detalle.");
     } finally {
       setLoading(false);
     }
@@ -40,7 +75,10 @@ const SubscriptionCard = ({ user }: { user: any }) => {
   return (
     <div className="bg-gradient-to-br from-orange-500 to-red-600 rounded-[2.5rem] p-8 text-white shadow-xl relative overflow-hidden group">
       {/* Decoración de fondo */}
-      <Heart className="absolute -bottom-4 -right-4 text-white/10 rotate-12 group-hover:scale-110 transition-transform" size={120} />
+      <Heart
+        className="absolute -bottom-4 -right-4 text-white/10 rotate-12 group-hover:scale-110 transition-transform"
+        size={120}
+      />
 
       <div className="relative z-10">
         <h3 className="text-2xl font-black uppercase tracking-tighter leading-none mb-2">

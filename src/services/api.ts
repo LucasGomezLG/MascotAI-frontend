@@ -66,9 +66,10 @@ export const api = {
   // ==========================================
   getStockStatus: (mascotaId: string) => apiClient.get(`/stock-status/${mascotaId}`),
   activarStock: (id: string, data: any) => apiClient.post(`/activar-stock/${id}`, data),
-  buscarPrecios: (marca: string) => apiClient.get(`/buscar-precios/${marca}`),
-  buscarResenas: (marca: string) => apiClient.get(`/buscar-resenas/${encodeURIComponent(marca)}`),
-
+  buscarPrecios: (marca: string) =>
+    apiClient.get('/busqueda/precios', { params: { marca } }),
+  buscarResenas: (marca: string) =>
+    apiClient.get('/busqueda/resenas', { params: { marca } }),
   // ==========================================
   // ⚠️ SISTEMA DE ALERTAS Y EVENTOS DE SALUD
   // ==========================================
@@ -84,7 +85,8 @@ export const api = {
   // 💰 FINANZAS Y HERRAMIENTAS
   // ==========================================
   guardarFinanzas: (data: any) => apiClient.post('/guardar-finanzas', data),
-  getPresupuestoMensual: () => apiClient.get('/presupuesto-mensual'),
+  // En tu archivo de servicios api.ts
+  getPresupuestoMensual: () => apiClient.get('/busqueda/presupuesto-mensual'),
   comparar: (ids: string[]) => apiClient.post('/comparar', { ids }),
 
   // ==========================================
