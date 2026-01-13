@@ -98,7 +98,17 @@ export const api = {
   // ==========================================
   // 🔐 AUTENTICACIÓN Y SESIÓN
   // ==========================================
+  // services/api.ts
+
+  // ... dentro del objeto api
+  // services/api.ts
   getUserProfile: () => apiClient.get('/user/me'),
+
+  // ✅ Nuevo método para forzar el refresco total
+  refreshProfileData: () => apiClient.get('/user/refresh', {
+    headers: { 'Cache-Control': 'no-cache' }
+  }),
+  // ...
 
   logout: () => apiClient.post('/logout'),
 

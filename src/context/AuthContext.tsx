@@ -51,26 +51,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   /**
    * 🔄 refreshUser: Versión final para Mobile
    */
-  const refreshUser = async () => {
-    // 1. Esperamos un segundo para asegurar que el backend terminó de procesar
-    await new Promise(resolve => setTimeout(resolve, 1000));
+  // context/AuthContext.tsx
 
+  const refreshUser = async () => {
     try {
-      // 2. Llamamos a la API (que ahora tiene el truco del timestamp en api.ts)
-      const res = await api.getUserProfile();
-      
+      // 1. Usamos el nuevo endpoint de refresco
+      const res = await api.refreshProfileData();
+
       if (res && res.data) {
         const formatted = formatUserData(res.data);
-        
-        // 3. Limpiamos y seteamos (Doble paso para forzar renderizado en Mobile)
-        setUser(null); // Pequeño reset flash
-        setUser({ ...formatted }); 
-        
-        console.log("📱 Créditos actualizados en Celular:", formatted.intentosIA);
+
+        // 2. Actualizamos el estado con un objeto nuevo
+        // Esto dispara el re-render en todos los componentes
+        setUser({ ...formatted });
+
+        console.log("📱 Perfil sincronizado vía /refresh:", formatted.intentosIA);
         return formatted;
       }
     } catch (error) {
-      console.error("❌ Error refrescando usuario:", error);
+      console.error("❌ Error en el refresco forzado:", error);
     }
     return null;
   };
