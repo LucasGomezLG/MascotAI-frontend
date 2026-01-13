@@ -23,7 +23,7 @@ import HomeContent from './components/home/HomeContent';
 type TabType = 'home' | 'scanner' | 'stats' | 'vet' | 'health' | 'pets';
 
 function App() {
-  const { user, loading: authLoading, logout } = useAuth();
+  const { user, loading: authLoading, logout, refreshUser } = useAuth();
 
   // --- ESTADOS ---
   const [activeTab, setActiveTab] = useState<TabType>('home');
@@ -53,39 +53,26 @@ function App() {
   const [soloMisPublicaciones, setSoloMisPublicaciones] = useState(false);
   const [soloCercanas, setSoloCercanas] = useState(true);
   const [userCoords, setUserCoords] = useState<{ lat: number, lng: number } | null>(null);
-  const [locationPermissionGranted, setLocationPermissionGranted] = useState(false); // 🛰️ Estado de permiso
+  const [locationPermissionGranted, setLocationPermissionGranted] = useState(false);
 
-  // --- 🛰️ LÓGICA DE GPS NATIVO INTELIGENTE ---
+  // --- 🛰️ LÓGICA DE GPS NATIVO ---
   const obtenerUbicacion = async () => {
     try {
       const permissions = await Geolocation.checkPermissions();
       let status = permissions.location;
-
-      // Si no tenemos permiso, lo pedimos explícitamente
       if (status !== 'granted') {
         const request = await Geolocation.requestPermissions();
         status = request.location;
       }
-
       if (status === 'granted') {
-        const position = await Geolocation.getCurrentPosition({
-          enableHighAccuracy: false,
-          timeout: 10000
-        });
-
-        setUserCoords({
-          lat: position.coords.latitude,
-          lng: position.coords.longitude
-        });
+        const position = await Geolocation.getCurrentPosition({ enableHighAccuracy: false, timeout: 10000 });
+        setUserCoords({ lat: position.coords.latitude, lng: position.coords.longitude });
         setLocationPermissionGranted(true);
-        console.log("📍 GPS OK:", position.coords.latitude, position.coords.longitude);
       } else {
-        // Si el usuario deniega, desactivamos el filtro y marcamos que no hay permiso
         setLocationPermissionGranted(false);
         setSoloCercanas(false);
       }
     } catch (error) {
-      console.warn("⚠️ Error obteniendo ubicación:", error);
       setLocationPermissionGranted(false);
       setSoloCercanas(false);
     }
@@ -93,6 +80,27 @@ function App() {
 
   useEffect(() => {
     obtenerUbicacion();
+    
+    // 🛡️ LÓGICA POST-DONACIÓN (Retorno de Mercado Pago)
+    const params = new URLSearchParams(window.location.search);
+    const status = params.get('status');
+    if (status === 'approved' || status === 'pending' || params.get('payment_id')) {
+      setActiveTab('home');
+      setFoodParaVer(null);
+      setVetParaVer(null);
+      setHealthParaVer(null);
+      if (status === 'approved') {
+        Swal.fire({
+          title: '¡Gracias por colaborar! ❤️',
+          text: 'Tu aporte ayuda a que MascotAI siga creciendo.',
+          icon: 'success',
+          confirmButtonColor: '#f97316',
+          customClass: { popup: 'rounded-[2rem]' }
+        });
+        refreshUser();
+      }
+      window.history.replaceState({}, document.title, "/");
+    }
   }, []);
 
   // --- FUNCIONES DE CARGA ---
@@ -105,10 +113,9 @@ function App() {
     api.getRefugios().then(res => setRefugios(res.data)).catch(() => { });
   };
 
-  // --- 💰 GESTIÓN DE DONACIONES (COLABORADORES) ---
+  // --- 💰 GESTIÓN DE DONACIONES ---
   const handleSuscripcion = () => {
     if (user?.esColaborador) return;
-
     Swal.fire({
       title: '¿Quieres colaborar?',
       text: "Ingresa el monto que desees donar para mantener MascotAI",
@@ -126,15 +133,13 @@ function App() {
         if (!value) return 'Debes ingresar un monto';
         const amount = parseInt(value);
         if (amount < 100) return 'El monto mínimo es $100';
-        if (amount > 500000) return 'El monto máximo permitido es $500.000';
       },
       customClass: { popup: 'rounded-[2rem]' }
     }).then(async (result) => {
       if (result.isConfirmed) {
-        const montoElegido = result.value;
         setLoadingSuscripcion(true);
         try {
-          const response = await api.crearSuscripcion(montoElegido);
+          const response = await api.crearSuscripcion(result.value);
           window.location.href = response.data.url;
         } catch (error) {
           Swal.fire('Error', 'No se pudo generar el link de pago.', 'error');
@@ -145,11 +150,21 @@ function App() {
     });
   };
 
+  // 🛡️ CIERRE DE SESIÓN COMPLETO
+  const handleFullLogout = async () => {
+    setShowLogoutModal(false);
+    setActiveTab('home');
+    setFoodParaVer(null);
+    setVetParaVer(null);
+    setHealthParaVer(null);
+    await logout();
+  };
+
   useEffect(() => {
     if (user) refreshData();
   }, [user]);
 
-  // --- LÓGICA DE DISTANCIA ---
+  // --- LÓGICA DE DISTANCIA (15KM) ---
   const calcularDistancia = (lat1: number, lon1: number, lat2: number, lon2: number) => {
     const R = 6371;
     const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -160,20 +175,17 @@ function App() {
     return R * c;
   };
 
-  // --- ✅ LÓGICA DE FILTRADO MAESTRO (15KM) ---
   const filtrarItems = (lista: any[]) => {
     return (lista || []).filter(item => {
       if (soloMisPublicaciones && item.userId !== user?.id) return false;
-
-      // Solo filtramos por cercanía si: el usuario quiere, tenemos permiso y tenemos coords
       if (soloCercanas && locationPermissionGranted && userCoords) {
         const itemLat = Number(item.lat);
         const itemLng = Number(item.lng);
         if (!itemLat || !itemLng || isNaN(itemLat)) return true;
         const dist = calcularDistancia(userCoords.lat, userCoords.lng, itemLat, itemLng);
-        return dist <= 15; // ✅ Radio actualizado a 15km
+        return dist <= 15; // ✅ Mantenemos el radio de 15km
       }
-      return true; // Si no hay GPS o el filtro está apagado, mostramos todo
+      return true;
     });
   };
 
@@ -181,7 +193,6 @@ function App() {
   const adopcionesFiltradas = filtrarItems(adopciones);
   const refugiosFiltrados = filtrarItems(refugios);
 
-  // --- ELIMINACIÓN ---
   const abrirConfirmacionBorrado = (id: string, tipo: 'perdido' | 'adopcion' | 'refugio') => {
     setItemABorrar({ id, tipo });
   };
@@ -189,13 +200,9 @@ function App() {
   const ejecutarBorrado = async () => {
     if (!itemABorrar) return;
     try {
-      if (itemABorrar.tipo === 'perdido') {
-        await api.eliminarMascotaPerdida(itemABorrar.id);
-      } else if (itemABorrar.tipo === 'adopcion') {
-        await api.eliminarMascotaAdopcion(itemABorrar.id);
-      } else if (itemABorrar.tipo === 'refugio') {
-        await api.eliminarRefugio(itemABorrar.id);
-      }
+      if (itemABorrar.tipo === 'perdido') await api.eliminarMascotaPerdida(itemABorrar.id);
+      else if (itemABorrar.tipo === 'adopcion') await api.eliminarMascotaAdopcion(itemABorrar.id);
+      else if (itemABorrar.tipo === 'refugio') await api.eliminarRefugio(itemABorrar.id);
       refreshData();
       setItemABorrar(null);
     } catch (e) {
@@ -204,7 +211,7 @@ function App() {
   };
 
   if (authLoading) return (
-    <div
+    <div 
       className="h-screen flex flex-col items-center justify-center bg-slate-50"
       style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
@@ -222,8 +229,8 @@ function App() {
   };
 
   return (
-    <div
-      className="min-h-screen bg-slate-50 font-sans text-slate-900 text-left"
+    <div 
+      className="min-h-screen bg-slate-50 font-sans text-slate-900 text-left" 
       style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom))' }}
     >
       <AppHeader
@@ -256,42 +263,14 @@ function App() {
             user={user}
             abrirConfirmacionBorrado={abrirConfirmacionBorrado}
             userCoords={userCoords}
-            locationPermissionGranted={locationPermissionGranted} // ✅ Prop nueva
-            obtenerUbicacion={obtenerUbicacion} // ✅ Prop nueva
+            locationPermissionGranted={locationPermissionGranted}
+            obtenerUbicacion={obtenerUbicacion}
           />
         )}
 
-        {/* 🛡️ SECCIONES DE ESCÁNER ACTUALIZADAS CON handleSuscripcion */}
-        {activeTab === 'scanner' && (
-          <FoodScanner
-            mascotas={mascotas}
-            onScanComplete={refreshData}
-            initialData={foodParaVer}
-            onReset={() => setFoodParaVer(null)}
-            handleSuscripcion={handleSuscripcion}
-          />
-        )}
-
-        {activeTab === 'vet' && (
-          <VetScanner
-            mascotas={mascotas}
-            onScanComplete={refreshData}
-            initialData={vetParaVer}
-            onReset={() => setVetParaVer(null)}
-            handleSuscripcion={handleSuscripcion}
-          />
-        )}
-
-        {activeTab === 'health' && (
-          <SaludScanner
-            mascotas={mascotas}
-            onScanComplete={refreshData}
-            initialData={healthParaVer}
-            onReset={() => setHealthParaVer(null)}
-            handleSuscripcion={handleSuscripcion}
-          />
-        )}
-
+        {activeTab === 'scanner' && <FoodScanner mascotas={mascotas} onScanComplete={refreshData} initialData={foodParaVer} onReset={() => setFoodParaVer(null)} handleSuscripcion={handleSuscripcion} />}
+        {activeTab === 'vet' && <VetScanner mascotas={mascotas} onScanComplete={refreshData} initialData={vetParaVer} onReset={() => setVetParaVer(null)} handleSuscripcion={handleSuscripcion} />}
+        {activeTab === 'health' && <SaludScanner mascotas={mascotas} onScanComplete={refreshData} initialData={healthParaVer} onReset={() => setHealthParaVer(null)} handleSuscripcion={handleSuscripcion} />}
         {activeTab === 'stats' && <ReportsManager onVerDetalle={verDetalle} />}
         {activeTab === 'pets' && <PetProfiles mascotas={mascotas} onUpdate={refreshData} onAddClick={() => setShowPetModal(true)} />}
       </main>
@@ -302,21 +281,21 @@ function App() {
       {showRefugioModal && <RefugioModal onClose={() => { setShowRefugioModal(false); refreshData(); }} />}
 
       {zoomedPhoto && (
-        <div
-          className="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300 cursor-zoom-out"
+        <div 
+          className="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300 cursor-zoom-out" 
           onClick={() => setZoomedPhoto(null)}
         >
-          <button
+          <button 
             className="absolute right-6 text-white/70 hover:text-white p-2 bg-white/10 rounded-full transition-colors shadow-lg"
             style={{ top: 'calc(1.5rem + env(safe-area-inset-top))' }}
           >
             <X size={24} />
           </button>
-          <img
-            src={zoomedPhoto}
-            className="max-w-full max-h-[85vh] rounded-[2.5rem] shadow-2xl animate-in zoom-in-95 duration-500 object-contain border-4 border-white/10"
-            alt="Zoom"
-            onClick={(e) => e.stopPropagation()}
+          <img 
+            src={zoomedPhoto} 
+            className="max-w-full max-h-[85vh] rounded-[2.5rem] shadow-2xl animate-in zoom-in-95 duration-500 object-contain border-4 border-white/10" 
+            alt="Zoom" 
+            onClick={(e) => e.stopPropagation()} 
           />
         </div>
       )}
@@ -324,8 +303,7 @@ function App() {
       <LogoutModal
         isOpen={showLogoutModal}
         onClose={() => setShowLogoutModal(false)}
-        onConfirm={logout}
-        // 🛡️ ESTA ES LA LÍNEA QUE FALTA O ESTÁ MAL:
+        onConfirm={handleFullLogout}
         handleSuscripcion={handleSuscripcion}
       />
       
@@ -335,9 +313,9 @@ function App() {
         onConfirm={ejecutarBorrado}
         titulo="¿Estás seguro?"
         mensaje={
-          itemABorrar?.tipo === 'perdido' ? "El reporte se eliminará permanentemente." :
-            itemABorrar?.tipo === 'adopcion' ? "La publicación de adopción desaparecerá." :
-              "La información del refugio se eliminará del sistema."
+          itemABorrar?.tipo === 'perdido' ? "El reporte se eliminará permanentemente." : 
+          itemABorrar?.tipo === 'adopcion' ? "La publicación de adopción desaparecerá." : 
+          "La información del refugio se eliminará del sistema."
         }
       />
 
