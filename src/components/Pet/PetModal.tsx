@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
-import { X, Camera as CameraIcon, Image as ImageIcon, PawPrint, Weight, HeartPulse, Calendar } from 'lucide-react';
+import {
+  X, Camera as CameraIcon, Image as ImageIcon, PawPrint,
+  Weight, HeartPulse, Calendar, Loader2
+} from 'lucide-react';
 import { api } from '../../services/api';
 import Swal from 'sweetalert2';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
@@ -18,6 +21,7 @@ interface PetFormState {
 
 const PetModal = ({ onClose }: PetModalProps) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [loading, setLoading] = useState(false);
   const [nuevaMascota, setNuevaMascota] = useState<PetFormState>({
     nombre: '', especie: 'Gato', fechaNacimiento: '', peso: '', condicion: '', foto: ''
   });
@@ -87,6 +91,7 @@ const PetModal = ({ onClose }: PetModalProps) => {
     formData.append('peso', String(pesoNum));
     formData.append('condicion', condicion.trim() || "Sano");
 
+    setLoading(true);
     try {
       await api.registrarConFoto(formData);
       Swal.fire({ title: '¡Registrada!', text: `${nombre} ya es parte de MascotAI`, icon: 'success', timer: 2000, showConfirmButton: false, customClass: { popup: 'rounded-[2rem]' } });
@@ -94,6 +99,8 @@ const PetModal = ({ onClose }: PetModalProps) => {
     } catch (e: any) {
       console.error("Error al registrar mascota:", e.message);
       Swal.fire({ title: 'Error', text: 'No pudimos guardar los datos en el servidor.', icon: 'error', customClass: { popup: 'rounded-[2rem]' } });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -215,9 +222,10 @@ const PetModal = ({ onClose }: PetModalProps) => {
 
             <button
               onClick={guardar}
-              className="w-full py-5 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-[2rem] font-black text-lg shadow-xl shadow-orange-200 active:scale-95 transition-all mt-6"
+              disabled={loading}
+              className="w-full py-5 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-[2rem] font-black text-lg shadow-xl shadow-orange-200 active:scale-95 transition-all mt-6 flex items-center justify-center gap-2 disabled:opacity-70"
             >
-              REGISTRAR MASCOTA
+              {loading ? <Loader2 className="animate-spin" /> : "REGISTRAR MASCOTA"}
             </button>
           </div>
         </div>
