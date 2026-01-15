@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
-import { MapPin, Maximize2, X, Trash2, MessageCircle, Copy, Check, ShieldAlert, Eye, Info } from 'lucide-react';
+import {
+  MapPin, Maximize2, X, Trash2, MessageCircle, Copy, Check,
+  ShieldAlert, Eye, Info, ChevronLeft, ChevronRight
+} from 'lucide-react';
 import { MapContainer, TileLayer, Circle } from 'react-leaflet';
 import type { ItemComunidad, UserDTO } from '../../types/api.types';
 import 'leaflet/dist/leaflet.css';
@@ -16,8 +19,21 @@ const LostPetCard = ({ reporte, currentUser, onDelete }: LostPetCardProps) => {
   const [showContact, setShowContact] = useState(false);
   const [showFullDesc, setShowFullDesc] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [currentFoto, setCurrentFoto] = useState(0);
 
   const esMia = String(reporte.userId) === String(currentUser?.id);
+  const fotos = reporte.fotos || [];
+  const tieneMasFotos = fotos.length > 1;
+
+  const nextFoto = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentFoto((prev) => (prev + 1) % fotos.length);
+  };
+
+  const prevFoto = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentFoto((prev) => (prev === 0 ? fotos.length - 1 : prev - 1));
+  };
 
   // Gestiona el copiado de contacto con feedback visual tipo Toast.
   const handleCopy = () => {
@@ -45,15 +61,30 @@ const LostPetCard = ({ reporte, currentUser, onDelete }: LostPetCardProps) => {
         )}
 
         {/* Galería de Fotos */}
-        <div className="grid grid-cols-2 gap-2 h-32 w-full">
-          {reporte.fotos?.map((url, i) => (
-            <div key={i} className="relative group cursor-pointer overflow-hidden rounded-2xl border border-slate-50 bg-slate-100" onClick={() => setImgZoom(url)}>
-              <img src={url} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" alt="Mascota" />
-              <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                <Maximize2 size={16} className="text-white" />
-              </div>
-            </div>
-          ))}
+        <div
+          className="relative h-40 bg-slate-100 rounded-2xl overflow-hidden group/img cursor-zoom-in"
+          onClick={() => setImgZoom(fotos[currentFoto])}
+        >
+          <img
+            src={fotos[currentFoto]}
+            className="w-full h-full object-cover transition-transform duration-500 group-hover/img:scale-110"
+            alt="Mascota"
+          />
+
+          <div className="absolute top-2 left-2 px-2 py-1 bg-red-600 text-white text-[8px] font-black rounded-lg uppercase shadow-lg">
+            {(reporte as any).especie || 'Perdido'}
+          </div>
+
+          <div className="absolute inset-0 bg-black/10 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center">
+            <Maximize2 size={20} className="text-white shadow-sm" />
+          </div>
+
+          {tieneMasFotos && (
+            <>
+              <button onClick={prevFoto} className="absolute left-2 top-1/2 -translate-y-1/2 p-1 bg-white/30 backdrop-blur-md text-white rounded-full hover:bg-white/50"><ChevronLeft size={14} /></button>
+              <button onClick={nextFoto} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 bg-white/30 backdrop-blur-md text-white rounded-full hover:bg-white/50"><ChevronRight size={14} /></button>
+            </>
+          )}
         </div>
 
         {/* Descripción y Ubicación Texto */}
@@ -134,9 +165,9 @@ const LostPetCard = ({ reporte, currentUser, onDelete }: LostPetCardProps) => {
 
       {/* ZOOM: Galería */}
       {imgZoom && (
-        <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[130] flex items-center justify-center p-4" onClick={() => setImgZoom(null)}>
+        <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-xl z-[200] flex items-center justify-center p-4 animate-in fade-in duration-300" onClick={() => setImgZoom(null)}>
           <button className="absolute top-10 right-10 text-white/50 hover:text-white"><X size={40} /></button>
-          <img src={imgZoom} className="max-w-full max-h-[80vh] rounded-[2rem] shadow-2xl animate-in zoom-in-95 duration-300 object-contain" alt="Zoom" />
+          <img src={imgZoom} className="max-w-full max-h-[85vh] rounded-[2.5rem] shadow-2xl animate-in zoom-in-95 duration-300 object-contain" alt="Zoom" />
         </div>
       )}
     </>
