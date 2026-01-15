@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Wallet, TrendingUp, Stethoscope, ShieldPlus, Utensils, Info } from 'lucide-react';
+import { Wallet, TrendingUp, Stethoscope, ShieldCheck, Utensils, Info } from 'lucide-react';
 import { api } from '../../services/api';
 import Swal from 'sweetalert2';
 
@@ -76,7 +76,7 @@ const PetBudget = () => {
                   <p className="font-black text-slate-700 text-lg">${data.salud.toLocaleString()}</p>
                 </div>
               </div>
-              <ShieldPlus size={16} className="text-slate-200" />
+              <ShieldCheck size={16} className="text-slate-200" />
             </div>
 
             <hr className="border-slate-50" />

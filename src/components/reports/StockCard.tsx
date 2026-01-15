@@ -54,7 +54,9 @@ const StockCard = ({ mascotaId }: { mascotaId: string }) => {
             <Calendar size={14} /> Se agota el:
           </div>
           <p className="font-black text-slate-800 text-sm">
-            {new Date(stock.fechaAgotamiento).toLocaleDateString('es-AR', { day: 'numeric', month: 'long' })}
+            {stock.fechaAgotamiento 
+              ? new Date(stock.fechaAgotamiento).toLocaleDateString('es-AR', { day: 'numeric', month: 'long' })
+              : '---'}
           </p>
         </div>
 

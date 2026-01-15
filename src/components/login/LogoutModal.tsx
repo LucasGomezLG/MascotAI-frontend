@@ -95,7 +95,11 @@ const LogoutModal = ({ isOpen, onClose, onConfirm, handleSuscripcion }: Props) =
 
           {!user?.esColaborador && (
             <button
-              onClick={() => { onClose(); handleSuscripcion(); }}
+              onClick={() => { 
+                onClose();
+                // Pequeño delay para asegurar que LogoutModal se cierre
+                setTimeout(handleSuscripcion, 300);
+              }}
               className="w-full py-4 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg mb-6 active:scale-95 transition-all flex items-center justify-center gap-2"
             >
               <Heart size={14} fill="currentColor" /> Ser Colaborador ❤️

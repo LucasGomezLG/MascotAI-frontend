@@ -1,150 +1,109 @@
 import axios from 'axios';
+import type { 
+  UserDTO, MascotaDTO, AlertaDTO, ItemComunidad, 
+  RefugioDTO, OfertaPrecioDTO, MascotaAdopcionDTO, 
+  MascotaPerdidaDTO, AlimentoDTO, RecordatorioSaludDTO,
+  ConsultaVetDTO, TriajeIADTO // 🩺 Nuevo DTO para clínica
+} from '../types/api.types';
 
-// --- CONFIGURACIÓN BASE ---
-// En producción, asegúrate de tener VITE_API_BASE_URL en tu .env
 export const SERVER_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
-export const API_BASE = `${SERVER_URL}/api/mascotas`;
+export const API_BASE = `${SERVER_URL}/api`;
 
-// Configuración global de axios para manejo de cookies/sesión
 axios.defaults.withCredentials = true;
 
-// Creamos la instancia que usaremos en toda la app
 export const apiClient = axios.create({
   baseURL: API_BASE,
   withCredentials: true
 });
 
 export const api = {
-  // ==========================================
-  // 🐾 GESTIÓN DE PERFILES Y MASCOTAS
-  // ==========================================
-  getPerfiles: () => apiClient.get('/perfiles'),
-  getMascotas: () => apiClient.get('/perfiles'),
-
-  guardarPerfil: (data: any) => apiClient.post('/guardar-perfil', data),
-
-  guardarPerfilConFoto: (formData: FormData) => {
-    // Dejamos que Axios maneje el boundary del multipart/form-data automáticamente
-    return apiClient.post('/con-foto', formData);
-  },
-
-  borrarMascota: (id: string) => apiClient.delete(`/perfiles/${id}`),
-
-  // ==========================================
-  // 🤖 MÓDULOS DE ANÁLISIS E IA
-  // ==========================================
-  analizarAlimento: (image: string, mascotaId: string) =>
-    apiClient.post('/analizar-personalizado', { image, mascotaId }),
-
-  analizarVet: (image: string, tipo: string, mascotaId: string) =>
-    apiClient.post('/analizar-veterinario', { image, tipo, mascotaId }),
-
-  analizarTriaje: (imagen: string, tipo: string, mascotaId: string) =>
-    apiClient.post('/triaje/analizar', { imagen, tipo, mascotaId }),
-
-  analizarSalud: (image: string, mascotaId: string) =>
-    apiClient.post('/analizar-salud', { image, mascotaId }),
-
-  analizarReceta: (image: string, mascotaId: string) =>
-    apiClient.post('/analizar-receta', { image, mascotaId }),
-
-  // ==========================================
-  // 📊 HISTORIALES Y REPORTE DE ACTIVIDAD
-  // ==========================================
-  getHistorial: () => apiClient.get('/historial'),
-  getHistorialVet: () => apiClient.get('/historial-vet'),
-  getHistorialSalud: (mascotaId: string) => apiClient.get(`/historial-salud/${mascotaId}`),
-  getHistorialTriaje: () => apiClient.get('/historial-triaje'),
-
-  borrarConsultaVet: (id: string) => apiClient.delete(`/consulta-vet/${id}`),
-  borrarAlimento: (id: string) => apiClient.delete(`/historial/${id}`),
-  borrarTriaje: (id: string) => apiClient.delete(`/triaje/${id}`),
-  eliminarConsultaVet: (id: string) => apiClient.delete(`/consulta-vet/${id}`),
-
-  // ==========================================
-  // 🍱 ALIMENTACIÓN, STOCK Y MERCADO
-  // ==========================================
-  getStockStatus: (mascotaId: string) => apiClient.get(`/stock-status/${mascotaId}`),
-  activarStock: (id: string, data: any) => apiClient.post(`/activar-stock/${id}`, data),
-  buscarPrecios: (marca: string) =>
-    apiClient.get('/busqueda/precios', { params: { marca } }),
-  buscarResenas: (marca: string) =>
-    apiClient.get('/busqueda/resenas', { params: { marca } }),
-  // ==========================================
-  // ⚠️ SISTEMA DE ALERTAS Y EVENTOS DE SALUD
-  // ==========================================
-  getAlertasSalud: () => apiClient.get('/alertas-salud'),
-  getAlertasSistema: () => apiClient.get('/alertas-sistema'),
-  marcarAlertaLeida: (id: string) => apiClient.put(`/alertas-sistema/${id}/leer`),
-
-  guardarEventoSalud: (data: any) => apiClient.post('/guardar-salud', data),
-  borrarEventoSalud: (id: string) => apiClient.delete(`/salud/${id}`),
-  actualizarEventoSalud: (id: string, data: any) => apiClient.put(`/salud/${id}`, data),
-
-  // ==========================================
-  // 💰 FINANZAS Y HERRAMIENTAS
-  // ==========================================
-  guardarFinanzas: (data: any) => apiClient.post('/guardar-finanzas', data),
-  // En tu archivo de servicios api.ts
-  getPresupuestoMensual: () => apiClient.get('/busqueda/presupuesto-mensual'),
-  comparar: (ids: string[]) => apiClient.post('/comparar', { ids }),
-
-  // ==========================================
-  // 📑 DOCUMENTACIÓN MÉDICA
-  // ==========================================
-  guardarConsultaVet: (data: any) => apiClient.post('/guardar-consulta', data),
-  guardarReceta: (data: any) => apiClient.post('/guardar-receta', data),
-
-  // ==========================================
-  // 🔐 AUTENTICACIÓN Y SESIÓN
-  // ==========================================
-  // services/api.ts
-
-  // ... dentro del objeto api
-  // services/api.ts
-  getUserProfile: () => apiClient.get('/user/me'),
-
-  // ✅ Nuevo método para forzar el refresco total
-  refreshProfileData: () => apiClient.get('/user/refresh', {
-    headers: { 'Cache-Control': 'no-cache' }
-  }),
-  // ...
-
+  // --- 👤 MÓDULO: USUARIO Y PERFIL ---
+  getUserProfile: () => apiClient.get<UserDTO>('/user/me'),
+  refreshProfileData: () => apiClient.get<UserDTO>('/user/me', { headers: { 'Cache-Control': 'no-cache' } }),
   logout: () => apiClient.post('/logout'),
+  
+  // --- 🔑 MÓDULO: PÚBLICO Y AUTH NATIVA ---
+  checkHealth: () => apiClient.get<string>('/mascotas/public/health'),
+  loginGoogleNative: (token: string) => apiClient.post<UserDTO>('/mascotas/public/auth/google-native', { token }),
 
-  crearSuscripcion: (monto: number) =>
-    apiClient.get('/usuarios/suscribirme', {
-      params: { monto }
-    }),
+  // --- 💳 MÓDULO: PAGOS Y SUSCRIPCIONES ---
+  crearSuscripcion: (monto: number) => apiClient.get<{ url: string }>('/mascotas/usuarios/suscribirme', { params: { monto } }),
+  getHistorialPagos: () => apiClient.get<string>('/pagos/mis-pagos'),
+  webhookSuscripciones: (payload: any) => apiClient.post('/mascotas/public/webhook-mp', payload),
 
-  loginNativoGoogle: (token: string) => apiClient.post('/public/auth/google-native', { token }),
+  // --- 🐾 MÓDULO: MASCOTAS PROPIAS ---
+  getMascotas: () => apiClient.get<MascotaDTO[]>('/mascotas'),
+  agregarMascota: (data: MascotaDTO) => apiClient.post<MascotaDTO>('/mascotas', data),
+  actualizarMascota: (id: string, data: MascotaDTO) => apiClient.put<MascotaDTO>(`/mascotas/${id}`, data),
+  borrarMascota: (id: string) => apiClient.delete(`/mascotas/${id}`),
+  registrarConFoto: (formData: FormData) => apiClient.post<MascotaDTO>('/mascotas/con-foto', formData),
 
-  // ==========================================
-  // 📍 COMUNIDAD: MASCOTAS PERDIDAS Y ADOPCIÓN
-  // ==========================================
-  reportarMascotaPerdida: (formData: FormData) => {
-    return apiClient.post('/perdidas/reportar', formData);
-  },
+  // --- 🥗 MÓDULO: IA, NUTRICIÓN Y HISTORIAL ---
+  analizarAlimento: (image: string, mascotaId: string | null) =>
+    apiClient.post('/mascotas/analizar-personalizado', { image, mascotaId: mascotaId || "" }),
+  getHistorialAlimentos: () => apiClient.get<AlimentoDTO[]>('/mascotas/historial'),
+  borrarAlimentoHistorial: (id: string) => apiClient.delete(`/mascotas/historial/${id}`),
+  activarStock: (id: string, data: AlimentoDTO) => apiClient.post(`/mascotas/activar-stock/${id}`, data),
+  guardarFinanzas: (data: AlimentoDTO) => apiClient.post('/mascotas/guardar-finanzas', data),
+  getStockStatus: (mascotaId: string) => apiClient.get(`/mascotas/stock-status/${mascotaId}`),
+  compararAlimentos: (ids: string[]) => apiClient.post('/mascotas/comparar', { ids }),
+  
+  // --- 🩺 MÓDULO: SALUD PREVENTIVA (Vacunas/Pipetas) ---
+  analizarSalud: (image: string, mascotaId: string) =>
+    apiClient.post<RecordatorioSaludDTO>('/salud/analizar', { image, mascotaId }),
+  getAlertasSaludPreventiva: () => apiClient.get<RecordatorioSaludDTO[]>('/salud/alertas'),
+  getHistorialPreventivoMascota: (mascotaId: string) => apiClient.get<RecordatorioSaludDTO[]>(`/salud/mascota/${mascotaId}`),
+  guardarEventoSalud: (data: RecordatorioSaludDTO) => apiClient.post<RecordatorioSaludDTO>('/salud', data),
+  eliminarRegistroPreventivo: (id: string) => apiClient.delete(`/salud/${id}`),
 
-  getMascotasPerdidas: () => apiClient.get('/perdidas/todas'),
-  getMascotasAdopcion: () => apiClient.get('/adopciones/todas'),
+  // --- 🩺 MÓDULO: SALUD (Vomitos/Piel/Etc) ---
+  analizarTriaje: (image: string, tipo: string, mascotaId: string) => 
+    apiClient.post<TriajeIADTO>('/salud/analizar-triaje', { image, tipo, mascotaId }),
+  obtenerTriajes: () => 
+    apiClient.get<TriajeIADTO[]>('/salud/triaje'), 
+  borrarTriaje: (id: string) => 
+    apiClient.delete(`/veterinaria/triaje/${id}`),
 
-  publicarMascotaAdopcion: (formData: FormData) => {
-    return apiClient.post('/adopciones/publicar', formData);
-  },
+  // --- 🩺 ✅ MÓDULO: IA VETERINARIA Y CLÍNICA (Sincronizado con VeterinariaController.java) ---
+  // Endpoint: POST /api/veterinaria/analizar
+  analizarVet: (image: string, mascotaId: string) => 
+    apiClient.post<ConsultaVetDTO>('/veterinaria/analizar', { image, mascotaId }),
 
-  eliminarMascotaPerdida: (id: string) => apiClient.delete(`/perdidas/${id}`),
-  eliminarMascotaAdopcion: (id: string) => apiClient.delete(`/adopciones/${id}`),
+  // Endpoint: POST /api/veterinaria (Guardar consulta/receta definitiva)
+  guardarConsultaVet: (data: ConsultaVetDTO) => 
+    apiClient.post<ConsultaVetDTO>('/veterinaria', data),
 
-  // ==========================================
-  // 🏛️ COMUNIDAD: REFUGIOS (NUEVO)
-  // ==========================================
-  /** Trae la lista de todos los refugios registrados */
-  getRefugios: () => apiClient.get('/refugios/todos'),
+  // Endpoint: GET /api/veterinaria/historial (Historial clínico del usuario)
+  getHistorialClinico: () => 
+    apiClient.get<ConsultaVetDTO[]>('/veterinaria/historial'),
 
-  /** Registra un nuevo refugio con hasta 3 fotos (Multipart FormData) */
-  registrarRefugio: (formData: FormData) => apiClient.post('/refugios/registrar', formData),
+  // Endpoint: DELETE /api/veterinaria/{id}
+  eliminarConsultaVet: (id: string) => 
+    apiClient.delete(`/veterinaria/${id}`),
 
-  /** Elimina un refugio (solo si el usuario es el creador) */
+  // --- 🔍 MÓDULO: BÚSQUEDA E IA DE PRECIOS ---
+  buscarPrecios: (marca: string) => apiClient.get<OfertaPrecioDTO[]>('/busqueda/precios', { params: { marca } }),
+  buscarResenas: (marca: string) => apiClient.get<{ resenas: string }>('/busqueda/resenas', { params: { marca } }),
+  getPresupuestoMensual: () => apiClient.get('/busqueda/presupuesto-mensual'),
+
+  // --- 🤝 MÓDULO: COMUNIDAD (PERDIDOS Y ADOPCIONES) ---
+  getMascotasPerdidas: () => apiClient.get<MascotaPerdidaDTO[]>('/mascotas/perdidas/todas'),
+  reportarMascotaPerdida: (formData: FormData) => apiClient.post<MascotaPerdidaDTO>('/mascotas/perdidas/reportar', formData),
+  eliminarMascotaPerdida: (id: string) => apiClient.delete(`/mascotas/perdidas/${id}`),
+  marcarMascotaEncontrada: (id: string) => apiClient.patch(`/mascotas/perdidas/${id}/encontrada`),
+  getMascotasAdopcion: () => apiClient.get<MascotaAdopcionDTO[]>('/mascotas/adopciones/todas'),
+  publicarMascotaAdopcion: (formData: FormData) => apiClient.post<MascotaAdopcionDTO>('/mascotas/adopciones/publicar', formData),
+  eliminarMascotaAdopcion: (id: string) => apiClient.delete(`/mascotas/adopciones/${id}`),
+
+  // --- 🏠 MÓDULO: REFUGIOS ---
+  getRefugios: () => apiClient.get<RefugioDTO[]>('/refugios'),
+  getMisRefugios: () => apiClient.get<RefugioDTO[]>('/refugios/mis-refugios'),
+  registrarRefugio: (formData: FormData) => apiClient.post<RefugioDTO>('/refugios', formData),
   eliminarRefugio: (id: string) => apiClient.delete(`/refugios/${id}`),
+
+  // --- 🔔 MÓDULO: ALERTAS ---
+  getAlertasSistema: () => apiClient.get<AlertaDTO[]>('/mascotas/alertas-sistema'),
+  crearAlertaPersonalizada: (alerta: any) => apiClient.post('/mascotas/alertas', alerta),
+  getMisAlertas: () => apiClient.get<AlertaDTO[]>('/alertas'),
+  marcarAlertaLeida: (id: string) => apiClient.patch(`/alertas/${id}/leida`),
 };

@@ -95,7 +95,7 @@ const VetScanner = ({ mascotas, onScanComplete, initialData, onReset, handleSusc
           <div className="flex gap-3">
             <div className="mt-1 bg-amber-200/50 h-1.5 w-1.5 rounded-full shrink-0" />
             <p className="text-[11px] font-bold text-amber-800/90 leading-relaxed">
-              <span className="text-amber-900 font-black uppercase text-[9px]">Triaje Rápido por IA:</span>
+              <span className="text-amber-900 font-black uppercase text-[9px]">Triaje Rápido por IA: </span>
               Analizá fotos de materia fecal, heridas o vómitos para obtener una primera orientación sobre la urgencia del síntoma.
             </p>
           </div>
@@ -103,7 +103,7 @@ const VetScanner = ({ mascotas, onScanComplete, initialData, onReset, handleSusc
           <div className="flex gap-3">
             <div className="mt-1 bg-amber-200/50 h-1.5 w-1.5 rounded-full shrink-0" />
             <p className="text-[11px] font-bold text-amber-800/90 leading-relaxed">
-              <span className="text-amber-900 font-black uppercase text-[9px]">Consultas y Recetas:</span>
+              <span className="text-amber-900 font-black uppercase text-[9px]">Consultas y Recetas: </span>
               Escaneá documentos físicos para digitalizar diagnósticos y medicaciones, integrándolos automáticamente a la cartilla de salud.
             </p>
           </div>
@@ -111,7 +111,7 @@ const VetScanner = ({ mascotas, onScanComplete, initialData, onReset, handleSusc
           <div className="flex gap-3">
             <div className="mt-1 bg-amber-200/50 h-1.5 w-1.5 rounded-full shrink-0" />
             <p className="text-[11px] font-bold text-amber-800/90 leading-relaxed">
-              <span className="text-amber-900 font-black uppercase text-[9px]">Seguimiento Histórico:</span>
+              <span className="text-amber-900 font-black uppercase text-[9px]">Seguimiento Histórico: </span>
               Guardamos el historial de visitas, profesionales y costos para que tengas un control total de la salud de tus mascotas.
             </p>
           </div>

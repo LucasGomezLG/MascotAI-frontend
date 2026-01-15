@@ -1,241 +1,234 @@
 import React, { useState } from 'react';
 import { X, Camera as CameraIcon, Image as ImageIcon, Heart, Loader2, Trash2, Info, MapPin } from 'lucide-react';
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
 import { api } from '../../services/api';
 import Swal from 'sweetalert2';
 import 'leaflet/dist/leaflet.css';
-
-// 🛡️ IMPORTACIONES NATIVAS
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { useCameraPermissions } from '../../hooks/useCameraPermissions';
 
-const LocationMarker = ({ position, setPosition }: any) => {
-  useMapEvents({
-    click(e) { setPosition(e.latlng); },
-  });
-  return position ? <Marker position={position} /> : null;
-};
+function ChangeView({ center }: { center: [number, number] }) {
+  const map = useMap();
+  map.setView(center);
+  return null;
+}
 
 const AdoptionModal = ({ onClose }: { onClose: () => void }) => {
   const [loading, setLoading] = useState(false);
+  const [buscando, setBuscando] = useState(false);
+  const [ubicacionConfirmada, setUbicacionConfirmada] = useState(false);
+
   const [data, setData] = useState({
-    nombre: '', especie: 'Gato', edad: '', descripcion: '', etiquetas: '', contacto: '', direccion: ''
+    nombre: '', especie: 'Gato', edad: '', descripcion: '', contacto: '', direccion: '',
+    lat: -34.6037, lng: -58.3816
   });
-  const [posicion, setPosicion] = useState<{ lat: number, lng: number } | null>(null);
+
   const [previews, setPreviews] = useState<string[]>([]);
   const [archivos, setArchivos] = useState<File[]>([]);
-
-  // 🛡️ HOOK DE PERMISOS
   const { validarCamara, validarGaleria } = useCameraPermissions();
 
-  // 📸 FUNCIÓN NATIVA: TOMAR FOTO
-  const handleNativeCamera = async () => {
-    if (archivos.length >= 4) return;
-    const ok = await validarCamara();
-    if (!ok) return;
-
+  const handleBuscarDireccion = async () => {
+    if (data.direccion.trim().length < 5) {
+      Swal.fire({ text: 'Ingresá un barrio o dirección específica.', icon: 'info', confirmButtonColor: '#10b981' });
+      return;
+    }
+    setBuscando(true);
     try {
-      const image = await Camera.getPhoto({
-        quality: 90,
-        allowEditing: false,
-        resultType: CameraResultType.Uri,
-        source: CameraSource.Camera
-      });
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(data.direccion + ", Buenos Aires")}`);
+      const results = await response.json();
+      if (results.length > 0) {
+        setData(prev => ({ ...prev, lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon) }));
+        setUbicacionConfirmada(true);
+      } else {
+        setUbicacionConfirmada(false);
+        Swal.fire({ title: 'Sin resultados', text: 'No pudimos localizar ese barrio.', icon: 'question', confirmButtonColor: '#10b981' });
+      }
+    } catch (e) { console.error("Error Mapas:", e); } finally { setBuscando(false); }
+  };
 
+  const handleImageCapture = async (source: CameraSource) => {
+    if (archivos.length >= 4) return;
+    const ok = source === CameraSource.Camera ? await validarCamara() : await validarGaleria();
+    if (!ok) return;
+    try {
+      const image = await Camera.getPhoto({ quality: 90, resultType: CameraResultType.Uri, source });
       if (image.webPath) {
         setPreviews(prev => [...prev, image.webPath!]);
         const response = await fetch(image.webPath);
-        const blob = await response.blob();
-        const file = new File([blob], `adoption_cam_${Date.now()}.jpg`, { type: 'image/jpeg' });
+        const file = new File([await response.blob()], `adoption_${Date.now()}.jpg`, { type: 'image/jpeg' });
         setArchivos(prev => [...prev, file]);
       }
-    } catch (e) { console.log("Cámara cancelada"); }
-  };
-
-  // 🖼️ FUNCIÓN NATIVA: GALERÍA
-  const handleNativeGallery = async () => {
-    if (archivos.length >= 4) return;
-    const ok = await validarGaleria();
-    if (!ok) return;
-
-    try {
-      const image = await Camera.getPhoto({
-        quality: 90,
-        allowEditing: false,
-        resultType: CameraResultType.Uri,
-        source: CameraSource.Photos
-      });
-
-      if (image.webPath) {
-        setPreviews(prev => [...prev, image.webPath!]);
-        const response = await fetch(image.webPath);
-        const blob = await response.blob();
-        const file = new File([blob], `adoption_gal_${Date.now()}.jpg`, { type: 'image/jpeg' });
-        setArchivos(prev => [...prev, file]);
-      }
-    } catch (e) { console.log("Galería cancelada"); }
-  };
-
-  const removeFile = (index: number) => {
-    setArchivos(prev => prev.filter((_, i) => i !== index));
-    setPreviews(prev => prev.filter((_, i) => i !== index));
+    } catch (e) { /* Cancelado */ }
   };
 
   const handlePublicar = async () => {
-    if (archivos.length === 0) {
-      Swal.fire({ text: 'Subí al menos una foto para que vean a la mascota.', icon: 'info', confirmButtonColor: '#059669' });
-      return;
-    }
-    if (!data.nombre.trim() || !data.contacto.trim()) {
-      Swal.fire({ text: 'El nombre y el contacto son obligatorios.', icon: 'warning', confirmButtonColor: '#059669' });
-      return;
-    }
-    if (!posicion) {
-      Swal.fire({ text: 'Por favor, tocá el mapa para marcar tu ubicación.', icon: 'info', confirmButtonColor: '#059669' });
-      return;
-    }
+    const { nombre, especie, edad, descripcion, contacto, direccion } = data;
+
+    // 🛡️ VALIDACIONES ESTRICTAS
+    if (archivos.length === 0) return alertErr('Falta foto', 'Subí al menos una foto.');
+    if (!nombre.trim()) return alertErr('Nombre', 'El nombre es obligatorio.');
+    if (!edad.trim()) return alertErr('Edad', 'La edad es obligatoria.');
+    if (!direccion.trim() || !ubicacionConfirmada) return alertErr('Ubicación', 'Confirmá el barrio en el mapa.');
+    if (descripcion.trim().length < 20) return alertErr('Descripción corta', 'Mínimo 20 caracteres.');
+    if (!contacto.trim()) return alertErr('Contacto', 'El contacto es obligatorio.');
 
     setLoading(true);
-    const etiquetasArray = data.etiquetas.split(',').map(tag => tag.trim()).filter(tag => tag !== "");
     const formData = new FormData();
-    const datosMascota = { ...data, etiquetas: etiquetasArray, lat: posicion.lat, lng: posicion.lng };
 
-    formData.append('datos', JSON.stringify(datosMascota));
+    // ✅ AJUSTE TÉCNICO: El backend espera un String en @RequestParam("datos")
+    const payload = {
+      nombre: nombre.trim(),
+      especie: especie, // "Gato" o "Perro"
+      edad: edad.trim(),
+      descripcion: descripcion.trim(),
+      contacto: contacto.trim(),
+      direccion: direccion.trim(),
+      lat: data.lat,
+      lng: data.lng,
+      etiquetas: [] // Opcional según tu DTO
+    };
+
+    // Enviamos como string puro, no como Blob
+    formData.append('datos', JSON.stringify(payload));
+
+    // Las fotos van en la parte "files"
     archivos.forEach(file => formData.append('files', file));
 
     try {
       await api.publicarMascotaAdopcion(formData);
       await Swal.fire({
         title: '¡Publicado!',
-        text: 'Gracias por ayudar a buscarle un hogar.',
+        text: 'La mascota ya está en adopción.',
         icon: 'success',
         timer: 2000,
         showConfirmButton: false
       });
       onClose();
-    } catch (e) {
-      Swal.fire({ title: 'Error', text: 'No pudimos publicar la adopción.', icon: 'error' });
+    } catch (e: any) {
+      console.error("Error Adopción:", e.message);
+      Swal.fire({ title: 'Error', text: 'No pudimos procesar la publicación.', icon: 'error' });
     } finally {
       setLoading(false);
     }
   };
 
+  const alertErr = (title: string, text: string) => {
+    Swal.fire({ title, text, icon: 'warning', confirmButtonColor: '#10b981', customClass: { popup: 'rounded-[2.5rem]' } });
+  };
+
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 text-left">
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-6 shadow-2xl relative max-h-[95vh] overflow-y-auto animate-in zoom-in-95">
-        {/* Botón Cerrar con Safe Area Superior */}
-        <button 
-          onClick={onClose} 
-          className="absolute right-6 text-slate-400 hover:text-slate-900 transition-colors z-10"
-          style={{ top: 'calc(1.5rem + env(safe-area-inset-top))' }}
-        >
-          <X size={24} />
+        <button onClick={onClose} className="absolute right-6 top-6 text-slate-300 hover:text-emerald-600 p-2 bg-slate-50 rounded-full transition-colors">
+          <X size={20} />
         </button>
 
-        <h3 className="text-2xl font-black text-slate-800 mb-6 tracking-tight flex items-center gap-2">
+        <h3 className="text-2xl font-black text-slate-800 mb-6 tracking-tight flex items-center gap-2 italic">
           <Heart className="text-emerald-500" fill="currentColor" size={24} /> Dar en Adopción
         </h3>
 
-        <div className="space-y-4">
-          {/* ✅ SECCIÓN DE FOTOS CON BOTONES HORIZONTALES */}
+        <div className="space-y-4 text-left">
+          {/* SECCIÓN FOTOS */}
           <div className="grid grid-cols-4 gap-2">
-            {previews.map((p, i: number) => (
-              <div key={i} className="relative h-20 group">
-                <img src={p} className="w-full h-full object-cover rounded-xl border-2 border-emerald-100 shadow-sm" alt="Preview" />
-                <button onClick={() => removeFile(i)} className="absolute -top-1.5 -right-1.5 bg-emerald-500 text-white p-1 rounded-full shadow-md active:scale-90 transition-transform">
-                  <Trash2 size={10} />
-                </button>
+            {previews.map((p, i) => (
+              <div key={i} className="relative h-20">
+                <img src={p} className="w-full h-full object-cover rounded-xl border-2 border-emerald-50 shadow-sm" alt="Preview" />
+                <button onClick={() => {
+                  setArchivos(prev => prev.filter((_, idx) => idx !== i));
+                  setPreviews(prev => prev.filter((_, idx) => idx !== i));
+                }} className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full shadow-lg"><Trash2 size={10} /></button>
               </div>
             ))}
             {previews.length < 4 && (
-              // ✅ CORRECCIÓN AQUÍ: Cambiado flex-col por flex y ajustada la altura
-              <div className="flex gap-2 h-20 col-span-2"> 
-                <button 
-                  onClick={handleNativeCamera} 
-                  className="flex-1 bg-emerald-50 border-2 border-dashed border-emerald-200 rounded-xl flex flex-col items-center justify-center text-emerald-600 hover:bg-emerald-100 active:scale-95 transition-all"
-                >
-                  <CameraIcon size={18} />
-                  <span className="text-[7px] font-black uppercase mt-0.5">Cámara</span>
+              <div className="flex gap-2 h-20 col-span-2">
+                <button onClick={() => handleImageCapture(CameraSource.Camera)} className="flex-1 bg-emerald-50 border-2 border-dashed border-emerald-200 rounded-xl flex flex-col items-center justify-center text-emerald-600 hover:bg-emerald-100 transition-all">
+                  <CameraIcon size={18} /><span className="text-[7px] font-black uppercase mt-0.5">Cámara</span>
                 </button>
-                <button 
-                  onClick={handleNativeGallery} 
-                  className="flex-1 bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center text-slate-500 hover:bg-slate-100 active:scale-95 transition-all"
-                >
-                  <ImageIcon size={18} />
-                  <span className="text-[7px] font-black uppercase mt-0.5">Galería</span>
+                <button onClick={() => handleImageCapture(CameraSource.Photos)} className="flex-1 bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center text-slate-500 hover:bg-slate-100 transition-all">
+                  <ImageIcon size={18} /><span className="text-[7px] font-black uppercase mt-0.5">Galería</span>
                 </button>
               </div>
             )}
           </div>
 
           <div className="grid grid-cols-2 gap-2">
-            <input 
-              placeholder="Nombre" 
-              maxLength={20}
-              className="p-3 bg-slate-50 rounded-xl font-bold outline-none text-sm border-2 border-transparent focus:border-emerald-500" 
-              onChange={e => setData({ ...data, nombre: e.target.value })} 
+            <input
+              placeholder="Nombre" maxLength={20}
+              className="p-4 bg-slate-50 rounded-xl font-bold outline-none text-sm border-2 border-transparent focus:border-emerald-500 transition-all"
+              value={data.nombre} onChange={e => setData({ ...data, nombre: e.target.value })}
             />
             <select
-              className="p-3 bg-slate-50 rounded-xl font-bold outline-none text-sm border-2 border-transparent focus:border-emerald-500"
-              onChange={e => setData({ ...data, especie: e.target.value })}
+              className="p-4 bg-slate-50 rounded-xl font-bold outline-none text-sm border-2 border-transparent focus:border-emerald-500 appearance-none"
+              value={data.especie} onChange={e => setData({ ...data, especie: e.target.value })}
             >
               <option value="Gato">Gato 🐈</option>
               <option value="Perro">Perro 🐕</option>
             </select>
           </div>
 
-          <input 
-            placeholder="Edad (ej: 2 meses)" 
-            maxLength={15}
-            className="w-full p-3 bg-slate-50 rounded-xl font-bold outline-none text-sm border-2 border-transparent focus:border-emerald-500" 
-            onChange={e => setData({ ...data, edad: e.target.value })} 
+          <input
+            placeholder="Edad aproximada (Obligatorio)" maxLength={15}
+            className="w-full p-4 bg-slate-50 rounded-xl font-bold outline-none text-sm border-2 border-transparent focus:border-emerald-500 transition-all"
+            value={data.edad} onChange={e => setData({ ...data, edad: e.target.value })}
           />
 
           <div className="space-y-2">
-            <input
-              placeholder="Barrio (ej: Palermo, CABA)"
-              maxLength={40}
-              className="w-full p-3 bg-slate-50 rounded-xl font-bold outline-none text-sm border-2 border-transparent focus:border-emerald-500"
-              onChange={e => setData({ ...data, direccion: e.target.value })}
-            />
-            <div className="h-32 rounded-2xl overflow-hidden border-2 border-slate-100 relative grayscale-[0.2] shadow-inner z-0">
-              <MapContainer center={[-34.6037, -58.3816]} zoom={11} zoomControl={false} style={{ height: '100%', width: '100%' }}>
+            <div className="relative">
+              <MapPin size={18} className="absolute left-4 top-4 text-emerald-500" />
+              <input
+                placeholder="Barrio o dirección"
+                className="w-full p-4 pl-12 pr-24 bg-slate-50 rounded-xl font-bold outline-none text-sm border-2 border-transparent focus:border-emerald-500"
+                value={data.direccion}
+                onChange={e => {
+                  setData({ ...data, direccion: e.target.value });
+                  setUbicacionConfirmada(false);
+                }}
+              />
+              <button onClick={handleBuscarDireccion} className="absolute right-2 top-2 bottom-2 px-3 bg-slate-800 text-white rounded-lg text-[9px] font-black uppercase transition-all active:scale-95">
+                {buscando ? <Loader2 className="animate-spin" size={12} /> : "Buscar"}
+              </button>
+            </div>
+
+            <div className={`h-36 rounded-2xl overflow-hidden border-2 relative transition-all ${ubicacionConfirmada ? 'border-emerald-400 ring-2 ring-emerald-50' : 'border-slate-100 opacity-60'}`}>
+              <MapContainer center={[data.lat, data.lng]} zoom={15} zoomControl={false} style={{ height: '100%', width: '100%' }}>
+                <ChangeView center={[data.lat, data.lng]} />
                 <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                <LocationMarker position={posicion} setPosition={setPosicion} />
+                <Marker position={[data.lat, data.lng]} />
               </MapContainer>
-              <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-lg shadow-sm z-[400] pointer-events-none">
-                <p className="text-[8px] font-black text-slate-500 uppercase tracking-tighter flex items-center gap-1">
-                  <MapPin size={8} className="text-emerald-500" /> Toca tu ubicación
-                </p>
-              </div>
+              {ubicacionConfirmada && (
+                <div className="absolute top-2 right-2 bg-emerald-500 text-white text-[8px] font-black px-2 py-1 rounded-full z-[400] animate-in fade-in zoom-in">
+                  ✓ UBICACIÓN FIJADA
+                </div>
+              )}
             </div>
           </div>
 
           <div className="space-y-1">
-            <textarea 
-              placeholder="Descripción..." 
+            <textarea
+              placeholder="Descripción (mín. 20 caracteres)..."
               maxLength={200}
-              className="w-full p-3 bg-slate-50 rounded-xl font-bold min-h-[60px] outline-none text-sm border-2 border-transparent focus:border-emerald-500 transition-all resize-none" 
-              onChange={e => setData({ ...data, descripcion: e.target.value })} 
+              className={`w-full p-4 bg-slate-50 rounded-xl font-bold min-h-[80px] outline-none text-sm border-2 transition-all resize-none ${data.descripcion.length > 0 && data.descripcion.length < 20 ? 'border-amber-200' : 'border-transparent focus:border-emerald-500'}`}
+              value={data.descripcion} onChange={e => setData({ ...data, descripcion: e.target.value })}
             />
-            <p className="text-[9px] text-right text-slate-400 font-bold px-2">{data.descripcion.length}/200</p>
+            <div className="flex justify-between items-center px-2">
+              <p className={`text-[9px] font-black uppercase tracking-widest ${data.descripcion.length < 20 ? 'text-amber-500' : 'text-emerald-500'}`}>
+                {data.descripcion.length < 20 ? `Faltan ${20 - data.descripcion.length} caracteres` : 'Descripción válida ✓'}
+              </p>
+              <p className="text-[9px] text-slate-400 font-bold">{data.descripcion.length}/200</p>
+            </div>
           </div>
 
-          <input 
-            placeholder="Contacto (IG o WhatsApp)" 
-            maxLength={50}
-            className="w-full p-3 bg-emerald-50 border-2 border-emerald-100 rounded-xl font-black text-emerald-700 outline-none text-sm placeholder:text-emerald-300" 
-            onChange={e => setData({ ...data, contacto: e.target.value })} 
+          <input
+            placeholder="WhatsApp o Instagram de contacto" maxLength={50}
+            className="w-full p-4 bg-emerald-50 border-2 border-emerald-100 rounded-xl font-black text-emerald-700 outline-none text-sm placeholder:text-emerald-300 focus:border-emerald-500 transition-all"
+            value={data.contacto} onChange={e => setData({ ...data, contacto: e.target.value })}
           />
 
-          <div className="flex items-center gap-2 px-4 py-3 bg-emerald-50 rounded-xl border border-emerald-100">
-            <Info size={14} className="text-emerald-600" />
-            <p className="text-[10px] font-bold text-emerald-700 leading-tight">
-              Aviso: Tu anuncio estará activo 30 días para mantener el feed actualizado.
-            </p>
-          </div>
-
-          <button onClick={handlePublicar} disabled={loading} className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-black shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-all shadow-emerald-100 disabled:bg-slate-300">
+          <button
+            onClick={handlePublicar}
+            disabled={loading}
+            className="w-full py-5 bg-emerald-600 text-white rounded-[2rem] font-black shadow-lg shadow-emerald-100 flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-50"
+          >
             {loading ? <Loader2 className="animate-spin" /> : "PUBLICAR ADOPCIÓN"}
           </button>
         </div>

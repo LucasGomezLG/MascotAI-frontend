@@ -5,6 +5,7 @@ import { useAuth } from '../../../context/AuthContext'; // 🛡️ Importamos el
 import { Toast } from '../../../utils/alerts';
 import MedicalReport from './MedicalReport';
 import Swal from 'sweetalert2';
+import SubscriptionCard from '../../../services/SuscriptionCard';
 
 // 🛡️ IMPORTACIONES NATIVAS
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
@@ -15,7 +16,7 @@ const SymptomScanner = ({ mascotas, initialData, onScanComplete }: any) => {
   const [selectedPet, setSelectedPet] = useState("");
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [loadingSuscripcion, setLoadingSuscripcion] = useState(false);
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [activeTab, setActiveTab] = useState("MATERIA FECAL");
 
@@ -34,60 +35,19 @@ const SymptomScanner = ({ mascotas, initialData, onScanComplete }: any) => {
     }
   }, [initialData]);
 
-  // 🛡️ MODAL DE DONACIÓN (Integrado)
-  const ejecutarFlujoDonacion = () => {
-    Swal.fire({
-      title: '¿Quieres colaborar?',
-      text: "Ingresa el monto que desees donar para mantener MascotAI",
-      input: 'number',
-      inputLabel: 'Monto en AR$',
-      inputValue: 5000,
-      inputAttributes: { min: '100', max: '500000', step: '1' },
-      showCancelButton: true,
-      confirmButtonColor: '#f97316',
-      cancelButtonColor: '#94a3b8',
-      confirmButtonText: 'Donar',
-      cancelButtonText: 'Ahora no',
-      reverseButtons: true,
-      inputValidator: (value) => {
-        if (!value) return 'Debes ingresar un monto';
-        const amount = parseInt(value);
-        if (amount < 100) return 'El monto mínimo es $100';
-        if (amount > 500000) return 'El monto máximo permitido es $500.000';
-      },
-      customClass: { popup: 'rounded-[2rem]' }
-    }).then(async (result) => {
-      if (result.isConfirmed) {
-        const montoElegido = result.value;
-        setLoadingSuscripcion(true);
-        try {
-          const response = await api.crearSuscripcion(montoElegido);
-          window.location.href = response.data.url;
-        } catch (error) {
-          Swal.fire('Error', 'No se pudo generar el link de pago.', 'error');
-        } finally {
-          setLoadingSuscripcion(false);
-        }
-      }
-    });
-  };
-
   // 🛡️ MODAL DE LÍMITE AGOTADO
   const mostrarModalLimite = () => {
     Swal.fire({
-      title: '¡Energía de IA Agotada! ⚡',
-      text: 'Has alcanzado el límite de 10 escaneos gratuitos este mes. Colaborá para tener análisis ilimitados y seguir cuidando a tu mascota.',
+      title: '¡Límite alcanzado!',
+      text: 'Usaste tus 10 escaneos del mes. Colaborá para tener acceso ilimitado y ayudarnos con los servidores.',
       icon: 'info',
       showCancelButton: true,
-      confirmButtonText: 'Ser Colaborador ❤️',
-      cancelButtonText: 'Más tarde',
+      confirmButtonText: 'SER COLABORADOR ⚡',
+      cancelButtonText: 'Luego',
       confirmButtonColor: '#f97316',
-      cancelButtonColor: '#94a3b8',
-      reverseButtons: true,
-      customClass: { popup: 'rounded-[2.5rem]' }
     }).then((res) => {
       if (res.isConfirmed) {
-        ejecutarFlujoDonacion();
+        setShowSubscriptionModal(true);
       }
     });
   };
@@ -131,13 +91,13 @@ const SymptomScanner = ({ mascotas, initialData, onScanComplete }: any) => {
     setResult(null);
     setLoading(true);
     try {
-      const petId = selectedPet || "GENERIC";
-      const res = await api.analizarTriaje(selectedImage, activeTab, petId);
+      const res = await api.analizarTriaje(selectedImage, activeTab, selectedPet || "GENERIC");
 
       // ✅ ACTUALIZACIÓN DE CRÉDITOS EN EL HEADER
       await refreshUser();
 
-      if (res.data.error === "NO_DETECTADO") {
+      const dataIA: any = res.data;
+      if (dataIA?.error === "NO_DETECTADO") {
         Swal.fire({
           title: 'Imagen no reconocida',
           text: `MascotAI no detectó evidencia de "${activeTab}"...`,
@@ -147,10 +107,11 @@ const SymptomScanner = ({ mascotas, initialData, onScanComplete }: any) => {
         });
         return;
       }
-      setResult(res.data);
+      setResult(dataIA);
       if (onScanComplete) onScanComplete();
     } catch (e: any) {
-      if (e.response?.status === 403 || e.toString().includes("LIMITE_IA_ALCANZADO")) {
+      const errorMsg = e.response?.data?.error || "";
+      if (e.response?.status === 403 || errorMsg.includes("LIMITE")) {
         mostrarModalLimite();
       } else {
         Toast.fire({ icon: 'error', title: 'Error en el análisis' });
@@ -173,7 +134,7 @@ const SymptomScanner = ({ mascotas, initialData, onScanComplete }: any) => {
               onChange={(e) => setSelectedPet(e.target.value)} 
               className="w-full p-4 rounded-2xl border-2 border-slate-50 bg-slate-50/50 font-bold outline-none text-slate-700 focus:border-red-500 transition-all"
             >
-              <option value="">Análisis Genérico (No sé quién fue)</option>
+              <option value="">No sé quién fue (Análisis Genérico)</option>
               {mascotas.map((p: any) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
             </select>
           </div>
@@ -243,6 +204,23 @@ const SymptomScanner = ({ mascotas, initialData, onScanComplete }: any) => {
           >
             NUEVA CONSULTA
           </button>
+        </div>
+      )}
+
+      {/* MODAL DE SUSCRIPCIÓN */}
+      {showSubscriptionModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[150] p-4">
+          <div className="bg-white rounded-[2rem] p-6 max-w-sm w-full relative">
+            <button
+              onClick={() => setShowSubscriptionModal(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <SubscriptionCard user={user} />
+          </div>
         </div>
       )}
     </div>

@@ -4,6 +4,7 @@ import { api } from '../../../services/api';
 import { useAuth } from '../../../context/AuthContext'; // 🛡️ Importamos el contexto
 import { Toast } from '../../../utils/alerts';
 import Swal from 'sweetalert2';
+import SubscriptionCard from '../../../services/SuscriptionCard';
 
 // 🛡️ IMPORTACIONES NATIVAS
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
@@ -14,7 +15,7 @@ const ConsultationScanner = ({ mascotas, onScanComplete, initialData }: any) => 
   const [selectedPet, setSelectedPet] = useState("");
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [loadingSuscripcion, setLoadingSuscripcion] = useState(false);
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
   const [editData, setEditData] = useState<any>(null);
 
   const { validarCamara, validarGaleria } = useCameraPermissions();
@@ -24,60 +25,19 @@ const ConsultationScanner = ({ mascotas, onScanComplete, initialData }: any) => 
   const restantes = Math.max(0, 10 - (user?.intentosIA || 0));
   const tieneEnergia = user?.esColaborador || restantes > 0;
 
-  // 🛡️ MODAL DE DONACIÓN
-  const ejecutarFlujoDonacion = () => {
-    Swal.fire({
-      title: '¿Quieres colaborar?',
-      text: "Ingresa el monto que desees donar para mantener MascotAI",
-      input: 'number',
-      inputLabel: 'Monto en AR$',
-      inputValue: 5000,
-      inputAttributes: { min: '100', max: '500000', step: '1' },
-      showCancelButton: true,
-      confirmButtonColor: '#f97316',
-      cancelButtonColor: '#94a3b8',
-      confirmButtonText: 'Donar',
-      cancelButtonText: 'Ahora no',
-      reverseButtons: true,
-      inputValidator: (value) => {
-        if (!value) return 'Debes ingresar un monto';
-        const amount = parseInt(value);
-        if (amount < 100) return 'El monto mínimo es $100';
-        if (amount > 500000) return 'El monto máximo permitido es $500.000';
-      },
-      customClass: { popup: 'rounded-[2rem]' }
-    }).then(async (result) => {
-      if (result.isConfirmed) {
-        const montoElegido = result.value;
-        setLoadingSuscripcion(true);
-        try {
-          const response = await api.crearSuscripcion(montoElegido);
-          window.location.href = response.data.url;
-        } catch (error) {
-          Swal.fire('Error', 'No se pudo generar el link de pago.', 'error');
-        } finally {
-          setLoadingSuscripcion(false);
-        }
-      }
-    });
-  };
-
   // 🛡️ MODAL DE LÍMITE AGOTADO
   const mostrarModalLimite = () => {
     Swal.fire({
-      title: '¡Energía de IA Agotada! ⚡',
-      text: 'Has alcanzado el límite de 10 escaneos gratuitos este mes. Colaborá para tener análisis ilimitados.',
+      title: '¡Límite alcanzado!',
+      text: 'Usaste tus 10 escaneos del mes. Colaborá para tener acceso ilimitado y ayudarnos con los servidores.',
       icon: 'info',
       showCancelButton: true,
-      confirmButtonText: 'Ser Colaborador ❤️',
-      cancelButtonText: 'Más tarde',
-      confirmButtonColor: '#2563eb',
-      cancelButtonColor: '#94a3b8',
-      reverseButtons: true,
-      customClass: { popup: 'rounded-[2.5rem]' }
+      confirmButtonText: 'SER COLABORADOR ⚡',
+      cancelButtonText: 'Luego',
+      confirmButtonColor: '#f97316',
     }).then((res) => {
       if (res.isConfirmed) {
-        ejecutarFlujoDonacion();
+        setShowSubscriptionModal(true);
       }
     });
   };
@@ -118,17 +78,40 @@ const ConsultationScanner = ({ mascotas, onScanComplete, initialData }: any) => 
     }
 
     if (!selectedPet) {
-      Toast.fire({ icon: 'warning', title: '¡Identificá al Paciente!' });
+      Toast.fire({ 
+        icon: 'warning', 
+        title: '¡Identificá al Paciente!', 
+        text: 'Por favor, seleccioná una mascota antes de escanear el documento.' 
+      });
       return;
     }
+
     if (!selectedImage) return;
 
     setLoading(true);
     try {
-      const res = await api.analizarVet(selectedImage, "CONSULTA", selectedPet);
+      const res = await api.analizarVet(selectedImage, selectedPet);
       await refreshUser(); // ✅ ACTUALIZACIÓN DE CRÉDITOS
 
-      if (res.data.error === "NO_ES_RECETA") {
+      const infoIA: any = res.data || {};
+      const rawFecha = infoIA.fecha || infoIA.date || hoy;
+      const cleanFecha = typeof rawFecha === 'string' ? rawFecha.split('T')[0] : hoy;
+
+      setEditData({
+        doctor: infoIA.veterinario || infoIA.doctor || "",
+        clinica: infoIA.clinica || infoIA.hospital || "",
+        fecha: cleanFecha,
+        diagnostico: infoIA.diagnostico || infoIA.motivo || infoIA.conclusion || "",
+        medicamentos: [], 
+        precio: 0, 
+        mascotaId: selectedPet, 
+        consultaId: infoIA.id || ""
+      });
+    } catch (e: any) {
+      const errorMsg = e.response?.data?.error || "";
+      if (e.response?.status === 403 || errorMsg.includes("LIMITE")) {
+        mostrarModalLimite();
+      } else if (errorMsg === "NO_ES_RECETA") {
         Swal.fire({
           title: 'Documento no reconocido',
           text: 'Intentá que se vea el sello o la firma del veterinario con más luz.',
@@ -136,19 +119,6 @@ const ConsultationScanner = ({ mascotas, onScanComplete, initialData }: any) => 
           confirmButtonColor: '#2563eb'
         });
         setSelectedImage(null);
-        return;
-      }
-      const infoIA = res.data.datos || {};
-      setEditData({
-        doctor: infoIA.veterinario || "",
-        clinica: infoIA.clinica || "",
-        fecha: infoIA.fecha || hoy,
-        diagnostico: infoIA.diagnostico || "",
-        medicamentos: [], precio: 0, mascotaId: selectedPet, consultaId: res.data.consultaId
-      });
-    } catch (e: any) {
-      if (e.response?.status === 403 || e.toString().includes("LIMITE_IA_ALCANZADO")) {
-        mostrarModalLimite();
       } else {
         Toast.fire({ icon: 'error', title: 'Error al leer el documento' });
       }
@@ -156,8 +126,30 @@ const ConsultationScanner = ({ mascotas, onScanComplete, initialData }: any) => 
   };
 
   const handleGuardarConsulta = async () => {
-    if (!editData.diagnostico.trim()) {
-      Swal.fire({ text: 'El diagnóstico o motivo es obligatorio.', icon: 'warning' });
+    // 🛡️ VALIDACIONES DE CAMPOS OBLIGATORIOS
+    if (!editData.doctor?.trim()) {
+      Swal.fire({ title: 'Faltan datos', text: 'El nombre del profesional es obligatorio.', icon: 'warning' });
+      return;
+    }
+    if (!editData.clinica?.trim()) {
+      Swal.fire({ title: 'Faltan datos', text: 'El nombre de la clínica es obligatorio.', icon: 'warning' });
+      return;
+    }
+    if (!editData.fecha || editData.fecha === "") {
+      Swal.fire({ title: 'Faltan datos', text: 'La fecha de la consulta es obligatoria.', icon: 'warning' });
+      return;
+    }
+    if (isNaN(new Date(editData.fecha).getTime())) {
+      Swal.fire({ title: 'Fecha inválida', text: 'Ingresá una fecha válida para la consulta.', icon: 'warning' });
+      return;
+    }
+    if (!editData.diagnostico?.trim()) {
+      Swal.fire({ title: 'Faltan datos', text: 'El diagnóstico o motivo es obligatorio.', icon: 'warning' });
+      return;
+    }
+    const precioNum = parseFloat(editData.precio);
+    if (isNaN(precioNum) || precioNum < 0) {
+      Swal.fire({ title: 'Dato inválido', text: 'Ingresá un costo válido (puede ser 0).', icon: 'warning' });
       return;
     }
     setLoading(true);
@@ -289,6 +281,23 @@ const ConsultationScanner = ({ mascotas, onScanComplete, initialData }: any) => 
                 {loading ? <Loader2 className="animate-spin" /> : "REGISTRAR"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE SUSCRIPCIÓN */}
+      {showSubscriptionModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[150] p-4">
+          <div className="bg-white rounded-[2rem] p-6 max-w-sm w-full relative">
+            <button
+              onClick={() => setShowSubscriptionModal(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <SubscriptionCard user={user} />
           </div>
         </div>
       )}

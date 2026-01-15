@@ -5,7 +5,12 @@ const MedicalReport = ({ data }: { data: any }) => {
   // 🛡️ Validación inicial para evitar errores de renderizado
   if (!data || Object.keys(data).length === 0) return null;
 
-  const nivelUrgencia = data.nivel_urgencia?.toUpperCase() || 'BAJA';
+  // 🔄 Normalización de atributos (Soporta snake_case del historial y camelCase de la API fresca)
+  const nivelUrgencia = (data.nivel_urgencia || data.nivelUrgencia || 'BAJA').toUpperCase();
+  const analisisDetalle = data.analisis_detalle || data.analisisDetalle || "No se encontraron detalles específicos en el análisis.";
+  const urgenciaExplicacion = data.urgencia_explicacion || data.urgenciaExplicacion || "Urgencia no especificada por la IA.";
+  const pasosASeguir = Array.isArray(data.pasos_a_seguir) ? data.pasos_a_seguir : (Array.isArray(data.pasosASeguir) ? data.pasosASeguir : []);
+  const resumenFinal = data.resumen_final || data.resumenFinal || "Análisis de MascotAI completado.";
   
   // 🎨 Definición de colores según urgencia
   const urgenciaColor = {
@@ -27,7 +32,7 @@ const MedicalReport = ({ data }: { data: any }) => {
             Hallazgos Técnicos
           </p>
           <p className="text-sm text-slate-700 font-medium leading-relaxed break-words">
-            {data.analisis_detalle || "No se encontraron detalles específicos en el análisis."}
+            {analisisDetalle}
           </p>
         </div>
       </div>
@@ -45,7 +50,7 @@ const MedicalReport = ({ data }: { data: any }) => {
             </span>
           </div>
           <p className="text-lg font-black leading-tight break-words">
-            {data.urgencia_explicacion || "Urgencia no especificada por la IA."}
+            {urgenciaExplicacion}
           </p>
         </div>
       </div>
@@ -55,8 +60,8 @@ const MedicalReport = ({ data }: { data: any }) => {
         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">
           Plan de Acción Recomendado:
         </p>
-        {data.pasos_a_seguir && Array.isArray(data.pasos_a_seguir) ? (
-          data.pasos_a_seguir.map((paso: string, i: number) => (
+        {pasosASeguir.length > 0 ? (
+          pasosASeguir.map((paso: string, i: number) => (
             <div 
               key={i} 
               className="bg-white p-4 rounded-2xl border border-slate-100 flex items-center gap-3 shadow-sm animate-in slide-in-from-right-3" 
@@ -86,7 +91,7 @@ const MedicalReport = ({ data }: { data: any }) => {
             </span>
           </div>
           <p className="text-white text-lg font-bold leading-tight italic break-words">
-            "{data.resumen_final || "Análisis de MascotAI completado."}"
+            "{resumenFinal}"
           </p>
         </div>
       </div>

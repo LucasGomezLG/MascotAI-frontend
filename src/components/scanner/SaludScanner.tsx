@@ -1,222 +1,209 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Loader2, User, Syringe, ShieldPlus, ClipboardPlus,
-  X, Wallet, RefreshCw, Sparkles, Image as ImageIcon,
-  Info, Camera as CameraIcon
+  Loader2, User, ShieldPlus, ClipboardPlus,
+  X, Wallet, Sparkles, Image as ImageIcon,
+  Info, Camera as CameraIcon, Syringe
 } from 'lucide-react';
 import { api } from '../../services/api';
-import { useAuth } from '../../context/AuthContext'; // 🛡️ Importamos el contexto
+import { useAuth } from '../../context/AuthContext';
+import { Toast } from '../../utils/alerts';
+import type { RecordatorioSaludDTO } from '../../types/api.types';
 import Swal from 'sweetalert2';
+import SubscriptionCard from '../../services/SuscriptionCard';
 
-// 🛡️ IMPORTACIONES NATIVAS
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { useCameraPermissions } from '../../hooks/useCameraPermissions';
 
 const SaludScanner = ({ mascotas, onScanComplete }: any) => {
-  const { user, refreshUser } = useAuth(); // 🛡️ Obtenemos datos y función de refresco
+  const { user, refreshUser } = useAuth();
   const [selectedPet, setSelectedPet] = useState("");
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [loadingSuscripcion, setLoadingSuscripcion] = useState(false);
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
   const [editData, setEditData] = useState<any>(null);
 
   const { validarCamara, validarGaleria } = useCameraPermissions();
   const hoy = new Date().toISOString().split("T")[0];
 
-  // 🛡️ Cálculo de energía
-  const restantes = Math.max(0, 10 - (user?.intentosIA || 0));
-  const tieneEnergia = user?.esColaborador || restantes > 0;
+  // 🛡️ Lógica de créditos
+  const tieneEnergia = user?.esColaborador || (10 - (user?.intentosIA || 0)) > 0;
 
-  // 🛡️ MODAL DE DONACIÓN (Integrado)
-  const ejecutarFlujoDonacion = () => {
-    Swal.fire({
-      title: '¿Quieres colaborar?',
-      text: "Ingresa el monto que desees donar para mantener MascotAI",
-      input: 'number',
-      inputLabel: 'Monto en AR$',
-      inputValue: 5000,
-      inputAttributes: { min: '100', max: '500000', step: '1' },
-      showCancelButton: true,
-      confirmButtonColor: '#f97316',
-      cancelButtonColor: '#94a3b8',
-      confirmButtonText: 'Donar',
-      cancelButtonText: 'Ahora no',
-      reverseButtons: true,
-      inputValidator: (value) => {
-        if (!value) return 'Debes ingresar un monto';
-        const amount = parseInt(value);
-        if (amount < 100) return 'El monto mínimo es $100';
-        if (amount > 500000) return 'El monto máximo permitido es $500.000';
-      },
-      customClass: { popup: 'rounded-[2rem]' }
-    }).then(async (result) => {
-      if (result.isConfirmed) {
-        const montoElegido = result.value;
-        setLoadingSuscripcion(true);
-        try {
-          const response = await api.crearSuscripcion(montoElegido);
-          window.location.href = response.data.url;
-        } catch (error) {
-          Swal.fire('Error', 'No se pudo generar el link de pago.', 'error');
-        } finally {
-          setLoadingSuscripcion(false);
-        }
-      }
-    });
-  };
-
-  // 🛡️ MODAL DE LÍMITE AGOTADO
   const mostrarModalLimite = () => {
     Swal.fire({
-      title: '¡Energía de IA Agotada! ⚡',
-      text: 'Has alcanzado el límite de 10 escaneos gratuitos este mes. Colaborá para tener análisis ilimitados y seguir cuidando a tu mascota.',
+      title: '¡Límite alcanzado!',
+      text: 'Usaste tus 10 escaneos del mes. Colaborá para tener acceso ilimitado y ayudarnos con los servidores.',
       icon: 'info',
       showCancelButton: true,
-      confirmButtonText: 'Ser Colaborador ❤️',
-      cancelButtonText: 'Más tarde',
+      confirmButtonText: 'SER COLABORADOR ⚡',
+      cancelButtonText: 'Luego',
       confirmButtonColor: '#f97316',
-      cancelButtonColor: '#94a3b8',
-      reverseButtons: true,
-      customClass: { popup: 'rounded-[2.5rem]' }
     }).then((res) => {
-      if (res.isConfirmed) {
-        ejecutarFlujoDonacion();
-      }
+      if (res.isConfirmed) setShowSubscriptionModal(true);
     });
   };
 
   const handleNativeCamera = async () => {
-    // 📸 Ahora abrimos la cámara sin validar créditos primero
     const ok = await validarCamara();
     if (!ok) return;
-
     try {
-      const image = await Camera.getPhoto({
-        quality: 90,
-        allowEditing: false,
-        resultType: CameraResultType.Base64,
-        source: CameraSource.Camera
-      });
-
+      const image = await Camera.getPhoto({ quality: 90, resultType: CameraResultType.Base64, source: CameraSource.Camera });
       if (image.base64String) {
         setSelectedImage(`data:image/jpeg;base64,${image.base64String}`);
         setEditData(null);
       }
-    } catch (error) {
-      console.log("Cámara cancelada");
-    }
+    } catch (e) { console.log("Cámara cancelada"); }
   };
 
   const handleNativeGallery = async () => {
-    // 🖼️ Ahora abrimos la galería sin validar créditos primero
     const ok = await validarGaleria();
     if (!ok) return;
-
     try {
-      const image = await Camera.getPhoto({
-        quality: 90,
-        allowEditing: false,
-        resultType: CameraResultType.Base64,
-        source: CameraSource.Photos
-      });
-
+      const image = await Camera.getPhoto({ quality: 90, resultType: CameraResultType.Base64, source: CameraSource.Photos });
       if (image.base64String) {
         setSelectedImage(`data:image/jpeg;base64,${image.base64String}`);
         setEditData(null);
       }
-    } catch (error) {
-      console.log("Galería cancelada");
-    }
-  };
-
-  const handleBorrarFoto = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setSelectedImage(null);
-    setEditData(null);
+    } catch (e) { console.log("Galería cancelada"); }
   };
 
   const handleAnalizarSalud = async () => {
-    // 🛡️ ÚNICO PUNTO DE VALIDACIÓN DE CRÉDITOS: Al presionar "ESCANEAR AHORA"
     if (!tieneEnergia) {
       mostrarModalLimite();
       return;
     }
-
     if (!selectedPet) {
-      Swal.fire({ text: 'Seleccioná a qué mascota le pertenece este producto.', icon: 'info', confirmButtonColor: '#10b981' });
+      Toast.fire({ icon: 'warning', title: '¡Identificá al Paciente!', text: 'Seleccioná una mascota antes de escanear.' });
       return;
     }
-
     if (!selectedImage) return;
 
     setLoading(true);
-    setEditData(null);
-
     try {
-      const res = await api.analizarSalud(selectedImage, selectedPet);
+      const petIdSeguro: string = selectedPet ?? "";
+      const res = await api.analizarSalud(selectedImage, petIdSeguro);
+      await refreshUser();
 
-      // ✅ ACTUALIZACIÓN DE CRÉDITOS EN EL HEADER
-      await refreshUser(); 
+      if (res.data.error) {
+        const config = res.data.error === "ESPECIE_INCORRECTA"
+          ? { title: '⚠️ ADVERTENCIA', icon: 'warning', color: '#ef4444' }
+          : { title: 'No reconocido', icon: 'error', color: '#10b981' };
 
-      if (res.data.error === "PRODUCTO_NO_VALIDO") {
-        Swal.fire({ title: 'Imagen no reconocida', text: 'MascotAI no detectó un producto médico.', icon: 'error', confirmButtonColor: '#10b981' });
+        Swal.fire({
+          title: config.title,
+          text: 'Producto no válido para esta mascota.',
+          icon: config.icon as any,
+          confirmButtonColor: config.color
+        });
         return;
       }
 
-      if (res.data.error === "ESPECIE_INCORRECTA") {
-        Swal.fire({ title: '⚠️ ¡ALERTA DE SEGURIDAD!', text: 'Este producto no parece ser apto para tu mascota.', icon: 'warning', confirmButtonColor: '#ef4444' });
-        return;
-      }
+      const cleanFecha = (f: any): string => {
+        if (!f || typeof f !== 'string') return "";
+        return f.includes('T') ? f.split('T')[0] : f;
+      };
 
       setEditData({
-        nombre: res.data.nombre || "Producto desconocido",
+        id: res.data.id || null,
+        nombre: res.data.nombre || "Nuevo Registro",
         tipo: res.data.tipo || "MEDICAMENTO",
-        fechaAplicacion: hoy,
-        proximaFecha: (res.data.proximaFecha && res.data.proximaFecha > hoy) ? res.data.proximaFecha : "",
+        fechaAplicacion: cleanFecha(res.data.fechaAplicacion) || hoy,
+        proximaFecha: cleanFecha(res.data.proximaFecha) || "",
         precio: res.data.precio || 0,
-        dosis: res.data.notas || res.data.dosis || "Dosis no detectada",
+        notas: res.data.notas || "",
         completado: true,
-        mascotaId: selectedPet
+        mascotaId: petIdSeguro
       });
 
     } catch (e: any) {
-      console.error("Error en análisis de salud:", e);
-      if (e.response?.status === 403 || e.toString().includes("LIMITE_IA_ALCANZADO")) {
-        mostrarModalLimite();
-      } else {
-        Swal.fire({ title: 'Error de Análisis', text: 'Revisá la conexión con el servidor.', icon: 'error', confirmButtonColor: '#10b981' });
-      }
+      console.error("Error en IA:", e);
+      const serverMsg = e.response?.data?.error || "";
+      if (serverMsg.includes("LIMITE")) mostrarModalLimite();
+      else Swal.fire({ title: 'Error', text: 'No se pudo procesar la imagen.', icon: 'error' });
     } finally {
       setLoading(false);
     }
   };
 
   const handleGuardar = async () => {
-    if (!editData.nombre.trim()) {
-      Swal.fire({ text: 'El nombre del producto es obligatorio.', icon: 'warning' });
-      return;
+    // 1. Validaciones básicas
+    if (!selectedPet) return Swal.fire({ text: 'Seleccioná una mascota primero.', icon: 'warning' });
+    if (!editData.nombre?.trim()) return Swal.fire({ text: 'El nombre es obligatorio.', icon: 'warning' });
+
+    const nombreFinal = editData.nombre.trim().substring(0, 50);
+
+    // 2. Validación Fecha de Aplicación
+    const regexFecha = /^\d{4}-\d{2}-\d{2}$/;
+    if (!regexFecha.test(editData.fechaAplicacion)) {
+      return Swal.fire({ text: 'Fecha de aplicación inválida o incompleta.', icon: 'warning' });
+    }
+
+    const dApp = new Date(editData.fechaAplicacion);
+    dApp.setHours(0, 0, 0, 0);
+    const dHoy = new Date();
+    dHoy.setHours(0, 0, 0, 0);
+
+    if (dApp > new Date()) {
+      return Swal.fire({ text: 'La fecha de aplicación no puede ser futura.', icon: 'warning' });
+    }
+
+    // 3. ✅ VALIDACIÓN ESTRICTA FECHA PRÓXIMO (REFUERZO)
+    if (!editData.proximaFecha || editData.proximaFecha === "") {
+      return Swal.fire({ text: 'Debes ingresar una fecha de próximo refuerzo.', icon: 'warning' });
+    }
+
+    if (!regexFecha.test(editData.proximaFecha)) {
+      return Swal.fire({ text: 'Fecha de próximo refuerzo inválida o incompleta.', icon: 'warning' });
+    }
+
+    const dProx = new Date(editData.proximaFecha);
+    dProx.setHours(0, 0, 0, 0);
+
+    if (isNaN(dProx.getTime())) {
+      return Swal.fire({ text: 'La fecha de refuerzo ingresada no es válida.', icon: 'warning' });
+    }
+
+    // Validación @Future (Backend Requerimiento)
+    if (dProx <= dHoy) {
+      return Swal.fire({
+        text: 'La fecha de próximo refuerzo debe ser a partir de mañana.',
+        icon: 'warning'
+      });
+    }
+
+    // ✅ Validación solicitada: No puede ser menor a fecha de aplicación
+    if (dProx < dApp) {
+      return Swal.fire({
+        text: 'La fecha de refuerzo no puede ser anterior a la fecha de aplicación.',
+        icon: 'warning'
+      });
     }
 
     setLoading(true);
     try {
-      const dataParaEnviar = {
-        ...editData,
+      const payload: RecordatorioSaludDTO = {
+        id: editData.id || undefined,
         mascotaId: selectedPet,
         tipo: editData.tipo || "MEDICAMENTO",
-        precio: editData.precio || 0,
-        completado: editData.completado,
-        notas: editData.dosis || "Sin notas",
-        fechaAplicacion: editData.fechaAplicacion.split('T')[0],
-        proximaFecha: editData.proximaFecha ? editData.proximaFecha.split('T')[0] : null
+        nombre: nombreFinal,
+        precio: parseFloat(editData.precio) || 0,
+        fechaAplicacion: editData.fechaAplicacion,
+        proximaFecha: editData.proximaFecha, 
+        notas: (editData.notas || "Sin notas").substring(0, 200),
+        completado: editData.completado ?? true
       };
 
-      await api.guardarEventoSalud(dataParaEnviar);
-      Swal.fire({ title: '¡Salud Registrada!', text: `${editData.nombre} se agregó a la cartilla.`, icon: 'success', timer: 2000, showConfirmButton: false });
+      await api.guardarEventoSalud(payload);
+
+      Swal.fire({ title: '¡Guardado!', text: 'Cartilla actualizada.', icon: 'success', timer: 1500, showConfirmButton: false });
+
       setEditData(null);
       setSelectedImage(null);
       if (onScanComplete) onScanComplete();
-    } catch (e) {
-      Swal.fire({ title: 'Error', text: 'No se pudo guardar.', icon: 'error' });
+
+    } catch (e: any) {
+      console.error("❌ ERROR 400:", e.response?.data);
+      const errorMsg = e.response?.data?.message || "Error de validación en el servidor.";
+      Swal.fire({ title: 'Error al Guardar', text: `El servidor rechazó los datos: ${errorMsg}`, icon: 'error' });
     } finally {
       setLoading(false);
     }
@@ -226,174 +213,174 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
       {!editData ? (
         <div className="space-y-6 text-left">
-          {/* Selector de Mascota */}
           <div className="bg-white p-6 rounded-[2.5rem] shadow-xl border border-emerald-100">
-            <label className="text-[10px] font-black text-emerald-900 uppercase tracking-widest flex items-center gap-2 mb-3">
-              <User size={14} /> Mascota
+            <label className="text-[10px] font-black text-emerald-900 uppercase tracking-widest flex items-center gap-2 mb-3 px-1">
+              <User size={14} /> Paciente
             </label>
             <select
               value={selectedPet}
               onChange={(e) => setSelectedPet(e.target.value)}
-              className="w-full p-4 rounded-2xl border-2 border-emerald-50 bg-emerald-50/50 font-bold outline-none text-slate-700 focus:border-emerald-500 transition-all"
+              className="w-full p-4 rounded-2xl border-2 border-emerald-50 bg-emerald-50/50 font-bold outline-none text-slate-700 focus:border-emerald-500 transition-all appearance-none"
             >
-              <option value="">¿A quién le toca?</option>
+              <option value="">¿Para quién es?</option>
               {mascotas.map((p: any) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
             </select>
           </div>
 
-          {/* Recuadro de Captura */}
           <div
             onClick={handleNativeCamera}
-            className="bg-white h-64 border-4 border-dashed border-emerald-100 rounded-[2.5rem] flex flex-col items-center justify-center cursor-pointer hover:border-emerald-300 transition-all active:scale-[0.98] group relative overflow-hidden shadow-inner"
+            className="bg-white h-72 border-4 border-dashed border-emerald-100 rounded-[2.5rem] flex flex-col items-center justify-center cursor-pointer hover:border-emerald-300 transition-all active:scale-[0.98] relative overflow-hidden shadow-inner"
           >
             {selectedImage ? (
               <>
                 <img src={selectedImage} alt="Preview" className="w-full h-full object-cover" />
-                <button onClick={handleBorrarFoto} className="absolute top-4 right-4 bg-white/90 p-2 rounded-full shadow-lg text-emerald-600 z-10">
-                    <X size={20} />
+                <button onClick={(e) => { e.stopPropagation(); setSelectedImage(null); }} className="absolute top-4 right-4 bg-white/90 p-2 rounded-full shadow-lg text-red-500 z-10">
+                  <X size={20} />
                 </button>
               </>
             ) : (
-              <div className="text-center px-6">
-                <div className="bg-emerald-50 p-5 rounded-full mb-4 inline-block shadow-sm text-emerald-200">
-                  <ShieldPlus size={40} />
+              <div className="text-center">
+                <div className="bg-emerald-50 p-5 rounded-full mb-4 inline-block text-emerald-300">
+                  <CameraIcon size={40} />
                 </div>
-                <p className="text-emerald-900/40 font-black uppercase text-[10px] tracking-widest leading-tight text-center">
-                  Capturar Etiqueta (Cámara)
-                </p>
+                <p className="text-emerald-900/40 font-black uppercase text-[10px] tracking-widest">Escanear Receta o Producto</p>
               </div>
             )}
           </div>
 
-          <button
-            type="button"
-            onClick={handleNativeGallery}
-            className="w-full py-3 rounded-2xl font-black text-xs uppercase bg-slate-100 text-slate-500 border-2 border-slate-200 flex items-center justify-center gap-2 active:scale-95 transition-all"
-          >
-            <ImageIcon size={16} /> Cargar desde Galería
+          <button onClick={handleNativeGallery} className="w-full py-4 rounded-2xl font-black text-[10px] uppercase bg-slate-100 text-slate-500 border-2 border-slate-200 flex items-center justify-center gap-2 active:scale-95 transition-all">
+            <ImageIcon size={16} /> Abrir Galería
           </button>
 
           <button
             onClick={handleAnalizarSalud}
             disabled={loading || !selectedImage}
-            className={`w-full flex items-center justify-center gap-3 py-6 rounded-[2rem] font-black text-xl shadow-xl transition-all active:scale-95 ${
-              loading || !selectedImage 
-                ? 'bg-emerald-50 text-emerald-200 cursor-not-allowed shadow-none' 
-                : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-200'
-            }`}
+            className={`w-full flex items-center justify-center gap-3 py-6 rounded-[2.2rem] font-black text-xl shadow-xl transition-all active:scale-95 ${loading || !selectedImage ? 'bg-slate-100 text-slate-300 cursor-not-allowed shadow-none' : 'bg-emerald-600 text-white hover:bg-emerald-700'}`}
           >
-            {loading ? (
-              <Loader2 className="animate-spin" />
-            ) : (
-              <>
-                <Sparkles size={22} className={selectedImage ? "text-emerald-200" : "text-emerald-300"} />
-                ESCANEAR AHORA
-              </>
-            )}
+            {loading ? <Loader2 className="animate-spin" /> : <><Sparkles size={22} /> ANALIZAR CON IA</>}
           </button>
+
+          {/* CARTEL INFORMATIVO AL FINAL */}
+          <div className="mt-10 bg-amber-50/80 border border-amber-200 p-6 rounded-[2.5rem] shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-700">
+            <div className="flex items-center gap-3 mb-3 text-left">
+              <div className="bg-amber-100 p-2 rounded-xl text-amber-600">
+                <Info size={20} />
+              </div>
+              <h4 className="font-black text-amber-900 uppercase text-xs tracking-widest">
+                ¿Cómo funciona esta sección?
+              </h4>
+            </div>
+
+            <div className="space-y-3 text-left">
+              <div className="flex gap-3">
+                <div className="mt-1 bg-amber-200/50 h-1.5 w-1.5 rounded-full shrink-0" />
+                <p className="text-[11px] font-bold text-amber-800/90 leading-relaxed">
+                  <span className="text-amber-900 font-black uppercase text-[9px]">Digitalización de Salud: </span>
+                  Escaneá vacunas, pipetas o medicamentos para extraer automáticamente fechas de aplicación y dosis.
+                </p>
+              </div>
+
+              <div className="flex gap-3">
+                <div className="mt-1 bg-amber-200/50 h-1.5 w-1.5 rounded-full shrink-0" />
+                <p className="text-[11px] font-bold text-amber-800/90 leading-relaxed">
+                  <span className="text-amber-900 font-black uppercase text-[9px]">Alertas de Refuerzo: </span>
+                  Calculamos la fecha del próximo refuerzo y te avisamos automáticamente para que tu mascota esté siempre protegida.
+                </p>
+              </div>
+
+              <div className="flex gap-3">
+                <div className="mt-1 bg-amber-200/50 h-1.5 w-1.5 rounded-full shrink-0" />
+                <p className="text-[11px] font-bold text-amber-800/90 leading-relaxed">
+                  <span className="text-amber-900 font-black uppercase text-[9px]">Cartilla Sanitaria: </span>
+                  Guardamos el historial completo de productos aplicados y sus costos, integrándolos a tu presupuesto mensual.
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       ) : (
-        /* VISTA DE CONFIRMACIÓN - Sin cambios */
-        <div className="bg-white rounded-[2.5rem] shadow-2xl p-8 border-2 border-emerald-50 text-left animate-in zoom-in-95">
-          <div className="flex items-center justify-between mb-6">
+        <div className="bg-white rounded-[2.5rem] shadow-2xl p-8 border border-emerald-100 text-left animate-in zoom-in-95">
+          <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-3">
-              <div className="bg-emerald-100 p-3 rounded-2xl text-emerald-600 shrink-0"><ClipboardPlus size={24} /></div>
+              <div className="bg-emerald-600 p-3 rounded-2xl text-white shadow-lg"><ClipboardPlus size={24} /></div>
               <div>
-                <h3 className="text-xl font-black text-slate-800 tracking-tight leading-none">Confirmar Datos</h3>
-                <p className="text-emerald-500 font-bold text-[10px] uppercase mt-1 italic tracking-widest">Cartilla de Salud</p>
+                <h3 className="text-xl font-black text-slate-800 tracking-tight leading-none">Veredicto IA</h3>
+                <p className="text-emerald-500 font-bold text-[10px] uppercase mt-1 tracking-widest">Revisar y Guardar</p>
               </div>
             </div>
 
-            <div className="flex flex-col items-center gap-1">
-              <button
-                onClick={() => setEditData({ ...editData, completado: !editData.completado })}
-                className={`relative inline-flex h-7 w-12 items-center rounded-full transition-all duration-300 ${editData.completado ? 'bg-emerald-500 shadow-md shadow-emerald-100' : 'bg-slate-200'}`}
-              >
-                <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform duration-300 ${editData.completado ? 'translate-x-6' : 'translate-x-1'}`} />
-              </button>
-              <span className={`text-[8px] font-black uppercase tracking-tighter ${editData.completado ? 'text-emerald-600' : 'text-slate-400'}`}>
+            <div className="flex items-center gap-3">
+              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
                 {editData.completado ? 'Aplicado' : 'Pendiente'}
               </span>
+              <button
+                onClick={() => setEditData({ ...editData, completado: !editData.completado })}
+                className={`w-12 h-6 rounded-full transition-all relative ${editData.completado ? 'bg-emerald-500' : 'bg-slate-200'}`}
+              >
+                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-all ${editData.completado ? 'right-1' : 'left-1'}`} />
+              </button>
             </div>
           </div>
 
           <div className="space-y-4 mb-8">
             <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100">
-              <p className="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Producto / Vacuna</p>
+              <p className="text-[10px] font-black text-slate-400 uppercase mb-2 px-1">Nombre del Tratamiento</p>
               <input
                 type="text"
-                className="w-full bg-transparent font-black text-lg text-slate-800 border-b-2 border-slate-100 focus:border-emerald-500 outline-none"
+                className="w-full bg-transparent font-black text-lg text-slate-800 border-b border-slate-200 focus:border-emerald-500 outline-none pb-1"
                 value={editData.nombre || ""}
                 onChange={(e) => setEditData({ ...editData, nombre: e.target.value })}
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3 text-center">
+            <div className="grid grid-cols-2 gap-3">
               <div className="bg-emerald-50/50 p-4 rounded-3xl border border-emerald-100">
-                <p className="text-[9px] font-black text-emerald-600 uppercase mb-2">Fecha Aplicación</p>
-                <input
-                  type="date"
-                  max={hoy}
-                  className="w-full bg-transparent text-xs font-black text-slate-700 outline-none"
-                  value={editData.fechaAplicacion || ""}
-                  onChange={(e) => setEditData({ ...editData, fechaAplicacion: e.target.value })}
-                />
+                <p className="text-[9px] font-black text-emerald-600 uppercase mb-2">Aplicación</p>
+                <input type="date" className="w-full bg-transparent text-xs font-black text-slate-700 outline-none" value={editData.fechaAplicacion} onChange={(e) => setEditData({ ...editData, fechaAplicacion: e.target.value })} />
               </div>
 
               <div className="bg-orange-50/50 p-4 rounded-3xl border border-orange-100">
-                <p className="text-[9px] font-black text-orange-600 uppercase mb-2">Próximo Refuerzo</p>
-                <input
-                  type="date"
-                  min={hoy}
-                  className="w-full bg-transparent text-xs font-black text-slate-700 outline-none"
-                  value={editData.proximaFecha || ""}
-                  onChange={(e) => setEditData({ ...editData, proximaFecha: e.target.value })}
-                />
+                <p className="text-[9px] font-black text-orange-600 uppercase mb-2">Próximo</p>
+                <input type="date" className="w-full bg-transparent text-xs font-black text-slate-700 outline-none" value={editData.proximaFecha} onChange={(e) => setEditData({ ...editData, proximaFecha: e.target.value })} />
               </div>
             </div>
 
             <div className="bg-blue-50/50 p-5 rounded-3xl border border-blue-100">
-              <p className="text-[10px] font-black text-blue-500 uppercase mb-2 flex items-center gap-2"><Wallet size={12} /> Precio ($)</p>
-              <input
-                type="number"
-                className="w-full bg-transparent font-black text-lg text-slate-800 border-b-2 border-slate-100 focus:border-blue-500 outline-none"
-                value={editData.precio ?? ""}
-                onChange={(e) => setEditData({ ...editData, precio: parseFloat(e.target.value) || 0 })}
-              />
+              <p className="text-[10px] font-black text-blue-500 uppercase mb-2 flex items-center gap-2 px-1"><Wallet size={12} /> Costo ($)</p>
+              <input type="number" className="w-full bg-transparent font-black text-lg text-slate-800 border-b border-slate-200 focus:border-blue-500 outline-none pb-1" value={editData.precio} onChange={(e) => setEditData({ ...editData, precio: e.target.value })} />
             </div>
 
-            <div className="bg-emerald-50/30 p-4 rounded-2xl border border-emerald-100/50">
-              <p className="text-[9px] font-black text-emerald-600 uppercase mb-2 flex items-center gap-1"><Syringe size={12} /> Dosis / Notas</p>
-              <textarea
-                className="w-full bg-transparent text-xs font-bold text-slate-700 outline-none resize-none"
-                rows={2}
-                value={editData.dosis || ""}
-                onChange={(e) => setEditData({ ...editData, dosis: e.target.value })}
-              />
+            <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100">
+              <p className="text-[10px] font-black text-slate-400 uppercase mb-2 px-1">Notas / Dosis</p>
+              <textarea className="w-full bg-transparent text-xs font-bold text-slate-600 outline-none resize-none" rows={3} value={editData.notas} onChange={(e) => setEditData({ ...editData, notas: e.target.value })} />
             </div>
           </div>
 
-          <div className="flex gap-2">
-            <button onClick={() => { setEditData(null); setSelectedImage(null); }} className="flex-1 py-4 bg-slate-100 text-slate-400 rounded-2xl font-black uppercase text-[10px]">Descartar</button>
-            <button onClick={handleGuardar} disabled={loading} className="flex-[2] py-4 bg-emerald-600 text-white rounded-2xl font-black shadow-lg uppercase text-[10px] flex items-center justify-center gap-2 disabled:bg-slate-300">
-              {loading ? <Loader2 className="animate-spin" size={14} /> : "REGISTRAR SALUD"}
+          <div className="flex gap-3">
+            <button onClick={() => setEditData(null)} className="flex-1 py-5 bg-slate-100 text-slate-400 rounded-[1.8rem] font-black uppercase text-xs active:scale-95 transition-all">Cancelar</button>
+            <button onClick={handleGuardar} disabled={loading} className="flex-[2] py-5 bg-emerald-600 text-white rounded-[1.8rem] font-black shadow-xl uppercase text-xs flex items-center justify-center gap-2 active:scale-95 transition-all disabled:bg-slate-300">
+              {loading ? <Loader2 className="animate-spin" /> : "CONFIRMAR REGISTRO"}
             </button>
           </div>
         </div>
       )}
 
-      {/* Info Footer */}
-      <div className="mt-10 bg-amber-50/80 border border-amber-200 p-6 rounded-[2.5rem] shadow-sm text-left">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="bg-amber-100 p-2 rounded-xl text-amber-600"><Info size={20} /></div>
-          <h4 className="font-black text-amber-900 uppercase text-xs tracking-widest">¿Cómo funciona?</h4>
+      {/* MODAL DE SUSCRIPCIÓN */}
+      {showSubscriptionModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[150] p-4">
+          <div className="bg-white rounded-[2rem] p-6 max-w-sm w-full relative">
+            <button
+              onClick={() => setShowSubscriptionModal(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <SubscriptionCard user={user} />
+          </div>
         </div>
-        <div className="space-y-3">
-          <p className="text-[11px] font-bold text-amber-800/90 leading-relaxed"><span className="text-amber-900 font-black uppercase text-[9px]">Escaneado:</span> Capturá medicamentos o vacunas para registrarlos automáticamente.</p>
-          <p className="text-[11px] font-bold text-amber-800/90 leading-relaxed"><span className="text-amber-900 font-black uppercase text-[9px]">Seguridad:</span> La IA verifica si el producto es apto para la especie de tu mascota.</p>
-          <p className="text-[11px] font-bold text-amber-800/90 leading-relaxed"><span className="text-amber-900 font-black uppercase text-[9px]">Refuerzos:</span> Calculamos el próximo vencimiento para enviarte recordatorios.</p>
-        </div>
-      </div>
+      )}
     </div>
   );
 };

@@ -1,19 +1,23 @@
 import React, { useEffect, useState } from 'react';
 import { 
-  Calendar, Syringe, ShieldCheck, Clock, Trash2, 
+  Calendar, ShieldPlus, ShieldCheck, Clock, Trash2, 
   AlertCircle, CheckCircle2, Edit3, X, ClipboardPlus 
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { Toast } from '../../utils/alerts';
+// ✅ Importamos el DTO para asegurar el tipado de los campos
+import type { RecordatorioSaludDTO } from '../../types/api.types';
 
 const HealthHistory = ({ mascotaId }: { mascotaId: string }) => {
-  const [eventos, setEventos] = useState<any[]>([]);
+  // ✅ Tipamos el estado para evitar errores en 'p.nombre', 'p.proximaFecha', etc.
+  const [eventos, setEventos] = useState<RecordatorioSaludDTO[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editando, setEditando] = useState<any>(null); // Estado para el modal de edición
+  const [editando, setEditando] = useState<RecordatorioSaludDTO | null>(null);
 
   const cargarHistorial = async () => {
     try {
-      const res = await api.getHistorialSalud(mascotaId);
+      // ✅ Endpoint actualizado: getHistorialPreventivoMascota
+      const res = await api.getHistorialPreventivoMascota(mascotaId);
       setEventos(res.data);
     } catch (e) {
       console.error("Error al cargar historial de salud");
@@ -37,7 +41,8 @@ const HealthHistory = ({ mascotaId }: { mascotaId: string }) => {
       confirmButtonColor: '#ef4444'
     }).then(async (result) => {
       if (result.isConfirmed) {
-        await api.borrarEventoSalud(id);
+        // ✅ Endpoint actualizado: eliminarRegistroPreventivo
+        await api.eliminarRegistroPreventivo(id);
         cargarHistorial();
         Toast.fire({ icon: 'success', title: 'Eliminado' });
       }
@@ -45,8 +50,23 @@ const HealthHistory = ({ mascotaId }: { mascotaId: string }) => {
   };
 
   const handleGuardarEdicion = async () => {
+    if (!editando) return;
+
+    // 🛡️ Validaciones de consistencia
+    if (!editando.nombre?.trim()) return Toast.fire({ icon: 'warning', title: 'El nombre es obligatorio' });
+    
+    const dApp = new Date(editando.fechaAplicacion);
+    if (isNaN(dApp.getTime())) return Toast.fire({ icon: 'warning', title: 'Fecha de aplicación inválida' });
+
+    if (editando.proximaFecha) {
+      const dProx = new Date(editando.proximaFecha);
+      if (isNaN(dProx.getTime())) return Toast.fire({ icon: 'warning', title: 'Fecha de refuerzo inválida' });
+      if (dProx <= dApp) return Toast.fire({ icon: 'warning', title: 'El refuerzo debe ser posterior a la aplicación' });
+    }
+
     try {
-      await api.actualizarEventoSalud(editando.id, editando);
+      // ✅ FIX: Llamada correcta al servicio
+      await api.guardarEventoSalud(editando);
       setEditando(null);
       cargarHistorial();
       Toast.fire({ icon: 'success', title: 'Cambios guardados' });
@@ -55,11 +75,16 @@ const HealthHistory = ({ mascotaId }: { mascotaId: string }) => {
     }
   };
 
+  // Filtrado de próximos vencimientos
   const proximos = eventos.filter(e => 
     e.completado === true && 
     e.proximaFecha && 
     new Date(e.proximaFecha) >= new Date()
-  ).sort((a, b) => new Date(a.proximaFecha).getTime() - new Date(b.proximaFecha).getTime());
+  ).sort((a, b) => {
+    const dateA = a.proximaFecha ? new Date(a.proximaFecha).getTime() : 0;
+    const dateB = b.proximaFecha ? new Date(b.proximaFecha).getTime() : 0;
+    return dateA - dateB;
+  });
 
   if (loading) return <div className="p-8 text-center font-bold text-slate-400">Cargando cartilla...</div>;
 
@@ -77,7 +102,7 @@ const HealthHistory = ({ mascotaId }: { mascotaId: string }) => {
               <div key={i} className="bg-white p-4 rounded-2xl shadow-sm flex items-center justify-between border border-orange-200">
                 <div className="flex items-center gap-3">
                   <div className="bg-orange-100 p-2 rounded-xl text-orange-600">
-                    {p.tipo === 'Vacuna' ? <Syringe size={18} /> : <ShieldCheck size={18} />}
+                    {p.tipo === 'Vacuna' ? <ShieldPlus size={18} /> : <ShieldCheck size={18} />}
                   </div>
                   <div>
                     <p className="font-black text-slate-800 text-sm leading-none">{p.nombre}</p>
@@ -86,7 +111,7 @@ const HealthHistory = ({ mascotaId }: { mascotaId: string }) => {
                 </div>
                 <div className="text-right">
                   <span className="bg-orange-600 text-white text-[9px] font-black px-2 py-1 rounded-lg uppercase">
-                    {Math.ceil((new Date(p.proximaFecha).getTime() - new Date().getTime()) / (1000 * 3600 * 24))} días
+                    {p.proximaFecha ? Math.ceil((new Date(p.proximaFecha).getTime() - new Date().getTime()) / (1000 * 3600 * 24)) : 0} días
                   </span>
                 </div>
               </div>
@@ -123,7 +148,7 @@ const HealthHistory = ({ mascotaId }: { mascotaId: string }) => {
                     </p>
                     <div className="flex items-center gap-1">
                       <button onClick={() => setEditando(e)} className="p-1.5 text-slate-300 hover:text-emerald-600 transition-colors"><Edit3 size={14}/></button>
-                      <button onClick={() => handleBorrar(e.id)} className="p-1.5 text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={14}/></button>
+                      <button onClick={() => e.id && handleBorrar(e.id)} className="p-1.5 text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={14}/></button>
                     </div>
                   </div>
                   
@@ -144,7 +169,7 @@ const HealthHistory = ({ mascotaId }: { mascotaId: string }) => {
         )}
       </div>
 
-      {/* MODAL DE EDICIÓN (Reusando estilo del Scanner) */}
+      {/* MODAL DE EDICIÓN */}
       {editando && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-6 animate-in fade-in">
           <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl relative text-left animate-in zoom-in-95">
@@ -176,7 +201,7 @@ const HealthHistory = ({ mascotaId }: { mascotaId: string }) => {
                 </div>
                 <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
                   <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Refuerzo</p>
-                  <input type="date" className="w-full bg-transparent text-xs font-black text-slate-700 outline-none" value={editando.proximaFecha} onChange={e => setEditando({...editando, proximaFecha: e.target.value})} />
+                  <input type="date" className="w-full bg-transparent text-xs font-black text-slate-700 outline-none" value={editando.proximaFecha || ''} onChange={e => setEditando({...editando, proximaFecha: e.target.value})} />
                 </div>
               </div>
             </div>

@@ -65,7 +65,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         // Esto dispara el re-render en todos los componentes
         setUser({ ...formatted });
 
-        console.log("📱 Perfil sincronizado vía /refresh:", formatted.intentosIA);
+        formatted.intentosIA;
         return formatted;
       }
     } catch (error) {
@@ -96,7 +96,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (Capacitor.isNativePlatform()) {
       try {
         const googleUser = await GoogleAuth.signIn();
-        const res = await api.loginNativoGoogle(googleUser.authentication.idToken);
+        const res = await api.loginGoogleNative(googleUser.authentication.idToken);
         if (res && res.data) {
           setUser(formatUserData(res.data));
           localStorage.setItem('mascotai_logged_in', 'true');
