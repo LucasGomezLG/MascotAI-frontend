@@ -30,6 +30,7 @@ export const apiClient = axios.create({
 
 // Add a request interceptor to attach the X-XSRF-TOKEN header
 apiClient.interceptors.request.use(config => {
+  console.log(`🚀 [API Request] ${config.method?.toUpperCase()} ${config.url}`);
   // Only add the header for methods that modify data
   const methodsToProtect = ['post', 'put', 'delete', 'patch'];
   if (config.method && methodsToProtect.includes(config.method.toLowerCase())) {
@@ -42,6 +43,21 @@ apiClient.interceptors.request.use(config => {
 }, error => {
   return Promise.reject(error);
 });
+
+apiClient.interceptors.response.use(
+  response => {
+    console.log(`✅ [API Response] ${response.status} ${response.config.url}`);
+    return response;
+  },
+  error => {
+    console.error(`❌ [API Error] ${error.config?.method?.toUpperCase()} ${error.config?.url}`, {
+      message: error.message,
+      code: error.code,
+      status: error.response?.status
+    });
+    return Promise.reject(error);
+  }
+);
 
 export const api = {
   // --- 👤 MÓDULO: USUARIO Y PERFIL ---
