@@ -54,11 +54,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   // context/AuthContext.tsx
 
   const refreshUser = async () => {
-    console.log("🔄 [AuthContext] Iniciando refreshUser (refresco forzado)...");
     try {
       // 1. Usamos el nuevo endpoint de refresco
       const res = await api.refreshProfileData();
-      console.log("✅ [AuthContext] refreshUser exitoso:", res.data);
 
       if (res && res.data) {
         const formatted = formatUserData(res.data);
@@ -71,7 +69,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return formatted;
       }
     } catch (error) {
-      console.error("❌ [AuthContext] Error en refreshUser:", error);
+      // Error manejado silenciosamente
     }
     return null;
   };
