@@ -49,7 +49,7 @@ apiClient.interceptors.request.use(config => {
 export const api = {
   // --- 👤 MÓDULO: USUARIO Y PERFIL ---
   getUserProfile: () => apiClient.get<UserDTO>('/user/me'),
-  refreshProfileData: () => apiClient.get<UserDTO>('/user/me', { headers: { 'Cache-Control': 'no-cache' } }),
+  refreshProfileData: () => apiClient.get<UserDTO>('/user/me'),
   logout: () => apiClient.post('/logout'),
 
   // --- 🔑 MÓDULO: PÚBLICO Y AUTH NATIVA ---
