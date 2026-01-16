@@ -6,14 +6,41 @@ import type {
   ConsultaVetDTO, TriajeIADTO // 🩺 Nuevo DTO para clínica
 } from '../types/api.types';
 
-export const SERVER_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+export const SERVER_URL = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_BASE_URL || '');
 export const API_BASE = `${SERVER_URL}/api`;
 
 axios.defaults.withCredentials = true;
 
+// Helper function to read cookies
+function getCookie(name: string): string | null {
+  const nameEQ = name + "=";
+  const ca = document.cookie.split(';');
+  for (let i = 0; i < ca.length; i++) {
+    let c = ca[i];
+    while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+    if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
+  }
+  return null;
+}
+
 export const apiClient = axios.create({
   baseURL: API_BASE,
   withCredentials: true
+});
+
+// Add a request interceptor to attach the X-XSRF-TOKEN header
+apiClient.interceptors.request.use(config => {
+  // Only add the header for methods that modify data
+  const methodsToProtect = ['post', 'put', 'delete', 'patch'];
+  if (config.method && methodsToProtect.includes(config.method.toLowerCase())) {
+    const xsrfToken = getCookie('XSRF-TOKEN');
+    if (xsrfToken) {
+      config.headers['X-XSRF-TOKEN'] = xsrfToken;
+    }
+  }
+  return config;
+}, error => {
+  return Promise.reject(error);
 });
 
 export const api = {
