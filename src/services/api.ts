@@ -1,12 +1,15 @@
 import axios from 'axios';
-import type { 
-  UserDTO, MascotaDTO, AlertaDTO, ItemComunidad, 
-  RefugioDTO, OfertaPrecioDTO, MascotaAdopcionDTO, 
+import type {
+  UserDTO, MascotaDTO, AlertaDTO, ItemComunidad,
+  RefugioDTO, OfertaPrecioDTO, MascotaAdopcionDTO,
   MascotaPerdidaDTO, AlimentoDTO, RecordatorioSaludDTO,
   ConsultaVetDTO, TriajeIADTO // 🩺 Nuevo DTO para clínica
 } from '../types/api.types';
 
-export const SERVER_URL = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_BASE_URL || '');
+export const SERVER_URL = import.meta.env.DEV
+  ? 'http://localhost:8080'
+  : (import.meta.env.VITE_API_BASE_URL || '');
+
 export const API_BASE = `${SERVER_URL}/api`;
 
 axios.defaults.withCredentials = true;
@@ -25,7 +28,7 @@ function getCookie(name: string): string | null {
 
 export const apiClient = axios.create({
   baseURL: API_BASE,
-  withCredentials: true
+  withCredentials: true // ✅ Esto permite que el navegador guarde la sesión (JSESSIONID)
 });
 
 // Add a request interceptor to attach the X-XSRF-TOKEN header
@@ -48,7 +51,7 @@ export const api = {
   getUserProfile: () => apiClient.get<UserDTO>('/user/me'),
   refreshProfileData: () => apiClient.get<UserDTO>('/user/me', { headers: { 'Cache-Control': 'no-cache' } }),
   logout: () => apiClient.post('/logout'),
-  
+
   // --- 🔑 MÓDULO: PÚBLICO Y AUTH NATIVA ---
   checkHealth: () => apiClient.get<string>('/mascotas/public/health'),
   loginGoogleNative: (token: string) => apiClient.post<UserDTO>('/mascotas/public/auth/google-native', { token }),
@@ -74,7 +77,7 @@ export const api = {
   guardarFinanzas: (data: AlimentoDTO) => apiClient.post('/mascotas/guardar-finanzas', data),
   getStockStatus: (mascotaId: string) => apiClient.get(`/mascotas/stock-status/${mascotaId}`),
   compararAlimentos: (ids: string[]) => apiClient.post('/mascotas/comparar', { ids }),
-  
+
   // --- 🩺 MÓDULO: SALUD PREVENTIVA (Vacunas/Pipetas) ---
   analizarSalud: (image: string, mascotaId: string) =>
     apiClient.post<RecordatorioSaludDTO>('/salud/analizar', { image, mascotaId }),
@@ -84,28 +87,28 @@ export const api = {
   eliminarRegistroPreventivo: (id: string) => apiClient.delete(`/salud/${id}`),
 
   // --- 🩺 MÓDULO: SALUD (Vomitos/Piel/Etc) ---
-  analizarTriaje: (image: string, tipo: string, mascotaId: string) => 
+  analizarTriaje: (image: string, tipo: string, mascotaId: string) =>
     apiClient.post<TriajeIADTO>('/salud/analizar-triaje', { image, tipo, mascotaId }),
-  obtenerTriajes: () => 
-    apiClient.get<TriajeIADTO[]>('/salud/triaje'), 
-  borrarTriaje: (id: string) => 
+  obtenerTriajes: () =>
+    apiClient.get<TriajeIADTO[]>('/salud/triaje'),
+  borrarTriaje: (id: string) =>
     apiClient.delete(`/veterinaria/triaje/${id}`),
 
   // --- 🩺 ✅ MÓDULO: IA VETERINARIA Y CLÍNICA (Sincronizado con VeterinariaController.java) ---
   // Endpoint: POST /api/veterinaria/analizar
-  analizarVet: (image: string, mascotaId: string) => 
+  analizarVet: (image: string, mascotaId: string) =>
     apiClient.post<ConsultaVetDTO>('/veterinaria/analizar', { image, mascotaId }),
 
   // Endpoint: POST /api/veterinaria (Guardar consulta/receta definitiva)
-  guardarConsultaVet: (data: ConsultaVetDTO) => 
+  guardarConsultaVet: (data: ConsultaVetDTO) =>
     apiClient.post<ConsultaVetDTO>('/veterinaria', data),
 
   // Endpoint: GET /api/veterinaria/historial (Historial clínico del usuario)
-  getHistorialClinico: () => 
+  getHistorialClinico: () =>
     apiClient.get<ConsultaVetDTO[]>('/veterinaria/historial'),
 
   // Endpoint: DELETE /api/veterinaria/{id}
-  eliminarConsultaVet: (id: string) => 
+  eliminarConsultaVet: (id: string) =>
     apiClient.delete(`/veterinaria/${id}`),
 
   // --- 🔍 MÓDULO: BÚSQUEDA E IA DE PRECIOS ---
