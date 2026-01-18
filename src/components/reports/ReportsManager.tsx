@@ -25,6 +25,8 @@ import HealthHistory from './HealthHistory';
 import PetBudget from './PetBudget';
 import type {AlimentoDTO, ConsultaVetDTO, MascotaDTO, TriajeIADTO} from '@/types/api.types.ts';
 import toast from 'react-hot-toast';
+import {useAuth} from '@/context/AuthContext';
+import Swal from 'sweetalert2';
 
 interface StockStatus {
   status: string;
@@ -81,6 +83,7 @@ const StockCard = ({ mascota, refreshKey }: { mascota: MascotaDTO, refreshKey: n
 type SubTabType = 'food' | 'vet' | 'health' | 'finance';
 
 const ReportsManager = ({ onVerDetalle }: { onVerDetalle: (item: AlimentoDTO | ConsultaVetDTO | TriajeIADTO, tipo: 'food' | 'vet' | 'health') => void }) => {
+  const { user, refreshUser } = useAuth();
   const [subTab, setSubTab] = useState<SubTabType>('food');
   const [vetSubTab, setVetSubTab] = useState<'triaje' | 'consultas'>('triaje');
   const [historial, setHistorial] = useState<AlimentoDTO[]>([]);
@@ -147,13 +150,40 @@ const ReportsManager = ({ onVerDetalle }: { onVerDetalle: (item: AlimentoDTO | C
   };
 
   const handleDuelo = async () => {
+    if (selectedIds.length !== 2) return;
+
+    // Verificar créditos si no es Pro
+    if (!user?.esColaborador) {
+        const restantes = Math.max(0, 20 - (user?.intentosIA || 0));
+        if (restantes <= 0) {
+            void Swal.fire({
+                title: '¡Sin créditos!',
+                text: 'No te quedan créditos de IA para este mes. Suscribite al Pase Mensual para acceso ilimitado.',
+                icon: 'info',
+                confirmButtonText: 'VER PLANES',
+                confirmButtonColor: '#f97316'
+            });
+            return;
+        }
+    }
+
     setLoadingDuelo(true);
     try {
       const res = await api.compararAlimentos(selectedIds);
+      await refreshUser(); // Actualizar créditos tras el consumo
+      
       const rawText = res.data.resultado || "";
 
       if (!rawText.includes('|')) {
-        toast.error("Formato de respuesta inválido");
+        // Si no viene con el formato de pipes, mostrar el texto plano de forma elegante
+        setDueloResult({
+            foods: historial.filter(h => h.id && selectedIds.includes(h.id)),
+            veredicto: {
+              ganador: "Análisis Comparativo",
+              diferencia: rawText,
+              conclusion: "Basado en los ingredientes y calidad nutricional detectada."
+            }
+          });
         return;
       }
 
