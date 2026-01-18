@@ -45,12 +45,12 @@ const SaludScanner = ({ mascotas, onScanComplete }: SaludScannerProps) => {
   const { validarCamara, validarGaleria } = useCameraPermissions();
   const hoy = new Date().toISOString().split("T")[0];
 
-  const tieneEnergia = user?.esColaborador || (10 - (user?.intentosIA || 0)) > 0;
+  const tieneEnergia = user?.esColaborador || (20 - (user?.intentosIA || 0)) > 0;
 
   const mostrarModalLimite = () => {
     void Swal.fire({
       title: '¡Límite alcanzado!',
-      text: 'Usaste tus 10 escaneos del mes. Colaborá para tener acceso ilimitado y ayudarnos con los servidores.',
+      text: 'Usaste tus 20 escaneos del mes. Colaborá para tener acceso ilimitado y ayudarnos con los servidores.',
       icon: 'info',
       showCancelButton: true,
       confirmButtonText: 'SER COLABORADOR ⚡',

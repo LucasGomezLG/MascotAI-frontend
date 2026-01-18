@@ -34,7 +34,7 @@ const SymptomScanner = ({ mascotas, initialData, onScanComplete }: SymptomScanne
 
   const { validarCamara, validarGaleria } = useCameraPermissions();
   
-  const restantes = Math.max(0, 10 - (user?.intentosIA || 0));
+  const restantes = Math.max(0, 20 - (user?.intentosIA || 0));
   const tieneEnergia = user?.esColaborador || restantes > 0;
 
   useEffect(() => {
@@ -49,7 +49,7 @@ const SymptomScanner = ({ mascotas, initialData, onScanComplete }: SymptomScanne
   const mostrarModalLimite = () => {
     void Swal.fire({
       title: '¡Límite alcanzado!',
-      text: 'Usaste tus 10 escaneos del mes. Colaborá para tener acceso ilimitado y ayudarnos con los servidores.',
+      text: 'Usaste tus 20 escaneos del mes. Colaborá para tener acceso ilimitado y ayudarnos con los servidores.',
       icon: 'info',
       showCancelButton: true,
       confirmButtonText: 'SER COLABORADOR ⚡',

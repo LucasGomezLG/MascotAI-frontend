@@ -18,8 +18,8 @@ const AICreditBadge = ({ user }: Props) => {
     );
   }
 
-  const restantes = Math.max(0, 10 - (user?.intentosIA || 0));
-  const esBajo = restantes <= 2;
+  const restantes = Math.max(0, 20 - (user?.intentosIA || 0));
+  const esBajo = restantes <= 3;
 
   return (
     <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-2xl border transition-all duration-300 ${
@@ -33,7 +33,7 @@ const AICreditBadge = ({ user }: Props) => {
         className={restantes > 0 ? "animate-pulse" : "opacity-30"}
       />
       <span className="text-[10px] font-black uppercase tracking-tight">
-        IA <span className="opacity-60">Credits:</span> {restantes}/10
+        IA <span className="opacity-60">Credits:</span> {restantes}/20
       </span>
     </div>
   );

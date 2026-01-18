@@ -21,7 +21,7 @@ const LogoutModal = ({ isOpen, onClose, onConfirm }: Props) => {
 
   if (!isOpen) return null;
 
-  const restantes = Math.max(0, 10 - (user?.intentosIA || 0));
+  const restantes = Math.max(0, 20 - (user?.intentosIA || 0));
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-100 flex items-end sm:items-center justify-center p-4">
@@ -70,7 +70,7 @@ const LogoutModal = ({ isOpen, onClose, onConfirm }: Props) => {
                     </div>
                     <div className="flex items-baseline gap-1">
                       <span className="text-4xl font-black">{restantes}</span>
-                      <span className="text-slate-400 font-bold">/ 10</span>
+                      <span className="text-slate-400 font-bold">/ 20</span>
                     </div>
                     <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase">Disponibles</p>
                   </div>

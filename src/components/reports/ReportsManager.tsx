@@ -16,7 +16,8 @@ import {
     User,
     Utensils,
     Wallet,
-    X
+    X,
+    Loader2
 } from 'lucide-react';
 import {api} from '@/services/api.ts';
 import Dashboard from '../../Dashboard';
@@ -91,6 +92,7 @@ const ReportsManager = ({ onVerDetalle }: { onVerDetalle: (item: AlimentoDTO | C
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [dueloResult, setDueloResult] = useState<{ foods: AlimentoDTO[], veredicto: { ganador: string, diferencia: string, conclusion: string } } | null>(null);
   const [historialTriaje, setHistorialTriaje] = useState<TriajeIADTO[]>([]);
+  const [loadingDuelo, setLoadingDuelo] = useState(false);
 
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -145,6 +147,7 @@ const ReportsManager = ({ onVerDetalle }: { onVerDetalle: (item: AlimentoDTO | C
   };
 
   const handleDuelo = async () => {
+    setLoadingDuelo(true);
     try {
       const res = await api.compararAlimentos(selectedIds);
       const rawText = res.data.resultado || "";
@@ -170,6 +173,8 @@ const ReportsManager = ({ onVerDetalle }: { onVerDetalle: (item: AlimentoDTO | C
     } catch (e) {
       toast.error("Error al realizar el análisis");
       console.error("Error en el duelo:", e);
+    } finally {
+      setLoadingDuelo(false);
     }
   };
 
@@ -271,8 +276,16 @@ const ReportsManager = ({ onVerDetalle }: { onVerDetalle: (item: AlimentoDTO | C
 
           {comparisonMode && (
             <div className="fixed bottom-24 left-0 right-0 p-6 flex justify-center z-30 animate-in slide-in-from-bottom-4">
-              <button onClick={handleDuelo} disabled={selectedIds.length !== 2} className={`px-8 py-4 rounded-2xl font-black uppercase shadow-2xl transition-all ${selectedIds.length === 2 ? 'bg-orange-600 text-white scale-105 hover:bg-orange-700' : 'bg-slate-300 text-slate-500 cursor-not-allowed'}`}>
-                INICIAR DUELO ({selectedIds.length}/2)
+              <button 
+                onClick={handleDuelo} 
+                disabled={selectedIds.length !== 2 || loadingDuelo} 
+                className={`px-8 py-4 rounded-2xl font-black uppercase shadow-2xl transition-all flex items-center gap-2 ${selectedIds.length === 2 && !loadingDuelo ? 'bg-orange-600 text-white scale-105 hover:bg-orange-700' : 'bg-slate-300 text-slate-500 cursor-not-allowed'}`}
+              >
+                {loadingDuelo ? (
+                  <><Loader2 className="animate-spin" size={20} /> ANALIZANDO...</>
+                ) : (
+                  <>INICIAR DUELO ({selectedIds.length}/2)</>
+                )}
               </button>
             </div>
           )}

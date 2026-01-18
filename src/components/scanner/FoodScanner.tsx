@@ -40,7 +40,7 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: FoodSca
   const { validarCamara, validarGaleria } = useCameraPermissions();
 
   const usadosEsteMes = user?.intentosIA || 0;
-  const tieneEnergia = user?.esColaborador || (10 - usadosEsteMes) > 0;
+  const tieneEnergia = user?.esColaborador || (20 - usadosEsteMes) > 0;
 
   useEffect(() => {
     if (initialData) {
@@ -76,7 +76,7 @@ const FoodScanner = ({ mascotas, initialData, onReset, onScanComplete }: FoodSca
     if (!tieneEnergia) {
       void Swal.fire({
         title: '¡Límite alcanzado!',
-        text: 'Usaste tus 10 escaneos del mes. Colaborá para tener acceso ilimitado y ayudarnos con los servidores.',
+        text: 'Usaste tus 20 escaneos del mes. Colaborá para tener acceso ilimitado y ayudarnos con los servidores.',
         icon: 'info',
         showCancelButton: true,
         confirmButtonText: 'SER COLABORADOR ⚡',
