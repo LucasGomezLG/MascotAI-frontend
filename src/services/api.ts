@@ -11,7 +11,8 @@ import type {
     RecordatorioSaludDTO,
     RefugioDTO,
     TriajeIADTO,
-    UserDTO
+    UserDTO,
+    ProductoDTO
 } from '../types/api.types';
 
 export const SERVER_URL = import.meta.env.DEV
@@ -85,9 +86,16 @@ export const api = {
   loginGoogleNative: (token: string) => apiClient.post<UserDTO>('/mascotas/public/auth/google-native', { token }),
 
   // --- 💳 MÓDULO: PAGOS Y SUSCRIPCIONES ---
-  crearSuscripcion: (monto: number) => apiClient.get<{ url: string }>('/mascotas/usuarios/suscribirme', { params: { monto } }),
+  crearSuscripcion: (email: string) => apiClient.post<{ init_point: string }>('/mascotas/usuarios/suscribirme', { email }),
   getHistorialPagos: () => apiClient.get<string>('/pagos/mis-pagos'),
   webhookSuscripciones: (payload: unknown) => apiClient.post('/mascotas/public/webhook-mp', payload),
+
+  // --- 🛒 MÓDULO: MARKETPLACE ---
+  getProductos: (search?: string) => apiClient.get<ProductoDTO[]>('/marketplace/productos', { params: { search } }),
+  getMisProductos: () => apiClient.get<ProductoDTO[]>('/marketplace/mis-productos'),
+  uploadProductoFotos: (formData: FormData) => apiClient.post<string[]>('/marketplace/productos/upload', formData),
+  crearProducto: (data: ProductoDTO) => apiClient.post<ProductoDTO>('/marketplace/productos', data),
+  destacarProducto: (id: string) => apiClient.post<{ init_point: string }>(`/marketplace/productos/${id}/destacar`),
 
   // --- 🐾 MÓDULO: MASCOTAS PROPIAS ---
   getMascotas: () => apiClient.get<MascotaDTO[]>('/mascotas'),

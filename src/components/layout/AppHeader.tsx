@@ -1,11 +1,11 @@
 import React from 'react';
-import {Bell, Dog, Heart, PawPrint, User as UserIcon} from 'lucide-react';
+import {Bell, Dog, Heart, PawPrint, User as UserIcon, ShoppingBag} from 'lucide-react';
 import NotificationsCenter from '../ui/NotificationsCenter';
 import {useAuth} from '../../context/AuthContext';
 import type {AlertaDTO, UserDTO} from '@/types/api.types';
 import {useUIStore} from '@/stores/uiStore';
 
-type TabType = 'home' | 'scanner' | 'stats' | 'vet' | 'health' | 'pets';
+type TabType = 'home' | 'scanner' | 'stats' | 'vet' | 'health' | 'pets' | 'marketplace';
 
 interface AppHeaderProps {
   user: UserDTO | null;
@@ -46,6 +46,13 @@ export default function AppHeader({
       </div>
 
       <div className="flex items-center gap-2">
+        <button
+          onClick={() => setActiveTab('marketplace')}
+          className={`p-2.5 rounded-xl transition-all ${activeTab === 'marketplace' ? 'bg-orange-600 text-white shadow-lg' : 'bg-slate-50 text-slate-400'}`}
+        >
+          <ShoppingBag size={20} />
+        </button>
+
         <div className="relative">
           <button
             onClick={() => toggleAlerts(!isAlertsOpen)}

@@ -14,7 +14,7 @@ import type {
 } from '@/types/api.types.ts';
 import {useUIStore} from '@/stores/uiStore';
 
-type TabType = 'home' | 'scanner' | 'stats' | 'vet' | 'health' | 'pets';
+type TabType = 'home' | 'scanner' | 'stats' | 'vet' | 'health' | 'pets' | 'marketplace';
 type SectionType = 'perdidos' | 'adopcion' | 'refugios' | null;
 type EspecieType = 'perro' | 'gato' | null;
 
@@ -109,16 +109,12 @@ export default function HomeContent({
       const currentScrollY = window.scrollY;
       const delta = currentScrollY - lastScrollY.current;
 
-      // Lógica de "Smart Sticky":
-      // 1. Siempre mostrar si estamos arriba (top < 50)
       if (currentScrollY < 50) {
         setShowSecondaryFilters(true);
       } 
-      // 2. Ocultar si bajamos rápido (> 40px de delta)
       else if (delta > 40) {
         setShowSecondaryFilters(false);
       }
-      // 3. Mostrar inmediatamente si subimos un poco (< -15px de delta)
       else if (delta < -15) {
         setShowSecondaryFilters(true);
       }
@@ -138,7 +134,6 @@ export default function HomeContent({
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  // EFECTO: Si el usuario escribe, desactivamos el filtro de cercanía para ampliar la búsqueda
   useEffect(() => {
     if (searchTerm.length > 2 && soloCercanas) {
       setSoloCercanas(false);
@@ -232,7 +227,6 @@ export default function HomeContent({
       </section>
 
       <div className="sticky top-18 z-30 -mx-6 px-6 py-3 bg-slate-50/90 backdrop-blur-md flex flex-col gap-3 border-b border-slate-200/50 transition-all duration-500 ease-in-out">
-        {/* Buscador y Filtro de Especie */}
         <div className={`flex gap-2 transition-all duration-500 ease-in-out overflow-hidden ${showSecondaryFilters ? 'max-h-12 opacity-100 mb-0' : 'max-h-0 opacity-0 -mb-3'}`}>
           <div className="relative flex-1">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />

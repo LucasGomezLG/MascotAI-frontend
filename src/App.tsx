@@ -35,8 +35,9 @@ import AppHeader from './components/layout/AppHeader';
 import AppBottomNav from './components/layout/AppBottomNav';
 import HomeContent from './components/home/HomeContent';
 import SubscriptionCard from './services/SuscriptionCard';
+import MarketplacePage from './pages/MarketplacePage';
 
-type TabType = 'home' | 'scanner' | 'stats' | 'vet' | 'health' | 'pets';
+type TabType = 'home' | 'scanner' | 'stats' | 'vet' | 'health' | 'pets' | 'marketplace';
 type DetailItem = AlimentoDTO | ConsultaVetDTO | TriajeIADTO | RecordatorioSaludDTO;
 
 const calcularDistancia = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -168,14 +169,20 @@ function App() {
     const checkUrlParams = async () => {
       await obtenerUbicacion();
       const params = new URLSearchParams(window.location.search);
-      if (params.get('status') === 'approved') {
+      if (params.get('status') === 'approved' || params.get('pago') === 'exitoso') {
         await refreshUser();
-        void Swal.fire({ title: '¡Gracias! ❤️', text: 'Aporte recibido.', icon: 'success' });
+        await refreshData();
+        void Swal.fire({ 
+            title: '¡Pago Exitoso! ❤️', 
+            text: 'Tu transacción se procesó correctamente. Los cambios se verán reflejados en breve.', 
+            icon: 'success',
+            confirmButtonColor: '#ea580c'
+        });
         window.history.replaceState({}, document.title, "/");
       }
     };
     void checkUrlParams();
-  }, [obtenerUbicacion, refreshUser]);
+  }, [obtenerUbicacion, refreshUser, refreshData]);
 
   useEffect(() => {
     if (user) refreshData();
@@ -195,44 +202,53 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 text-left pt-[env(safe-area-inset-top)]" style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom))' }}>
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 text-left pt-[env(safe-area-inset-top)]" style={{ paddingBottom: activeTab === 'marketplace' ? 0 : 'calc(6rem + env(safe-area-inset-bottom))' }}>
       <Toaster 
         position="top-center" 
         reverseOrder={false} 
         containerStyle={{
           top: 'calc(20px + env(safe-area-inset-top))',
+          zIndex: 9999
         }}
       />
-      <AppHeader
-        user={user} setActiveTab={setActiveTab} alertas={alertas}
-        onMarkRead={async (id) => { await api.marcarAlertaLeida(id); refreshData(); }}
-        activeTab={activeTab}
-      />
 
-      <main className="max-w-md mx-auto p-6">
-        {activeTab === 'home' && (
-          <HomeContent
-            mascotas={mascotas} setActiveTab={setActiveTab}
-            soloCercanas={soloCercanas} setSoloCercanas={setSoloCercanas}
-            soloMisPublicaciones={soloMisPublicaciones} setSoloMisPublicaciones={setSoloMisPublicaciones}
-            perdidosFiltrados={perdidosFiltrados} adopcionesFiltradas={adopcionesFiltradas} refugiosFiltrados={refugiosFiltrados}
-            user={user}
-            userCoords={userCoords} locationPermissionGranted={locationPermissionGranted} obtenerUbicacion={obtenerUbicacion}
-            refreshData={refreshData}
-            isLoading={isDataLoading}
+      {activeTab === 'marketplace' ? (
+        <MarketplacePage user={user} onBack={() => setActiveTab('home')} />
+      ) : (
+        <>
+          <AppHeader
+            user={user} setActiveTab={setActiveTab} alertas={alertas}
+            onMarkRead={async (id) => { await api.marcarAlertaLeida(id); refreshData(); }}
+            activeTab={activeTab}
           />
-        )}
 
-        {activeTab === 'scanner' && <FoodScanner mascotas={mascotas} onScanComplete={refreshData} initialData={foodParaVer || undefined} onReset={() => setFoodParaVer(null)} />}
-        {activeTab === 'vet' && <VetScanner mascotas={mascotas} onScanComplete={refreshData} initialData={vetParaVer || undefined} />}
-        {activeTab === 'health' && <SaludScanner mascotas={mascotas} onScanComplete={refreshData} />}
-        {activeTab === 'stats' && <ReportsManager onVerDetalle={(item, tipo) => {
-          if (tipo === 'food') { setFoodParaVer(item as AlimentoDTO); setActiveTab('scanner'); }
-          else if (tipo === 'vet') { setVetParaVer(item as (ConsultaVetDTO | TriajeIADTO)); setActiveTab('vet'); }
-          else if (isRecordatorioSalud(item)) { setHealthParaVer(item); setActiveTab('health'); }
-        }} />}
-        {activeTab === 'pets' && <PetProfiles mascotas={mascotas} onUpdate={refreshData} />}
-      </main>
+          <main className="max-w-md mx-auto p-6">
+            {activeTab === 'home' && (
+              <HomeContent
+                mascotas={mascotas} setActiveTab={setActiveTab}
+                soloCercanas={soloCercanas} setSoloCercanas={setSoloCercanas}
+                soloMisPublicaciones={soloMisPublicaciones} setSoloMisPublicaciones={setSoloMisPublicaciones}
+                perdidosFiltrados={perdidosFiltrados} adopcionesFiltradas={adopcionesFiltradas} refugiosFiltrados={refugiosFiltrados}
+                user={user}
+                userCoords={userCoords} locationPermissionGranted={locationPermissionGranted} obtenerUbicacion={obtenerUbicacion}
+                refreshData={refreshData}
+                isLoading={isDataLoading}
+              />
+            )}
+
+            {activeTab === 'scanner' && <FoodScanner mascotas={mascotas} onScanComplete={refreshData} initialData={foodParaVer || undefined} onReset={() => setFoodParaVer(null)} />}
+            {activeTab === 'vet' && <VetScanner mascotas={mascotas} onScanComplete={refreshData} initialData={vetParaVer || undefined} />}
+            {activeTab === 'health' && <SaludScanner mascotas={mascotas} onScanComplete={refreshData} />}
+            {activeTab === 'stats' && <ReportsManager onVerDetalle={(item, tipo) => {
+              if (tipo === 'food') { setFoodParaVer(item as AlimentoDTO); setActiveTab('scanner'); }
+              else if (tipo === 'vet') { setVetParaVer(item as (ConsultaVetDTO | TriajeIADTO)); setActiveTab('vet'); }
+              else if (isRecordatorioSalud(item)) { setHealthParaVer(item); setActiveTab('health'); }
+            }} />}
+            {activeTab === 'pets' && <PetProfiles mascotas={mascotas} onUpdate={refreshData} />}
+          </main>
+          <AppBottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
+        </>
+      )}
 
       {isPetModalOpen && <PetModal onClose={() => { togglePetModal(false); refreshData(); }} />}
       {isLostPetModalOpen && <LostPetModal onClose={() => { toggleLostPetModal(false); refreshData(); }} />}
@@ -272,8 +288,6 @@ function App() {
         }}
         titulo="¿Eliminar publicación?" mensaje="Esta acción no se puede deshacer."
       />
-
-      <AppBottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
     </div>
   );
 }
