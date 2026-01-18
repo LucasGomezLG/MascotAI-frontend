@@ -206,7 +206,7 @@ const SymptomScanner = ({ mascotas, initialData, onScanComplete }: SymptomScanne
                 : 'bg-red-600 text-white shadow-red-200 hover:bg-red-700'
             }`}
           >
-            {loading ? <Loader2 className="animate-spin" /> : <><Sparkles size={22} className={selectedImage ? "text-red-200" : "text-red-300"} /> ESCANEAR AHORA</>}
+            {loading ? <Loader2 className="animate-spin" /> : <><Sparkles size={22} className={selectedImage ? "text-red-200" : "text-red-300"} /> ANALIZAR CON IA</>}
           </button>
         </div>
       ) : (

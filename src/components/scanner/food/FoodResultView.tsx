@@ -141,7 +141,7 @@ const FoodResultView = ({
 
       <div className="mb-8 px-1">
         <h3 className="font-black text-slate-400 uppercase text-[9px] tracking-[0.2em] mb-4 flex items-center gap-2">
-            <Sparkles size={14} className="text-orange-400" /> Composición Destacada
+            <Sparkles size={14} className="text-yellow-300" fill="currentColor" /> Composición Destacada
         </h3>
         <div className="flex flex-wrap gap-2">
           {alimento?.ingredientes?.map((ing, i) => (
@@ -196,7 +196,7 @@ const FoodResultView = ({
           disabled={loadingResenas}
           className="w-full py-5 bg-white text-violet-600 border-2 border-violet-100 rounded-[2rem] font-black text-[10px] uppercase flex items-center justify-center gap-3 shadow-sm active:scale-95 transition-all disabled:opacity-50 mt-2"
         >
-          {loadingResenas ? <Loader2 className="animate-spin" size={16} /> : <Sparkles size={16} />} 
+          {loadingResenas ? <Loader2 className="animate-spin" size={16} /> : <Sparkles size={16} className="text-yellow-300" fill="currentColor" />}
           {resenasIA ? "REGENERAR ANÁLISIS DE RESEÑAS" : "ANALIZAR RESEÑAS CON IA"}
         </button>
       </div>

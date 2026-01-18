@@ -239,7 +239,7 @@ const ConsultationScanner = ({ mascotas, onScanComplete, initialData }: Consulta
                 : 'bg-blue-600 text-white shadow-blue-200 hover:bg-blue-700'
             }`}
           >
-            {loading ? <Loader2 className="animate-spin" /> : <><Sparkles size={22} className={selectedImage ? "text-blue-200" : "text-blue-300"} /> ESCANEAR AHORA</>}
+            {loading ? <Loader2 className="animate-spin" /> : <><Sparkles size={22} className={selectedImage ? "text-blue-200" : "text-blue-300"} /> ANALIZAR CON IA</>}
           </button>
         </div>
       ) : (

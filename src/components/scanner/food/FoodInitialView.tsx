@@ -95,7 +95,7 @@ const FoodInitialView = ({
           }`}
         >
           {loading ? <Loader2 className="animate-spin" /> : (
-            <><Sparkles size={22} /> ESCANEAR AHORA</>
+            <><Sparkles size={22} className="text-yellow-300" fill="currentColor" /> ANALIZAR CON IA</>
           )}
         </button>
       </div>

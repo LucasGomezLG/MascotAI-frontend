@@ -13,7 +13,7 @@ const MedicalReport = ({ data }: { data: TriajeIADTO }) => {
   
   const urgenciaColor = {
     'ALTA': 'bg-red-600 text-white shadow-red-200',
-    'MEDIA': 'bg-orange-500 text-white shadow-orange-200',
+    'MEDIA': 'bg-orange-50 text-orange-200',
     'BAJA': 'bg-emerald-500 text-white shadow-emerald-200'
   }[nivelUrgencia] || 'bg-slate-600 text-white';
 
@@ -76,7 +76,7 @@ const MedicalReport = ({ data }: { data: TriajeIADTO }) => {
       </div>
 
       <div className="bg-slate-900 p-8 rounded-[2.5rem] shadow-2xl relative overflow-hidden group w-full">
-        <Sparkles className="absolute -right-2 -top-2 text-white/10" size={80} />
+        <Sparkles className="absolute -right-2 -top-2 text-yellow-300/10" size={80} fill="currentColor" />
         <div className="relative z-10">
           <div className="flex items-center gap-2 mb-3">
             <div className="h-1 w-8 bg-red-500 rounded-full" />
