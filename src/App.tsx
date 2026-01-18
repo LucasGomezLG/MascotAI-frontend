@@ -73,6 +73,7 @@ function App() {
   const [soloCercanas, setSoloCercanas] = useState(true);
   const [userCoords, setUserCoords] = useState<{ lat: number, lng: number } | null>(null);
   const [locationPermissionGranted, setLocationPermissionGranted] = useState(false);
+  const [isDataLoading, setIsDataLoading] = useState(false);
 
   const obtenerUbicacion = useCallback(async () => {
     try {
@@ -87,41 +88,47 @@ function App() {
     } catch (e) { console.error("Error GPS:", e); }
   }, []);
 
-  const refreshData = useCallback(() => {
+  const refreshData = useCallback(async () => {
     if (!user) return;
+    setIsDataLoading(true);
 
-    void api.getMascotas().then(res => setMascotas(res.data)).catch(e => console.error(e.message));
+    try {
+      const [mascotasRes, perdidosRes, adopcionesRes, refugiosRes, alertasRes] = await Promise.all([
+        api.getMascotas(),
+        api.getMascotasPerdidas(),
+        api.getMascotasAdopcion(),
+        api.getRefugios(),
+        api.getAlertasSistema()
+      ]);
 
-    void api.getMascotasPerdidas().then(res => {
-      const mapped = res.data.map((p: MascotaPerdidaDTO) => ({
+      setMascotas(mascotasRes.data);
+      
+      setPerdidos(perdidosRes.data.map((p: MascotaPerdidaDTO) => ({
         ...p,
         id: p.id || '',
         tipo: 'perdido' as const,
         contacto: p.contacto || ''
-      }));
-      setPerdidos(mapped);
-    }).catch(e => console.error(e.message));
+      })));
 
-    void api.getMascotasAdopcion().then(res => {
-      const mapped = res.data.map((a: MascotaAdopcionDTO) => ({
+      setAdopciones(adopcionesRes.data.map((a: MascotaAdopcionDTO) => ({
         ...a,
         id: a.id || '',
         tipo: 'adopcion' as const
-      }));
-      setAdopciones(mapped);
-    }).catch(e => console.error(e.message));
+      })));
 
-    void api.getRefugios().then(res => {
-      const mapped = res.data.map((r: RefugioDTO) => ({
+      setRefugios(refugiosRes.data.map((r: RefugioDTO) => ({
         ...r,
         id: r.id || '',
         tipo: 'refugio' as const,
         contacto: r.redSocial || r.aliasDonacion || ''
-      }));
-      setRefugios(mapped);
-    }).catch(e => console.error(e.message));
+      })));
 
-    void api.getAlertasSistema().then(res => setAlertas(res.data)).catch(() => { });
+      setAlertas(alertasRes.data);
+    } catch (e) {
+      console.error("Error al refrescar datos:", e);
+    } finally {
+      setIsDataLoading(false);
+    }
   }, [user]);
 
   const handleFullLogout = async () => {
@@ -205,6 +212,8 @@ function App() {
             perdidosFiltrados={perdidosFiltrados} adopcionesFiltradas={adopcionesFiltradas} refugiosFiltrados={refugiosFiltrados}
             user={user}
             userCoords={userCoords} locationPermissionGranted={locationPermissionGranted} obtenerUbicacion={obtenerUbicacion}
+            refreshData={refreshData}
+            isLoading={isDataLoading}
           />
         )}
 

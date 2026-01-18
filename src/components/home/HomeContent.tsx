@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import {Dog, Globe, Heart, MapPin, Plus, User as UserIcon} from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import {Dog, Globe, Heart, MapPin, Plus, User as UserIcon, RefreshCw, LucideIcon} from 'lucide-react';
 import LostPetCard from '../LostPet/LostPetCard';
 import AdoptionCard from '../AdoptionPet/AdoptionCard';
 import RefugioCard from '../Refugio/RefugioCard';
@@ -30,18 +30,82 @@ interface HomeContentProps {
   userCoords: { lat: number, lng: number } | null;
   locationPermissionGranted: boolean;
   obtenerUbicacion: () => Promise<void>;
+  refreshData: () => void | Promise<void>;
+  isLoading?: boolean;
 }
+
+const SkeletonCard = () => (
+  <div className="min-w-70 w-full h-95 bg-slate-200 animate-pulse rounded-4xl" />
+);
+
+const EmptyState = ({ 
+  title, 
+  description, 
+  icon: Icon, 
+  actionLabel, 
+  onAction,
+  colorClass
+}: { 
+  title: string; 
+  description: string; 
+  icon: LucideIcon; 
+  actionLabel: string; 
+  onAction: () => void;
+  colorClass: string;
+}) => (
+  <div className="w-full py-12 px-6 bg-white rounded-4xl border-2 border-dashed border-slate-200 flex flex-col items-center text-center gap-4">
+    <div className={`p-4 rounded-3xl ${colorClass} bg-opacity-10`}>
+      <Icon size={32} className={colorClass.replace('bg-', 'text-')} />
+    </div>
+    <div className="space-y-1">
+      <h3 className="font-black uppercase text-slate-800 text-sm tracking-tight">{title}</h3>
+      <p className="text-xs text-slate-500 font-medium leading-relaxed max-w-50">{description}</p>
+    </div>
+    <button 
+      onClick={onAction}
+      className={`mt-2 px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase transition-all active:scale-95 shadow-sm ${colorClass} text-white`}
+    >
+      {actionLabel}
+    </button>
+  </div>
+);
 
 export default function HomeContent({
   mascotas = [], setActiveTab,
   soloCercanas, setSoloCercanas, soloMisPublicaciones, setSoloMisPublicaciones,
   perdidosFiltrados = [], adopcionesFiltradas = [], refugiosFiltrados = [],
   user,
-  locationPermissionGranted, obtenerUbicacion
+  locationPermissionGranted, obtenerUbicacion,
+  refreshData,
+  isLoading = false
 }: HomeContentProps) {
   
   const { setZoomedPhoto, toggleLostPetModal, toggleAdoptionModal, toggleRefugioModal, setItemToDelete } = useUIStore();
   const [activeSection, setActiveSection] = useState<SectionType>(null);
+  const [showSecondaryFilters, setShowSecondaryFilters] = useState(true);
+  const [lastScrollY, setLastScrollY] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      if (currentScrollY > lastScrollY && currentScrollY > 150) {
+        setShowSecondaryFilters(false);
+      } else if (currentScrollY < lastScrollY) {
+        setShowSecondaryFilters(true);
+      }
+      setLastScrollY(currentScrollY);
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [lastScrollY]);
+
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    await refreshData();
+    setTimeout(() => setIsRefreshing(false), 1000);
+  }, [refreshData]);
 
   const totalResultados = 
     activeSection === null ? (perdidosFiltrados.length + adopcionesFiltradas.length + refugiosFiltrados.length) :
@@ -56,7 +120,15 @@ export default function HomeContent({
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <section className="space-y-3">
-        <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Mis Mascotas</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Mis Mascotas</h2>
+          <button 
+            onClick={handleRefresh}
+            className={`p-2 text-slate-400 hover:text-orange-500 transition-all ${isRefreshing ? 'animate-spin text-orange-500' : ''}`}
+          >
+            <RefreshCw size={18} />
+          </button>
+        </div>
         <div className="flex gap-4 overflow-x-auto pb-2 no-scrollbar">
           {mascotas.map(pet => (
             <div key={pet.id} className="flex flex-col items-center gap-2 min-w-20">
@@ -81,8 +153,7 @@ export default function HomeContent({
         </div>
       </section>
 
-      <div className="sticky top-18 z-30 -mx-6 px-6 py-3 bg-slate-50/80 backdrop-blur-md flex flex-col gap-3 border-b border-slate-200/50">
-        {/* Selector de Secciones con Iconos */}
+      <div className="sticky top-18 z-30 -mx-6 px-6 py-3 bg-slate-50/90 backdrop-blur-md flex flex-col gap-3 border-b border-slate-200/50 transition-all duration-300">
         <div className="flex bg-slate-200/50 p-1 rounded-2xl gap-1">
           <button
             onClick={() => handleSectionClick('perdidos')}
@@ -107,7 +178,7 @@ export default function HomeContent({
           </button>
         </div>
 
-        <div className="flex items-center justify-between">
+        <div className={`flex items-center justify-between overflow-hidden transition-all duration-300 ease-in-out ${showSecondaryFilters ? 'max-h-20 opacity-100' : 'max-h-0 opacity-0'}`}>
           <div className="flex gap-2">
             <button
               onClick={() => !locationPermissionGranted ? obtenerUbicacion() : setSoloCercanas(!soloCercanas)}
@@ -139,10 +210,19 @@ export default function HomeContent({
               <button onClick={() => toggleLostPetModal(true)} className="p-2 bg-red-50 text-red-600 rounded-xl active:scale-90"><Plus size={20} /></button>
             </div>
             <div className={`flex ${activeSection ? 'flex-col items-center' : 'overflow-x-auto no-scrollbar'} gap-6 pb-4`}>
-              {perdidosFiltrados.length > 0 ? (
+              {isLoading ? (
+                [1, 2, 3].map(i => <SkeletonCard key={i} />)
+              ) : perdidosFiltrados.length > 0 ? (
                 perdidosFiltrados.map(p => <LostPetCard key={p.id} reporte={p} currentUser={user} onDelete={() => setItemToDelete({ id: p.id!, tipo: 'perdido' })} />)
               ) : (
-                <div className="w-full h-32 bg-slate-50 rounded-[2.5rem] border-2 border-dashed border-slate-200 flex items-center justify-center font-black text-[10px] text-slate-400 uppercase tracking-widest">Sin reportes</div>
+                <EmptyState 
+                  title="Sin reportes"
+                  description="No hay mascotas perdidas cerca. ¡Qué buena noticia! O publica una si sabes de alguna."
+                  icon={MapPin}
+                  actionLabel="Reportar Perdido"
+                  onAction={() => toggleLostPetModal(true)}
+                  colorClass="bg-red-500"
+                />
               )}
             </div>
           </section>
@@ -158,10 +238,19 @@ export default function HomeContent({
               <button onClick={() => toggleAdoptionModal(true)} className="p-2 bg-emerald-50 text-emerald-600 rounded-xl active:scale-90"><Plus size={20} /></button>
             </div>
             <div className={`flex ${activeSection ? 'flex-col items-center' : 'overflow-x-auto no-scrollbar'} gap-6 pb-4`}>
-              {adopcionesFiltradas.length > 0 ? (
+              {isLoading ? (
+                [1, 2, 3].map(i => <SkeletonCard key={i} />)
+              ) : adopcionesFiltradas.length > 0 ? (
                 adopcionesFiltradas.map(a => <AdoptionCard key={a.id} mascota={a} currentUser={user} onDelete={() => setItemToDelete({ id: a.id!, tipo: 'adopcion' })} />)
               ) : (
-                <div className="w-full h-32 bg-emerald-50/30 rounded-[2.5rem] border-2 border-dashed border-emerald-100 flex items-center justify-center font-black text-[10px] text-emerald-400 uppercase tracking-widest">Sin publicaciones</div>
+                <EmptyState 
+                  title="Sin adopciones"
+                  description="No hay mascotas buscando hogar en este momento. Vuelve pronto."
+                  icon={Heart}
+                  actionLabel="Dar en Adopción"
+                  onAction={() => toggleAdoptionModal(true)}
+                  colorClass="bg-emerald-500"
+                />
               )}
             </div>
           </section>
@@ -177,10 +266,19 @@ export default function HomeContent({
               <button onClick={() => toggleRefugioModal(true)} className="p-2 bg-violet-50 text-violet-600 rounded-xl active:scale-90"><Plus size={20} /></button>
             </div>
             <div className={`flex ${activeSection ? 'flex-col items-center' : 'overflow-x-auto no-scrollbar'} gap-6 pb-10`}>
-              {refugiosFiltrados.length > 0 ? (
+              {isLoading ? (
+                [1, 2, 3].map(i => <SkeletonCard key={i} />)
+              ) : refugiosFiltrados.length > 0 ? (
                 refugiosFiltrados.map(r => <RefugioCard key={r.id} refugio={r} currentUser={user} onDelete={() => setItemToDelete({ id: r.id!, tipo: 'refugio' })} />)
               ) : (
-                <div className="w-full h-32 bg-violet-50/30 rounded-[2.5rem] border-2 border-dashed border-violet-100 flex items-center justify-center font-black text-[10px] text-violet-400 uppercase tracking-widest">Sin refugios</div>
+                <EmptyState 
+                  title="Sin refugios"
+                  description="No encontramos refugios registrados en esta zona todavía."
+                  icon={Globe}
+                  actionLabel="Registrar Refugio"
+                  onAction={() => toggleRefugioModal(true)}
+                  colorClass="bg-violet-500"
+                />
               )}
             </div>
           </section>
