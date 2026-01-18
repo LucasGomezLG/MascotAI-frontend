@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import {Dog, Globe, Heart, MapPin, Plus, User as UserIcon, RefreshCw} from 'lucide-react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import {Dog, Globe, Heart, MapPin, Plus, User as UserIcon, RefreshCw, Search, X as CloseIcon} from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import LostPetCard from '../LostPet/LostPetCard';
 import AdoptionCard from '../AdoptionPet/AdoptionCard';
@@ -16,6 +16,7 @@ import {useUIStore} from '@/stores/uiStore';
 
 type TabType = 'home' | 'scanner' | 'stats' | 'vet' | 'health' | 'pets';
 type SectionType = 'perdidos' | 'adopcion' | 'refugios' | null;
+type EspecieType = 'perro' | 'gato' | null;
 
 interface HomeContentProps {
   mascotas: MascotaDTO[];
@@ -36,7 +37,19 @@ interface HomeContentProps {
 }
 
 const SkeletonCard = () => (
-  <div className="min-w-70 w-full h-95 bg-slate-200 animate-pulse rounded-4xl" />
+  <div className="min-w-70 max-w-70 bg-white rounded-[2.5rem] p-5 shadow-sm border border-slate-100 flex flex-col gap-4 animate-pulse">
+    <div className="h-40 bg-slate-200 rounded-2xl" />
+    <div className="space-y-3">
+      <div className="flex justify-between items-start gap-2">
+        <div className="h-3 bg-slate-200 rounded-full w-3/4" />
+        <div className="h-6 w-6 bg-slate-100 rounded-lg" />
+      </div>
+      <div className="h-3 bg-slate-200 rounded-full w-1/2" />
+    </div>
+    <div className="h-5 bg-slate-100 rounded-lg w-24" />
+    <div className="h-28 bg-slate-100 rounded-2xl" />
+    <div className="h-12 bg-slate-200 rounded-2xl w-full" />
+  </div>
 );
 
 const EmptyState = ({ 
@@ -83,24 +96,54 @@ export default function HomeContent({
   
   const { setZoomedPhoto, toggleLostPetModal, toggleAdoptionModal, toggleRefugioModal, setItemToDelete } = useUIStore();
   const [activeSection, setActiveSection] = useState<SectionType>(null);
+  const [activeEspecie, setActiveEspecie] = useState<EspecieType>(null);
   const [showSecondaryFilters, setShowSecondaryFilters] = useState(true);
-  const [lastScrollY, setLastScrollY] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  const lastScrollY = useRef(0);
+  const ticking = useRef(false);
 
   useEffect(() => {
-    const handleScroll = () => {
+    const updateScroll = () => {
       const currentScrollY = window.scrollY;
-      if (currentScrollY > lastScrollY && currentScrollY > 150) {
+      const delta = currentScrollY - lastScrollY.current;
+
+      // Lógica de "Smart Sticky":
+      // 1. Siempre mostrar si estamos arriba (top < 50)
+      if (currentScrollY < 50) {
+        setShowSecondaryFilters(true);
+      } 
+      // 2. Ocultar si bajamos rápido (> 40px de delta)
+      else if (delta > 40) {
         setShowSecondaryFilters(false);
-      } else if (currentScrollY < lastScrollY) {
+      }
+      // 3. Mostrar inmediatamente si subimos un poco (< -15px de delta)
+      else if (delta < -15) {
         setShowSecondaryFilters(true);
       }
-      setLastScrollY(currentScrollY);
+
+      lastScrollY.current = currentScrollY;
+      ticking.current = false;
     };
 
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [lastScrollY]);
+    const onScroll = () => {
+      if (!ticking.current) {
+        window.requestAnimationFrame(updateScroll);
+        ticking.current = true;
+      }
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  // EFECTO: Si el usuario escribe, desactivamos el filtro de cercanía para ampliar la búsqueda
+  useEffect(() => {
+    if (searchTerm.length > 2 && soloCercanas) {
+      setSoloCercanas(false);
+    }
+  }, [searchTerm, soloCercanas, setSoloCercanas]);
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
@@ -108,14 +151,48 @@ export default function HomeContent({
     setTimeout(() => setIsRefreshing(false), 1000);
   }, [refreshData]);
 
+  const applyFilters = useCallback(<T extends { descripcion?: string; direccion?: string; nombre?: string; nombreMascota?: string; raza?: string; nombreRefugio?: string; especie?: string }>(lista: T[]) => {
+    let filtered = lista;
+
+    if (activeEspecie) {
+      filtered = filtered.filter(item => {
+        const especieItem = item.especie?.toLowerCase() || '';
+        const descItem = item.descripcion?.toLowerCase() || '';
+        return especieItem.includes(activeEspecie) || descItem.includes(activeEspecie);
+      });
+    }
+
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase().trim();
+      filtered = filtered.filter(item => 
+        item.descripcion?.toLowerCase().includes(term) ||
+        item.direccion?.toLowerCase().includes(term) ||
+        item.nombre?.toLowerCase().includes(term) ||
+        item.nombreMascota?.toLowerCase().includes(term) ||
+        item.raza?.toLowerCase().includes(term) ||
+        item.nombreRefugio?.toLowerCase().includes(term)
+      );
+    }
+
+    return filtered;
+  }, [searchTerm, activeEspecie]);
+
+  const perdidosFinal = useMemo(() => applyFilters(perdidosFiltrados), [perdidosFiltrados, applyFilters]);
+  const adopcionesFinal = useMemo(() => applyFilters(adopcionesFiltradas), [adopcionesFiltradas, applyFilters]);
+  const refugiosFinal = useMemo(() => applyFilters(refugiosFiltrados), [refugiosFiltrados, applyFilters]);
+
   const totalResultados = 
-    activeSection === null ? (perdidosFiltrados.length + adopcionesFiltradas.length + refugiosFiltrados.length) :
-    activeSection === 'perdidos' ? perdidosFiltrados.length :
-    activeSection === 'adopcion' ? adopcionesFiltradas.length :
-    refugiosFiltrados.length;
+    activeSection === null ? (perdidosFinal.length + adopcionesFinal.length + refugiosFinal.length) :
+    activeSection === 'perdidos' ? perdidosFinal.length :
+    activeSection === 'adopcion' ? adopcionesFinal.length :
+    refugiosFinal.length;
 
   const handleSectionClick = (section: SectionType) => {
     setActiveSection(prev => prev === section ? null : section);
+  };
+
+  const handleEspecieClick = (especie: EspecieType) => {
+    setActiveEspecie(prev => prev === especie ? null : especie);
   };
 
   return (
@@ -154,7 +231,44 @@ export default function HomeContent({
         </div>
       </section>
 
-      <div className="sticky top-18 z-30 -mx-6 px-6 py-3 bg-slate-50/90 backdrop-blur-md flex flex-col gap-3 border-b border-slate-200/50 transition-all duration-300">
+      <div className="sticky top-18 z-30 -mx-6 px-6 py-3 bg-slate-50/90 backdrop-blur-md flex flex-col gap-3 border-b border-slate-200/50 transition-all duration-500 ease-in-out">
+        {/* Buscador y Filtro de Especie */}
+        <div className={`flex gap-2 transition-all duration-500 ease-in-out overflow-hidden ${showSecondaryFilters ? 'max-h-12 opacity-100 mb-0' : 'max-h-0 opacity-0 -mb-3'}`}>
+          <div className="relative flex-1">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+            <input 
+              type="text"
+              placeholder="Buscar..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-11 pr-10 py-3 bg-slate-200/50 border-none rounded-2xl text-xs font-bold text-slate-700 placeholder:text-slate-400 focus:ring-2 focus:ring-orange-500/20 transition-all"
+            />
+            {searchTerm && (
+              <button 
+                onClick={() => setSearchTerm('')}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <CloseIcon size={16} />
+              </button>
+            )}
+          </div>
+          
+          <div className="flex gap-1 bg-slate-200/50 p-1 rounded-2xl">
+            <button 
+              onClick={() => handleEspecieClick('perro')}
+              className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all ${activeEspecie === 'perro' ? 'bg-orange-500 text-white shadow-md scale-105' : 'text-slate-400 hover:bg-slate-200'}`}
+            >
+              <span className="text-lg">🐶</span>
+            </button>
+            <button 
+              onClick={() => handleEspecieClick('gato')}
+              className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all ${activeEspecie === 'gato' ? 'bg-orange-500 text-white shadow-md scale-105' : 'text-slate-400 hover:bg-slate-200'}`}
+            >
+              <span className="text-lg">🐱</span>
+            </button>
+          </div>
+        </div>
+
         <div className="flex bg-slate-200/50 p-1 rounded-2xl gap-1">
           <button
             onClick={() => handleSectionClick('perdidos')}
@@ -179,7 +293,7 @@ export default function HomeContent({
           </button>
         </div>
 
-        <div className={`flex items-center justify-between overflow-hidden transition-all duration-300 ease-in-out ${showSecondaryFilters ? 'max-h-20 opacity-100' : 'max-h-0 opacity-0'}`}>
+        <div className={`flex items-center justify-between overflow-hidden transition-all duration-500 ease-in-out ${showSecondaryFilters ? 'max-h-20 opacity-100' : 'max-h-0 opacity-0'}`}>
           <div className="flex gap-2">
             <button
               onClick={() => !locationPermissionGranted ? obtenerUbicacion() : setSoloCercanas(!soloCercanas)}
@@ -213,15 +327,33 @@ export default function HomeContent({
             <div className={`flex ${activeSection ? 'flex-col items-center' : 'overflow-x-auto no-scrollbar'} gap-6 pb-4`}>
               {isLoading ? (
                 [1, 2, 3].map(i => <SkeletonCard key={i} />)
-              ) : perdidosFiltrados.length > 0 ? (
-                perdidosFiltrados.map(p => <LostPetCard key={p.id} reporte={p} currentUser={user} onDelete={() => setItemToDelete({ id: p.id!, tipo: 'perdido' })} />)
+              ) : perdidosFinal.length > 0 ? (
+                perdidosFinal.map(p => <LostPetCard key={p.id} reporte={p} currentUser={user} onDelete={() => setItemToDelete({ id: p.id!, tipo: 'perdido' })} />)
               ) : (
                 <EmptyState 
-                  title="Sin reportes"
-                  description="No hay mascotas perdidas cerca. ¡Qué buena noticia! O publica una si sabes de alguna."
-                  icon={MapPin}
-                  actionLabel="Reportar Perdido"
-                  onAction={() => toggleLostPetModal(true)}
+                  title={(searchTerm || activeEspecie) ? "Sin coincidencias" : "Sin reportes"}
+                  description={
+                    soloCercanas && (searchTerm || activeEspecie) 
+                    ? "No hay resultados cerca de ti. Prueba buscando en todo el mapa."
+                    : (searchTerm || activeEspecie) 
+                    ? `No encontramos nada que coincida con tus filtros.` 
+                    : "No hay mascotas perdidas cerca. ¡Qué buena noticia! O publica una si sabes de alguna."
+                  }
+                  icon={(searchTerm || activeEspecie) ? Search : MapPin}
+                  actionLabel={
+                    soloCercanas && (searchTerm || activeEspecie)
+                    ? "Buscar en todo el mapa"
+                    : (searchTerm || activeEspecie) 
+                    ? "Limpiar Filtros" 
+                    : "Reportar Perdido"
+                  }
+                  onAction={
+                    soloCercanas && (searchTerm || activeEspecie)
+                    ? () => setSoloCercanas(false)
+                    : (searchTerm || activeEspecie) 
+                    ? () => { setSearchTerm(''); setActiveEspecie(null); } 
+                    : () => toggleLostPetModal(true)
+                  }
                   colorClass="bg-red-500"
                 />
               )}
@@ -241,15 +373,33 @@ export default function HomeContent({
             <div className={`flex ${activeSection ? 'flex-col items-center' : 'overflow-x-auto no-scrollbar'} gap-6 pb-4`}>
               {isLoading ? (
                 [1, 2, 3].map(i => <SkeletonCard key={i} />)
-              ) : adopcionesFiltradas.length > 0 ? (
-                adopcionesFiltradas.map(a => <AdoptionCard key={a.id} mascota={a} currentUser={user} onDelete={() => setItemToDelete({ id: a.id!, tipo: 'adopcion' })} />)
+              ) : adopcionesFinal.length > 0 ? (
+                adopcionesFinal.map(a => <AdoptionCard key={a.id} mascota={a} currentUser={user} onDelete={() => setItemToDelete({ id: a.id!, tipo: 'adopcion' })} />)
               ) : (
                 <EmptyState 
-                  title="Sin adopciones"
-                  description="No hay mascotas buscando hogar en este momento. Vuelve pronto."
-                  icon={Heart}
-                  actionLabel="Dar en Adopción"
-                  onAction={() => toggleAdoptionModal(true)}
+                  title={(searchTerm || activeEspecie) ? "Sin coincidencias" : "Sin adopciones"}
+                  description={
+                    soloCercanas && (searchTerm || activeEspecie) 
+                    ? "No hay resultados cerca de ti. Prueba buscando en todo el mapa."
+                    : (searchTerm || activeEspecie) 
+                    ? `No encontramos nada que coincida con tus filtros.` 
+                    : "No hay mascotas buscando hogar en este momento. Vuelve pronto."
+                  }
+                  icon={(searchTerm || activeEspecie) ? Search : Heart}
+                  actionLabel={
+                    soloCercanas && (searchTerm || activeEspecie)
+                    ? "Buscar en todo el mapa"
+                    : (searchTerm || activeEspecie) 
+                    ? "Limpiar Filtros" 
+                    : "Dar en Adopción"
+                  }
+                  onAction={
+                    soloCercanas && (searchTerm || activeEspecie)
+                    ? () => setSoloCercanas(false)
+                    : (searchTerm || activeEspecie) 
+                    ? () => { setSearchTerm(''); setActiveEspecie(null); } 
+                    : () => toggleAdoptionModal(true)
+                  }
                   colorClass="bg-emerald-500"
                 />
               )}
@@ -269,15 +419,33 @@ export default function HomeContent({
             <div className={`flex ${activeSection ? 'flex-col items-center' : 'overflow-x-auto no-scrollbar'} gap-6 pb-10`}>
               {isLoading ? (
                 [1, 2, 3].map(i => <SkeletonCard key={i} />)
-              ) : refugiosFiltrados.length > 0 ? (
-                refugiosFiltrados.map(r => <RefugioCard key={r.id} refugio={r} currentUser={user} onDelete={() => setItemToDelete({ id: r.id!, tipo: 'refugio' })} />)
+              ) : refugiosFinal.length > 0 ? (
+                refugiosFinal.map(r => <RefugioCard key={r.id} refugio={r} currentUser={user} onDelete={() => setItemToDelete({ id: r.id!, tipo: 'refugio' })} />)
               ) : (
                 <EmptyState 
-                  title="Sin refugios"
-                  description="No encontramos refugios registrados en esta zona todavía."
-                  icon={Globe}
-                  actionLabel="Registrar Refugio"
-                  onAction={() => toggleRefugioModal(true)}
+                  title={(searchTerm || activeEspecie) ? "Sin coincidencias" : "Sin refugios"}
+                  description={
+                    soloCercanas && (searchTerm || activeEspecie) 
+                    ? "No hay resultados cerca de ti. Prueba buscando en todo el mapa."
+                    : (searchTerm || activeEspecie) 
+                    ? `No encontramos nada que cocincida con tus filtros.`
+                    : "No encontramos refugios registrados en esta zona todavía."
+                  }
+                  icon={(searchTerm || activeEspecie) ? Search : Globe}
+                  actionLabel={
+                    soloCercanas && (searchTerm || activeEspecie)
+                    ? "Buscar en todo el mapa"
+                    : (searchTerm || activeEspecie) 
+                    ? "Limpiar Filtros" 
+                    : "Registrar Refugio"
+                  }
+                  onAction={
+                    soloCercanas && (searchTerm || activeEspecie)
+                    ? () => setSoloCercanas(false)
+                    : (searchTerm || activeEspecie) 
+                    ? () => { setSearchTerm(''); setActiveEspecie(null); } 
+                    : () => toggleRefugioModal(true)
+                  }
                   colorClass="bg-violet-500"
                 />
               )}

@@ -195,8 +195,14 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 text-left" style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom))' }}>
-      <Toaster position="top-center" reverseOrder={false} />
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 text-left pt-[env(safe-area-inset-top)]" style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom))' }}>
+      <Toaster 
+        position="top-center" 
+        reverseOrder={false} 
+        containerStyle={{
+          top: 'calc(20px + env(safe-area-inset-top))',
+        }}
+      />
       <AppHeader
         user={user} setActiveTab={setActiveTab} alertas={alertas}
         onMarkRead={async (id) => { await api.marcarAlertaLeida(id); refreshData(); }}

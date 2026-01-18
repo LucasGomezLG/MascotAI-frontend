@@ -1,13 +1,13 @@
 // --- DTOs Principales de la Aplicación ---
-
 export interface UserDTO {
   id: string;
   nombre?: string;
   email?: string;
-  foto?: string; // ALINEADO: antes 'fotoUrl'
+  foto?: string;
   intentosIA?: number;
-  intentosRestantes?: number; // NUEVO
+  intentosRestantes?: number;
   esColaborador?: boolean;
+  fechaFinColaborador?: string; // NUEVO: Formato ISO string
 }
 
 export interface MascotaDTO {

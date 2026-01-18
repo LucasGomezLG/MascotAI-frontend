@@ -12,7 +12,8 @@ import {
     MessageCircle,
     ShieldAlert,
     Trash2,
-    X
+    X,
+    Share2
 } from 'lucide-react';
 import {Circle, MapContainer, TileLayer} from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -48,6 +49,21 @@ const AdoptionCard = ({ mascota, currentUser, onDelete }: AdoptionCardProps) => 
     setCurrentFoto((prev) => (prev === 0 ? fotos.length - 1 : prev - 1));
   };
 
+  const handleShare = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    toast('Opción en desarrollo 🚀', {
+      icon: '🛠️',
+      style: {
+        borderRadius: '1rem',
+        background: '#333',
+        color: '#fff',
+        fontSize: '12px',
+        fontWeight: 'bold',
+        textTransform: 'uppercase'
+      },
+    });
+  };
+
   const handleCopy = () => {
     if (!mascota.contacto) return;
     navigator.clipboard.writeText(mascota.contacto)
@@ -62,30 +78,38 @@ const AdoptionCard = ({ mascota, currentUser, onDelete }: AdoptionCardProps) => 
   return (
     <>
       <div className="relative min-w-70 max-w-70 bg-white rounded-[2.5rem] p-5 shadow-sm border border-slate-100 flex flex-col gap-4 animate-in fade-in slide-in-from-right-4">
-
-        {esMia && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              Swal.fire({
-                title: '¿Eliminar publicación?',
-                text: "La mascota ya no aparecerá en adopción.",
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#10b981',
-                confirmButtonText: 'Sí, borrar',
-                customClass: { popup: 'rounded-4xl' }
-              }).then(res => {
-                if (res.isConfirmed && mascota.id) {
-                  onDelete(mascota.id);
-                }
-              });
-            }}
-            className="absolute top-4 right-4 p-2 bg-emerald-500 text-white rounded-full shadow-lg z-20 active:scale-90"
+        
+        <div className="absolute top-4 right-4 flex gap-2 z-20">
+          <button 
+            onClick={handleShare}
+            className="p-2 bg-white/80 backdrop-blur-md text-slate-600 rounded-full shadow-lg active:scale-90 transition-transform hover:bg-white"
           >
-            <Trash2 size={12} />
+            <Share2 size={12} />
           </button>
-        )}
+          {esMia && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                Swal.fire({
+                  title: '¿Eliminar publicación?',
+                  text: "La mascota ya no aparecerá en adopción.",
+                  icon: 'warning',
+                  showCancelButton: true,
+                  confirmButtonColor: '#10b981',
+                  confirmButtonText: 'Sí, borrar',
+                  customClass: { popup: 'rounded-4xl' }
+                }).then(res => {
+                  if (res.isConfirmed && mascota.id) {
+                    onDelete(mascota.id);
+                  }
+                });
+              }}
+              className="p-2 bg-emerald-500 text-white rounded-full shadow-lg active:scale-90"
+            >
+              <Trash2 size={12} />
+            </button>
+          )}
+        </div>
 
         <div
           className="relative h-40 bg-slate-100 rounded-2xl overflow-hidden group/img cursor-zoom-in"

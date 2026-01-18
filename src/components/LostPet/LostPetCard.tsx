@@ -11,12 +11,13 @@ import {
     MessageCircle,
     ShieldAlert,
     Trash2,
-    X
+    X,
+    Share2
 } from 'lucide-react';
 import {Circle, MapContainer, TileLayer} from 'react-leaflet';
 import type {ItemComunidad, MascotaPerdidaDTO, UserDTO} from '@/types/api.types';
 import 'leaflet/dist/leaflet.css';
-import Swal from 'sweetalert2';
+import toast from 'react-hot-toast';
 
 interface LostPetCardProps {
   reporte: ItemComunidad & MascotaPerdidaDTO;
@@ -43,19 +44,27 @@ const LostPetCard = ({ reporte, currentUser, onDelete }: LostPetCardProps) => {
     });
   };
 
+  const handleShare = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    toast('Opción en desarrollo 🚀', {
+      icon: '🛠️',
+      style: {
+        borderRadius: '1rem',
+        background: '#333',
+        color: '#fff',
+        fontSize: '12px',
+        fontWeight: 'bold',
+        textTransform: 'uppercase'
+      },
+    });
+  };
+
   const handleCopy = async () => {
     if (!reporte.contacto) return;
     try {
       await navigator.clipboard.writeText(reporte.contacto);
       setCopied(true);
-      
-      void Swal.mixin({
-        toast: true,
-        position: 'top',
-        showConfirmButton: false,
-        timer: 2000,
-      }).fire({ icon: 'success', title: '¡Copiado!' });
-
+      toast.success('¡Contacto copiado!');
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       console.error('Failed to copy text: ', err);
@@ -65,11 +74,22 @@ const LostPetCard = ({ reporte, currentUser, onDelete }: LostPetCardProps) => {
   return (
     <>
       <div className="relative min-w-70 max-w-70 bg-white rounded-[2.5rem] p-5 shadow-sm border border-slate-100 flex flex-col gap-4 animate-in fade-in slide-in-from-right-4">
-        {esMia && (
-          <button onClick={(e) => { e.stopPropagation(); onDelete(reporte.id); }} className="absolute top-4 right-4 p-2 bg-red-500 text-white rounded-full shadow-lg z-20 active:scale-90 transition-transform hover:bg-red-600">
-            <Trash2 size={14} />
+        <div className="absolute top-4 right-4 flex gap-2 z-20">
+          <button 
+            onClick={handleShare}
+            className="p-2 bg-white/80 backdrop-blur-md text-slate-600 rounded-full shadow-lg active:scale-90 transition-transform hover:bg-white"
+          >
+            <Share2 size={14} />
           </button>
-        )}
+          {esMia && (
+            <button 
+              onClick={(e) => { e.stopPropagation(); onDelete(reporte.id); }} 
+              className="p-2 bg-red-500 text-white rounded-full shadow-lg active:scale-90 transition-transform hover:bg-red-600"
+            >
+              <Trash2 size={14} />
+            </button>
+          )}
+        </div>
 
         <div
           className="relative h-40 bg-slate-100 rounded-2xl overflow-hidden group/img cursor-zoom-in"
