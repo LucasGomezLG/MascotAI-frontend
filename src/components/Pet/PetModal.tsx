@@ -20,6 +20,7 @@ interface PetModalProps { onClose: () => void; }
 interface PetFormState {
   nombre: string;
   especie: string;
+  raza: string;
   fechaNacimiento: string;
   peso: string;
   condicion: string;
@@ -30,7 +31,7 @@ const PetModal = ({ onClose }: PetModalProps) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [nuevaMascota, setNuevaMascota] = useState<PetFormState>({
-    nombre: '', especie: 'Gato', fechaNacimiento: '', peso: '', condicion: '', foto: ''
+    nombre: '', especie: 'Gato', raza: '', fechaNacimiento: '', peso: '', condicion: '', foto: ''
   });
 
   const { validarCamara, validarGaleria } = useCameraPermissions();
@@ -57,7 +58,7 @@ const PetModal = ({ onClose }: PetModalProps) => {
   };
 
   const guardar = async () => {
-    const { nombre, fechaNacimiento, peso, condicion, especie } = nuevaMascota;
+    const { nombre, fechaNacimiento, peso, condicion, especie, raza } = nuevaMascota;
     const pesoNum = parseFloat(peso);
 
     if (!selectedFile) return alertValidacion('¡Falta la foto!', 'Es necesario identificar a tu mascota con una imagen.');
@@ -72,6 +73,7 @@ const PetModal = ({ onClose }: PetModalProps) => {
     formData.append('file', selectedFile);
     formData.append('nombre', nombre.trim());
     formData.append('especie', especie);
+    formData.append('raza', raza.trim() || "Mestizo");
     formData.append('fechaNacimiento', fechaNacimiento);
     formData.append('peso', String(pesoNum));
     formData.append('condicion', condicion.trim() || "Sano");
@@ -79,20 +81,20 @@ const PetModal = ({ onClose }: PetModalProps) => {
     setLoading(true);
     try {
       await api.registrarConFoto(formData);
-      void Swal.fire({ title: '¡Registrada!', text: `${nombre} ya es parte de MascotAI`, icon: 'success', timer: 2000, showConfirmButton: false, customClass: { popup: 'rounded-[2rem]' } });
+      void Swal.fire({ title: '¡Registrada!', text: `${nombre} ya es parte de MascotAI`, icon: 'success', timer: 2000, showConfirmButton: false, customClass: { popup: 'rounded-4xl' } });
       onClose();
     } catch (e) {
       if (isAxiosError(e)) {
         console.error("Error al registrar mascota:", e.message);
       }
-      void Swal.fire({ title: 'Error', text: 'No pudimos guardar los datos en el servidor.', icon: 'error', customClass: { popup: 'rounded-[2rem]' } });
+      void Swal.fire({ title: 'Error', text: 'No pudimos guardar los datos en el servidor.', icon: 'error', customClass: { popup: 'rounded-4xl' } });
     } finally {
       setLoading(false);
     }
   };
 
   const alertValidacion = (title: string, text: string) => {
-    void Swal.fire({ title, text, icon: 'warning', confirmButtonColor: '#f97316', customClass: { popup: 'rounded-[2rem]' } });
+    void Swal.fire({ title, text, icon: 'warning', confirmButtonColor: '#f97316', customClass: { popup: 'rounded-4xl' } });
   };
 
   return (
@@ -112,10 +114,10 @@ const PetModal = ({ onClose }: PetModalProps) => {
           <div className="flex flex-col items-center">
             <div className="relative">
               <div className="absolute -top-3 -right-3 flex flex-col gap-2 z-50">
-                <button type="button" onClick={() => processNativeImage(CameraSource.Camera)} className="bg-orange-500 text-white p-3 rounded-2xl shadow-xl border-[4px] border-white active:scale-90 transition-all">
+                <button type="button" onClick={() => processNativeImage(CameraSource.Camera)} className="bg-orange-500 text-white p-3 rounded-2xl shadow-xl border-4 border-white active:scale-90 transition-all">
                   <CameraIcon size={20} strokeWidth={2.5} />
                 </button>
-                <button type="button" onClick={() => processNativeImage(CameraSource.Photos)} className="bg-slate-800 text-white p-3 rounded-2xl shadow-xl border-[4px] border-white active:scale-90 transition-all">
+                <button type="button" onClick={() => processNativeImage(CameraSource.Photos)} className="bg-slate-800 text-white p-3 rounded-2xl shadow-xl border-4 border-white active:scale-90 transition-all">
                   <ImageIcon size={20} strokeWidth={2.5} />
                 </button>
               </div>
@@ -160,6 +162,17 @@ const PetModal = ({ onClose }: PetModalProps) => {
               >
                 PERRO 🐕
               </button>
+            </div>
+
+            <div className="relative group">
+              <input
+                placeholder="Raza (ej: Caniche, Siamés, Mestizo)"
+                maxLength={30}
+                className="w-full p-5 pl-12 bg-slate-50 rounded-2xl font-bold border-2 border-transparent focus:border-orange-500 outline-none transition-all"
+                value={nuevaMascota.raza}
+                onChange={e => setNuevaMascota({ ...nuevaMascota, raza: e.target.value })}
+              />
+              <PawPrint className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-orange-500 transition-colors" size={20} />
             </div>
 
             <div className="flex gap-3">
@@ -207,7 +220,7 @@ const PetModal = ({ onClose }: PetModalProps) => {
             <button
               onClick={guardar}
               disabled={loading}
-              className="w-full py-5 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-[2rem] font-black text-lg shadow-xl shadow-orange-200 active:scale-95 transition-all mt-6 flex items-center justify-center gap-2 disabled:opacity-70"
+              className="w-full py-5 bg-linear-to-r from-orange-500 to-orange-600 text-white rounded-4xl font-black text-lg shadow-xl shadow-orange-200 active:scale-95 transition-all mt-6 flex items-center justify-center gap-2 disabled:opacity-70"
             >
               {loading ? <Loader2 className="animate-spin" /> : "REGISTRAR MASCOTA"}
             </button>

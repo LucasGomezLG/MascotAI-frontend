@@ -41,6 +41,7 @@ const PetProfiles = ({ mascotas, onUpdate }: PetProfilesProps) => {
         id: formData.id,
         nombre: formData.nombre || '',
         especie: formData.especie || 'Perro',
+        raza: formData.raza || 'Mestizo',
         fechaNacimiento: formData.fechaNacimiento || '',
         peso: pesoNum,
         condicion: formData.condicion?.trim() || "Sano",
@@ -97,21 +98,33 @@ const PetProfiles = ({ mascotas, onUpdate }: PetProfilesProps) => {
           <div key={pet.id || index} className="bg-white rounded-[2.5rem] p-6 shadow-sm border border-slate-100 relative overflow-hidden">
             {editingId === pet.id ? (
               <div className="space-y-4">
-                <input
-                  maxLength={20}
-                  className="w-full p-3 bg-slate-50 rounded-xl font-bold border-2 border-orange-100 outline-none focus:border-orange-500 transition-all"
-                  value={formData.nombre || ''}
-                  onChange={e => setFormData({ ...formData, nombre: e.target.value })}
-                />
+                <div className="flex gap-2">
+                  <input
+                    maxLength={20}
+                    placeholder="Nombre"
+                    className="w-1/2 p-3 bg-slate-50 rounded-xl font-bold border-2 border-orange-100 outline-none focus:border-orange-500 transition-all"
+                    value={formData.nombre || ''}
+                    onChange={e => setFormData({ ...formData, nombre: e.target.value })}
+                  />
+                  <input
+                    maxLength={30}
+                    placeholder="Raza"
+                    className="w-1/2 p-3 bg-slate-50 rounded-xl font-bold border-2 border-orange-100 outline-none focus:border-orange-500 transition-all"
+                    value={formData.raza || ''}
+                    onChange={e => setFormData({ ...formData, raza: e.target.value })}
+                  />
+                </div>
                 <div className="flex gap-2">
                   <input
                     type="number" step="0.1"
+                    placeholder="Peso"
                     className="w-1/3 p-3 bg-slate-50 rounded-xl font-bold border-2 border-orange-100 outline-none focus:border-orange-500"
                     value={formData.peso || ''}
                     onChange={e => e.target.value.length <= 4 && setFormData({ ...formData, peso: Number(e.target.value) })}
                   />
                   <input
                     type="text" maxLength={20}
+                    placeholder="Condición"
                     className="w-2/3 p-3 bg-slate-50 rounded-xl font-bold border-2 border-orange-100 outline-none focus:border-orange-500 text-sm"
                     value={formData.condicion || ''}
                     onChange={e => setFormData({ ...formData, condicion: e.target.value })}
@@ -131,7 +144,7 @@ const PetProfiles = ({ mascotas, onUpdate }: PetProfilesProps) => {
                   </div>
                   <div>
                     <h3 className="font-black text-lg text-slate-800 leading-none">{pet.nombre}</h3>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">{pet.especie} • {pet.edad || 0} años</p>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">{pet.especie} • {pet.raza || "Mestizo"} • {pet.edad || 0} años</p>
                     <div className="flex gap-2 mt-2">
                       <span className="px-3 py-1 bg-orange-50 text-orange-600 text-[8px] font-black rounded-lg border border-orange-100 uppercase">{pet.condicion || "Sano"}</span>
                       {pet.peso && pet.peso > 0 && <span className="px-3 py-1 bg-slate-50 text-slate-500 text-[8px] font-black rounded-lg border border-slate-100 uppercase">{pet.peso} kg</span>}
