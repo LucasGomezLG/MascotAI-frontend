@@ -1,8 +1,10 @@
-import React, {useCallback, useEffect, useState} from 'react';
-import {CheckCircle2, ClipboardPlus, Clock, Edit3, ShieldCheck, ShieldPlus, Trash2, X} from 'lucide-react';
+import React, {useCallback, useEffect, useState, useMemo} from 'react';
+import {CheckCircle2, ClipboardPlus, Clock, Edit3, ShieldCheck, ShieldPlus, Trash2, X, Sparkles, AlertTriangle, Heart, ArrowRight} from 'lucide-react';
 import {api} from '@/services/api.ts';
 import {Toast} from '@/utils/alerts.ts';
 import type {RecordatorioSaludDTO} from '@/types/api.types.ts';
+import toast from 'react-hot-toast';
+import Swal from 'sweetalert2';
 
 const HealthHistory = ({ mascotaId }: { mascotaId: string }) => {
   const [eventos, setEventos] = useState<RecordatorioSaludDTO[]>([]);
@@ -24,6 +26,20 @@ const HealthHistory = ({ mascotaId }: { mascotaId: string }) => {
     if (mascotaId) void cargarHistorial();
   }, [mascotaId, cargarHistorial]);
 
+  const handleEnDesarrollo = () => {
+    toast('Opción en desarrollo 🚀', {
+      icon: '🛠️',
+      style: {
+        borderRadius: '1rem',
+        background: '#333',
+        color: '#fff',
+        fontSize: '12px',
+        fontWeight: 'bold',
+        textTransform: 'uppercase'
+      },
+    });
+  };
+
   const handleBorrar = (id: string) => {
     void Toast.fire({
       title: '¿Eliminar registro?',
@@ -44,45 +60,141 @@ const HealthHistory = ({ mascotaId }: { mascotaId: string }) => {
 
   const handleGuardarEdicion = async () => {
     if (!editando) return;
-
     if (!editando.nombre?.trim()) return Toast.fire({ icon: 'warning', title: 'El nombre es obligatorio' });
     
     const dApp = new Date(editando.fechaAplicacion);
+    dApp.setHours(0, 0, 0, 0);
+    const dHoy = new Date();
+    dHoy.setHours(0, 0, 0, 0);
+
     if (isNaN(dApp.getTime())) return Toast.fire({ icon: 'warning', title: 'Fecha de aplicación inválida' });
+    
+    if (dApp > dHoy) {
+      return Swal.fire({ 
+        title: 'Fecha inválida',
+        text: 'La fecha de aplicación no puede ser futura.', 
+        icon: 'warning',
+        confirmButtonColor: '#10b981' 
+      });
+    }
 
     if (editando.proximaFecha) {
       const dProx = new Date(editando.proximaFecha);
+      dProx.setHours(0, 0, 0, 0);
+
       if (isNaN(dProx.getTime())) return Toast.fire({ icon: 'warning', title: 'Fecha de refuerzo inválida' });
-      if (dProx <= dApp) return Toast.fire({ icon: 'warning', title: 'El refuerzo debe ser posterior a la aplicación' });
+      
+      if (dProx <= dHoy) {
+        return Swal.fire({
+          title: 'Fecha vieja',
+          text: 'La fecha de próximo refuerzo debe ser a partir de mañana.',
+          icon: 'warning',
+          confirmButtonColor: '#10b981'
+        });
+      }
+
+      if (dProx <= dApp) {
+        return Swal.fire({
+          title: 'Revisar fechas',
+          text: 'La fecha de refuerzo debe ser posterior a la aplicación.',
+          icon: 'warning',
+          confirmButtonColor: '#10b981'
+        });
+      }
     }
 
     try {
-      await api.guardarEventoSalud(editando);
+      if (editando.id) {
+        await api.actualizarEventoSalud(editando.id, editando);
+      } else {
+        await api.guardarEventoSalud(editando);
+      }
       setEditando(null);
       await cargarHistorial();
-      void Toast.fire({ icon: 'success', title: 'Cambios guardados' });
+      void Toast.fire({ icon: 'success', title: 'Registro actualizado correctamente' });
     } catch {
       void Toast.fire({ icon: 'error', title: 'Error al actualizar' });
     }
   };
 
-  const proximos = eventos.filter(e => 
-    e.completado === true && 
-    e.proximaFecha && 
-    new Date(e.proximaFecha) >= new Date()
-  ).sort((a, b) => {
-    const dateA = a.proximaFecha ? new Date(a.proximaFecha).getTime() : 0;
-    const dateB = b.proximaFecha ? new Date(b.proximaFecha).getTime() : 0;
-    return dateA - dateB;
-  });
+  const proximos = useMemo(() => 
+    eventos.filter(e => 
+      e.completado === true && 
+      e.proximaFecha && 
+      new Date(e.proximaFecha) >= new Date()
+    ).sort((a, b) => {
+      const dateA = a.proximaFecha ? new Date(a.proximaFecha).getTime() : 0;
+      const dateB = b.proximaFecha ? new Date(b.proximaFecha).getTime() : 0;
+      return dateA - dateB;
+    }), [eventos]);
+
+  const vencidos = useMemo(() => 
+    eventos.filter(e => 
+      e.completado === true && 
+      e.proximaFecha && 
+      new Date(e.proximaFecha) < new Date()
+    ), [eventos]);
+
+  const healthInsight = useMemo(() => {
+    if (eventos.length === 0) return {
+        title: "Cartilla Vacía",
+        text: "Aún no registramos eventos de salud. Escaneá una receta o carnet para empezar el seguimiento.",
+        color: "from-slate-600 to-slate-700",
+        icon: <ClipboardPlus size={18} />
+    };
+
+    if (vencidos.length > 0) return {
+        title: "Atención Requerida",
+        text: `Tenés ${vencidos.length} refuerzo(s) pendientes. Es importante mantener la protección al día.`,
+        color: "from-red-500 to-red-600",
+        icon: <AlertTriangle size={18} />
+    };
+
+    if (proximos.length > 0) {
+        const dias = Math.ceil((new Date(proximos[0].proximaFecha!).getTime() - new Date().getTime()) / (1000 * 3600 * 24));
+        if (dias <= 7) return {
+            title: "Refuerzo Próximo",
+            text: `Recordatorio: ${proximos[0].nombre} vence en ${dias} días.`,
+            color: "from-orange-500 to-orange-600",
+            icon: <Clock size={18} />
+        };
+    }
+
+    return {
+        title: "Protección Óptima",
+        text: "¡Excelente! Tu mascota tiene todos sus tratamientos y vacunas al día.",
+        color: "from-emerald-500 to-teal-600",
+        icon: <ShieldCheck size={18} />
+    };
+  }, [eventos, vencidos, proximos]);
 
   if (loading) return <div className="p-8 text-center font-bold text-slate-400">Cargando cartilla...</div>;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-700 text-left">
       
+      {/* Card de Insight IA de Salud */}
+      <div className={`bg-linear-to-br ${healthInsight.color} p-6 rounded-[2.5rem] text-white shadow-lg relative overflow-hidden group`}>
+        <Sparkles className="absolute -right-4 -top-4 text-white/10 rotate-12 group-hover:scale-110 transition-transform" size={120} />
+        <div className="relative z-10">
+            <div className="flex items-center gap-2 mb-4">
+                <div className="bg-white/20 p-2 rounded-xl">{healthInsight.icon}</div>
+                <h4 className="font-black uppercase text-xs tracking-widest text-white/90">{healthInsight.title}</h4>
+            </div>
+            <p className="text-sm font-bold leading-relaxed mb-4">
+                {healthInsight.text}
+            </p>
+            <button 
+                onClick={handleEnDesarrollo}
+                className="flex items-center gap-2 text-[10px] font-black uppercase bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-full transition-all"
+            >
+                Ver Recomendaciones <ArrowRight size={12} />
+            </button>
+        </div>
+      </div>
+
       {proximos.length > 0 && (
-        <div className="bg-orange-50 p-6 rounded-[2rem] border-2 border-orange-100">
+        <div className="bg-orange-50 p-6 rounded-4xl border-2 border-orange-100">
           <h4 className="text-[10px] font-black text-orange-600 uppercase tracking-widest mb-4 flex items-center gap-2">
             <Clock size={14} /> Próximos Vencimientos
           </h4>
@@ -111,7 +223,7 @@ const HealthHistory = ({ mascotaId }: { mascotaId: string }) => {
 
       <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-slate-50 relative">
         <h3 className="text-lg font-black text-slate-800 mb-6 flex items-center gap-2">
-            <span className="text-emerald-500">🛡️</span> Historial Sanitario
+            <Heart className="text-emerald-500" fill="currentColor" size={20} /> Historial Sanitario
         </h3>
         
         {eventos.length === 0 ? (
@@ -144,7 +256,9 @@ const HealthHistory = ({ mascotaId }: { mascotaId: string }) => {
                   <div className="flex items-center gap-2">
                     <span className="text-[9px] font-black text-slate-400 uppercase">{e.tipo}</span>
                     {e.completado && e.proximaFecha && (
-                      <span className="text-[9px] font-black text-emerald-600 uppercase tracking-tight">• Refuerzo: {e.proximaFecha}</span>
+                      <span className={`text-[9px] font-black uppercase tracking-tight ${new Date(e.proximaFecha) < new Date() ? 'text-red-500' : 'text-emerald-600'}`}>
+                        • Refuerzo: {e.proximaFecha} {new Date(e.proximaFecha) < new Date() ? '(Vencido)' : ''}
+                      </span>
                     )}
                     {!e.completado && <span className="bg-slate-200 text-slate-600 text-[8px] font-black px-1.5 py-0.5 rounded uppercase">Pendiente</span>}
                   </div>
@@ -158,7 +272,7 @@ const HealthHistory = ({ mascotaId }: { mascotaId: string }) => {
       </div>
 
       {editando && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-6 animate-in fade-in">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-100 flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl relative text-left animate-in zoom-in-95">
             <button onClick={() => setEditando(null)} className="absolute top-6 right-6 text-slate-400 hover:text-slate-900"><X size={24} /></button>
             

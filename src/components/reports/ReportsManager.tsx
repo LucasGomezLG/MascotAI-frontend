@@ -13,7 +13,9 @@ import {
     Wallet,
     CheckSquare,
     Square,
-    Loader2
+    Loader2,
+    ArrowRight,
+    TrendingUp
 } from 'lucide-react';
 import {api} from '@/services/api.ts';
 import Dashboard from '../../Dashboard';
@@ -46,6 +48,20 @@ const ReportsManager = ({ onVerDetalle }: { onVerDetalle: (item: AlimentoDTO | C
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
 
   const [refreshKey, setRefreshKey] = useState(0);
+
+  const handleEnDesarrollo = () => {
+    toast('Opción en desarrollo 🚀', {
+      icon: '🛠️',
+      style: {
+        borderRadius: '1rem',
+        background: '#333',
+        color: '#fff',
+        fontSize: '12px',
+        fontWeight: 'bold',
+        textTransform: 'uppercase'
+      },
+    });
+  };
 
   const calcularEdad = useCallback((fecha: string) => {
     if (!fecha) return "---";
@@ -154,6 +170,30 @@ const ReportsManager = ({ onVerDetalle }: { onVerDetalle: (item: AlimentoDTO | C
     }
   };
 
+  const foodInsight = useMemo(() => {
+    if (historial.length === 0) return {
+        title: "Sin Historial",
+        text: "Aún no has escaneado alimentos. Empezá ahora para conocer la calidad de su dieta.",
+        color: "from-slate-600 to-slate-700",
+        icon: <Utensils size={18} />
+    };
+
+    const bajas = historial.filter(h => (h.calidad || "").toLowerCase().includes('baja')).length;
+    if (bajas > 0) return {
+        title: "Calidad a Revisar",
+        text: `Detectamos ${bajas} alimento(s) de gama baja en tu historial. Considerá opciones más nutritivas.`,
+        color: "from-orange-500 to-orange-600",
+        icon: <TrendingUp size={18} />
+    };
+
+    return {
+        title: "Dieta Saludable",
+        text: "La mayoría de los alimentos escaneados son de buena calidad. ¡Seguí así!",
+        color: "from-indigo-500 to-indigo-600",
+        icon: <Sparkles size={18} />
+    };
+  }, [historial]);
+
   return (
     <div className="space-y-6 pb-20 text-left">
       <div className="flex bg-white p-1.5 rounded-2xl shadow-sm border border-slate-100 overflow-x-auto no-scrollbar">
@@ -181,7 +221,27 @@ const ReportsManager = ({ onVerDetalle }: { onVerDetalle: (item: AlimentoDTO | C
 
       {subTab === 'food' && (
         <>
-          <div className="animate-in slide-in-from-top-4">
+          {/* Card de Insight IA de Alimentos */}
+          <div className={`bg-linear-to-br ${foodInsight.color} p-6 rounded-[2.5rem] text-white shadow-lg relative overflow-hidden group animate-in slide-in-from-top-4`}>
+            <Sparkles className="absolute -right-4 -top-4 text-white/10 rotate-12 group-hover:scale-110 transition-transform" size={120} />
+            <div className="relative z-10">
+                <div className="flex items-center gap-2 mb-4">
+                    <div className="bg-white/20 p-2 rounded-xl">{foodInsight.icon}</div>
+                    <h4 className="font-black uppercase text-xs tracking-widest text-white/90">{foodInsight.title}</h4>
+                </div>
+                <p className="text-sm font-bold leading-relaxed mb-4">
+                    {foodInsight.text}
+                </p>
+                <button 
+                    onClick={handleEnDesarrollo}
+                    className="flex items-center gap-2 text-[10px] font-black uppercase bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-full transition-all"
+                >
+                    Comparar Calidades <ArrowRight size={12} />
+                </button>
+            </div>
+          </div>
+
+          <div className="mt-8">
             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
               <Sparkles size={12} className="text-orange-500" /> Proyecciones de Stock
             </h3>

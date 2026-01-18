@@ -120,6 +120,7 @@ export const api = {
   getAlertasSaludPreventiva: () => apiClient.get<RecordatorioSaludDTO[]>('/salud/alertas'),
   getHistorialPreventivoMascota: (mascotaId: string) => apiClient.get<RecordatorioSaludDTO[]>(`/salud/mascota/${mascotaId}`),
   guardarEventoSalud: (data: RecordatorioSaludDTO) => apiClient.post<RecordatorioSaludDTO>('/salud', data),
+  actualizarEventoSalud: (id: string, data: RecordatorioSaludDTO) => apiClient.put<RecordatorioSaludDTO>(`/salud/${id}`, data),
   eliminarRegistroPreventivo: (id: string) => apiClient.delete(`/salud/${id}`),
 
   // --- 🩺 MÓDULO: SALUD (Vomitos/Piel/Etc) ---
