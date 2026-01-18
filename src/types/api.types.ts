@@ -36,14 +36,16 @@ export interface AlertaDTO {
 
 export interface ProductoDTO {
   id?: string;
-  userId?: string;
+  userId?: string; // El ID del usuario vendedor (solo lectura)
   nombre: string;
   descripcion?: string;
   precio: number;
   categoria: string;
-  contacto: string;
+  contacto: string; // Info para que el comprador contacte al vendedor
   fotos?: string[];
   stock: number;
+  destacado?: boolean; // NUEVO: Indica si el producto está pagado para resaltar
+  fechaFinDestaque?: string; // NUEVO: Fecha en que termina el destaque (ISO string)
 }
 
 
