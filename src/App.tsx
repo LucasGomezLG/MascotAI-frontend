@@ -202,7 +202,7 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 text-left pt-[env(safe-area-inset-top)]" style={{ paddingBottom: activeTab === 'marketplace' ? 0 : 'calc(6rem + env(safe-area-inset-bottom))' }}>
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 text-left" style={{ paddingBottom: activeTab === 'marketplace' ? 0 : 'calc(6rem + env(safe-area-inset-bottom))' }}>
       <Toaster 
         position="top-center" 
         reverseOrder={false} 

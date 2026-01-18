@@ -32,8 +32,7 @@ export default function AppHeader({
 
   return (
     <header
-      className="bg-white p-4 border-b sticky top-0 z-40 flex items-center justify-between shadow-sm"
-      style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top))' }}
+      className="bg-white p-4 border-b sticky top-0 z-40 flex items-center justify-between shadow-sm pt-[calc(1rem+env(safe-area-inset-top))]"
     >
       <div className="flex items-center gap-2 cursor-pointer" onClick={() => setActiveTab('home')}>
         <div className="bg-orange-600 p-2 rounded-xl shadow-lg rotate-3">
