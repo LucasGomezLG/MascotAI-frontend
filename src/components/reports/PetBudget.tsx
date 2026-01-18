@@ -1,26 +1,26 @@
-import React, { useEffect, useState } from 'react';
-import { Wallet, TrendingUp, Stethoscope, ShieldCheck, Utensils, Info } from 'lucide-react';
-import { api } from '../../services/api';
-import Swal from 'sweetalert2';
+import React, {useEffect, useState} from 'react';
+import {Info, ShieldCheck, Stethoscope, TrendingUp, Utensils, Wallet} from 'lucide-react';
+import {api} from '@/services/api.ts';
 
 const PetBudget = () => {
   const [data, setData] = useState({ comida: 0, vete: 0, salud: 0, total: 0 });
   const [loading, setLoading] = useState(true);
 
-  // ✅ Obtenemos el nombre del mes actual para que el reporte sea claro
   const nombreMes = new Intl.DateTimeFormat('es-ES', { month: 'long' }).format(new Date());
 
   useEffect(() => {
-    setLoading(true);
-    api.getPresupuestoMensual()
-      .then(res => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const res = await api.getPresupuestoMensual();
         if (res.data) setData(res.data);
-      })
-      .catch(err => {
+      } catch (err) {
         console.error("Error al cargar presupuesto", err);
-        // ✅ No interrumpimos con un modal gigante, pero avisamos en consola
-      })
-      .finally(() => setLoading(false));
+      } finally {
+        setLoading(false);
+      }
+    };
+    void fetchData();
   }, []);
 
   return (
@@ -28,7 +28,6 @@ const PetBudget = () => {
       <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-slate-50 animate-in fade-in slide-in-from-bottom-4">
         <div className="flex items-center justify-between mb-8">
           <div>
-            {/* ✅ Título Dinámico: "Presupuesto de Diciembre" */}
             <h3 className="text-xl font-black text-slate-800 tracking-tight leading-none capitalize">
               Inversión de {nombreMes}
             </h3>
@@ -43,7 +42,6 @@ const PetBudget = () => {
           <div className="py-10 flex justify-center"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div></div>
         ) : (
           <div className="space-y-6">
-            {/* 1. ALIMENTACIÓN */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-2 h-8 bg-orange-500 rounded-full shadow-sm shadow-orange-100"></div>
@@ -55,7 +53,6 @@ const PetBudget = () => {
               <Utensils size={16} className="text-slate-200" />
             </div>
 
-            {/* 2. VETERINARIA */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-2 h-8 bg-red-500 rounded-full shadow-sm shadow-red-100"></div>
@@ -67,7 +64,6 @@ const PetBudget = () => {
               <Stethoscope size={16} className="text-slate-200" />
             </div>
 
-            {/* 3. SALUD PREVENTIVA */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-2 h-8 bg-emerald-500 rounded-full shadow-sm shadow-emerald-100"></div>
@@ -81,7 +77,6 @@ const PetBudget = () => {
 
             <hr className="border-slate-50" />
 
-            {/* TOTAL */}
             <div className="bg-slate-900 p-6 rounded-[2rem] text-white flex items-center justify-between shadow-xl shadow-slate-200 border-t-4 border-emerald-500/20">
               <div>
                 <p className="text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">Total Acumulado</p>
@@ -95,7 +90,6 @@ const PetBudget = () => {
         )}
       </div>
 
-      {/* 📒 CARTEL INFORMATIVO */}
       <div className="bg-amber-50/80 border border-amber-200 p-6 rounded-[2.5rem] shadow-sm">
         <div className="flex items-center gap-3 mb-3">
           <div className="bg-amber-100 p-2 rounded-xl text-amber-600"><Info size={20} /></div>

@@ -1,37 +1,31 @@
-import React, { useEffect, useState } from 'react';
-import { 
-  Calendar, ShieldPlus, ShieldCheck, Clock, Trash2, 
-  AlertCircle, CheckCircle2, Edit3, X, ClipboardPlus 
-} from 'lucide-react';
-import { api } from '../../services/api';
-import { Toast } from '../../utils/alerts';
-// ✅ Importamos el DTO para asegurar el tipado de los campos
-import type { RecordatorioSaludDTO } from '../../types/api.types';
+import React, {useCallback, useEffect, useState} from 'react';
+import {CheckCircle2, ClipboardPlus, Clock, Edit3, ShieldCheck, ShieldPlus, Trash2, X} from 'lucide-react';
+import {api} from '@/services/api.ts';
+import {Toast} from '@/utils/alerts.ts';
+import type {RecordatorioSaludDTO} from '@/types/api.types.ts';
 
 const HealthHistory = ({ mascotaId }: { mascotaId: string }) => {
-  // ✅ Tipamos el estado para evitar errores en 'p.nombre', 'p.proximaFecha', etc.
   const [eventos, setEventos] = useState<RecordatorioSaludDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [editando, setEditando] = useState<RecordatorioSaludDTO | null>(null);
 
-  const cargarHistorial = async () => {
+  const cargarHistorial = useCallback(async () => {
     try {
-      // ✅ Endpoint actualizado: getHistorialPreventivoMascota
       const res = await api.getHistorialPreventivoMascota(mascotaId);
       setEventos(res.data);
-    } catch (e) {
+    } catch {
       console.error("Error al cargar historial de salud");
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    if (mascotaId) cargarHistorial();
   }, [mascotaId]);
 
+  useEffect(() => {
+    if (mascotaId) void cargarHistorial();
+  }, [mascotaId, cargarHistorial]);
+
   const handleBorrar = (id: string) => {
-    Toast.fire({
+    void Toast.fire({
       title: '¿Eliminar registro?',
       text: "Esta acción quitará el evento de la cartilla.",
       icon: 'warning',
@@ -41,10 +35,9 @@ const HealthHistory = ({ mascotaId }: { mascotaId: string }) => {
       confirmButtonColor: '#ef4444'
     }).then(async (result) => {
       if (result.isConfirmed) {
-        // ✅ Endpoint actualizado: eliminarRegistroPreventivo
         await api.eliminarRegistroPreventivo(id);
-        cargarHistorial();
-        Toast.fire({ icon: 'success', title: 'Eliminado' });
+        await cargarHistorial();
+        void Toast.fire({ icon: 'success', title: 'Eliminado' });
       }
     });
   };
@@ -52,7 +45,6 @@ const HealthHistory = ({ mascotaId }: { mascotaId: string }) => {
   const handleGuardarEdicion = async () => {
     if (!editando) return;
 
-    // 🛡️ Validaciones de consistencia
     if (!editando.nombre?.trim()) return Toast.fire({ icon: 'warning', title: 'El nombre es obligatorio' });
     
     const dApp = new Date(editando.fechaAplicacion);
@@ -65,17 +57,15 @@ const HealthHistory = ({ mascotaId }: { mascotaId: string }) => {
     }
 
     try {
-      // ✅ FIX: Llamada correcta al servicio
       await api.guardarEventoSalud(editando);
       setEditando(null);
-      cargarHistorial();
-      Toast.fire({ icon: 'success', title: 'Cambios guardados' });
-    } catch (e) {
-      Toast.fire({ icon: 'error', title: 'Error al actualizar' });
+      await cargarHistorial();
+      void Toast.fire({ icon: 'success', title: 'Cambios guardados' });
+    } catch {
+      void Toast.fire({ icon: 'error', title: 'Error al actualizar' });
     }
   };
 
-  // Filtrado de próximos vencimientos
   const proximos = eventos.filter(e => 
     e.completado === true && 
     e.proximaFecha && 
@@ -91,7 +81,6 @@ const HealthHistory = ({ mascotaId }: { mascotaId: string }) => {
   return (
     <div className="space-y-6 animate-in fade-in duration-700 text-left">
       
-      {/* SECCIÓN DE PRÓXIMOS REFUERZOS */}
       {proximos.length > 0 && (
         <div className="bg-orange-50 p-6 rounded-[2rem] border-2 border-orange-100">
           <h4 className="text-[10px] font-black text-orange-600 uppercase tracking-widest mb-4 flex items-center gap-2">
@@ -120,7 +109,6 @@ const HealthHistory = ({ mascotaId }: { mascotaId: string }) => {
         </div>
       )}
 
-      {/* HISTORIAL COMPLETO */}
       <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-slate-50 relative">
         <h3 className="text-lg font-black text-slate-800 mb-6 flex items-center gap-2">
             <span className="text-emerald-500">🛡️</span> Historial Sanitario
@@ -169,7 +157,6 @@ const HealthHistory = ({ mascotaId }: { mascotaId: string }) => {
         )}
       </div>
 
-      {/* MODAL DE EDICIÓN */}
       {editando && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-6 animate-in fade-in">
           <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl relative text-left animate-in zoom-in-95">

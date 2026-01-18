@@ -1,10 +1,10 @@
 import React from 'react';
-import { Bell, X, Package, ShieldPlus, Check } from 'lucide-react';
+import {Bell, Check, Package, ShieldPlus, X} from 'lucide-react';
 
 interface Alerta {
   id: string;
   mensaje: string;
-  tipo: 'STOCK' | 'SALUD';
+  tipo: string;
   fecha: string;
 }
 
@@ -16,10 +16,8 @@ interface Props {
 
 const NotificationsCenter = ({ alertas, onMarkRead, onClose }: Props) => {
   return (
-    /* ✅ CONTENEDOR FIJO: Cubre toda la pantalla para centrar el modal */
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in">
       
-      {/* ✅ EL MODAL: Centrado y con ancho máximo controlado */}
       <div className="relative w-full max-w-[320px] sm:max-w-sm bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-300 overflow-hidden">
         
         <div className="p-6 border-b border-slate-50 flex justify-between items-center">
@@ -35,7 +33,6 @@ const NotificationsCenter = ({ alertas, onMarkRead, onClose }: Props) => {
         <div className="max-h-96 overflow-y-auto p-4 space-y-3 custom-scrollbar">
           {alertas.length === 0 ? (
             <div className="py-12 text-center">
-              {/* ✅ CÍRCULO VERDE: Para Helena, Simba y los demás */}
               <div className="bg-green-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Check size={28} className="text-green-500" />
               </div>

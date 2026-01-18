@@ -1,27 +1,37 @@
-import React, { useState } from 'react';
+import React, {useState} from 'react';
 import {
-  MapPin, Trash2, Globe, Wallet, Copy, Check,
-  ChevronLeft, ChevronRight, ShieldAlert, ShieldCheck, Eye, Info, X, Maximize2
+    Check,
+    ChevronLeft,
+    ChevronRight,
+    Eye,
+    Globe,
+    Info,
+    MapPin,
+    Maximize2,
+    ShieldAlert,
+    ShieldCheck,
+    Trash2,
+    Wallet,
+    X
 } from 'lucide-react';
-import { MapContainer, TileLayer, Circle } from 'react-leaflet';
+import {Circle, MapContainer, TileLayer} from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import Swal from 'sweetalert2';
+import type {RefugioDTO, UserDTO} from '@/types/api.types.ts';
+import toast from 'react-hot-toast';
 
 interface RefugioCardProps {
-  refugio: any;
-  currentUser: any;
-  onDelete: (id: string) => void;
+  refugio: RefugioDTO;
+  currentUser: UserDTO | null;
+  onDelete: (id: string | undefined) => void;
 }
 
 const RefugioCard = ({ refugio, currentUser, onDelete }: RefugioCardProps) => {
-
   const [currentFoto, setCurrentFoto] = useState(0);
   const [copiedAlias, setCopiedAlias] = useState(false);
-  const [copiedSocial, setCopiedSocial] = useState(false);
   const [showFullDesc, setShowFullDesc] = useState(false);
   const [imgZoom, setImgZoom] = useState<string | null>(null);
 
-  // ✅ LÓGICA DE PROPIEDAD: Identifica al dueño sin logs
   const esMio = currentUser && refugio.userId && 
                 String(refugio.userId).trim() === String(currentUser.id).trim();
 
@@ -37,17 +47,20 @@ const RefugioCard = ({ refugio, currentUser, onDelete }: RefugioCardProps) => {
     setCurrentFoto(prev => (prev === 0 ? fotos.length - 1 : prev - 1));
   };
 
-  const showToast = (text: string) => {
-    Swal.mixin({
-      toast: true,
-      position: 'top',
-      showConfirmButton: false,
-      timer: 2000,
-    }).fire({ icon: 'success', title: text });
+  const handleCopy = (text: string, successMessage: string) => {
+    navigator.clipboard.writeText(text)
+      .then(() => {
+        toast.success(successMessage);
+        if (text === refugio.aliasDonacion) {
+          setCopiedAlias(true);
+          setTimeout(() => setCopiedAlias(false), 2000);
+        }
+      })
+      .catch(() => toast.error('Error al copiar'));
   };
 
   const handleCopyAlias = () => {
-    Swal.fire({
+    void Swal.fire({
       title: '¡Aviso de Seguridad!',
       html: `
         <div class="text-left space-y-3">
@@ -67,23 +80,19 @@ const RefugioCard = ({ refugio, currentUser, onDelete }: RefugioCardProps) => {
       customClass: { popup: 'rounded-[2.5rem]' }
     }).then((result) => {
       if (result.isConfirmed) {
-        navigator.clipboard.writeText(refugio.aliasDonacion);
-        setCopiedAlias(true);
-        showToast('Alias copiado');
-        setTimeout(() => setCopiedAlias(false), 2000);
+        handleCopy(refugio.aliasDonacion, 'Alias copiado');
       }
     });
   };
 
   return (
     <>
-      <div className="relative min-w-[280px] max-w-[280px] bg-white rounded-[2.5rem] p-5 shadow-sm border border-slate-100 flex flex-col gap-4 animate-in fade-in slide-in-from-right-4">
+      <div className="relative min-w-70 max-w-70 bg-white rounded-[2.5rem] p-5 shadow-sm border border-slate-100 flex flex-col gap-4 animate-in fade-in slide-in-from-right-4">
 
-        {/* BOTÓN ELIMINAR: Solo para el dueño */}
         {esMio && (
           <button
             onClick={() => {
-              Swal.fire({
+              void Swal.fire({
                 title: '¿Eliminar refugio?',
                 text: "Esta publicación desaparecerá de la comunidad.",
                 icon: 'warning',
@@ -91,7 +100,7 @@ const RefugioCard = ({ refugio, currentUser, onDelete }: RefugioCardProps) => {
                 confirmButtonColor: '#ef4444',
                 confirmButtonText: 'Sí, eliminar',
                 cancelButtonText: 'Cancelar',
-                customClass: { popup: 'rounded-[2rem]' }
+                customClass: { popup: 'rounded-4xl' }
               }).then((result) => {
                 if (result.isConfirmed) onDelete(refugio.id);
               });
@@ -102,7 +111,6 @@ const RefugioCard = ({ refugio, currentUser, onDelete }: RefugioCardProps) => {
           </button>
         )}
 
-        {/* CAROUSEL DE FOTOS CON ZOOM */}
         <div
           className="relative h-36 bg-slate-100 rounded-2xl overflow-hidden group/img cursor-zoom-in"
           onClick={() => setImgZoom(fotos[currentFoto])}
@@ -128,7 +136,6 @@ const RefugioCard = ({ refugio, currentUser, onDelete }: RefugioCardProps) => {
           )}
         </div>
 
-        {/* INFO PRINCIPAL */}
         <div className="space-y-2 text-left">
           <div className="flex justify-between items-start">
             <h4 className="font-black text-slate-800 text-base leading-none truncate flex-1">{refugio.nombre}</h4>
@@ -136,7 +143,7 @@ const RefugioCard = ({ refugio, currentUser, onDelete }: RefugioCardProps) => {
           </div>
 
           <div className="flex justify-between items-start gap-2">
-            <p className="text-[11px] font-bold text-slate-500 leading-snug line-clamp-2 flex-1 min-h-[32px] break-words">
+            <p className="text-[11px] font-bold text-slate-500 leading-snug line-clamp-2 flex-1 min-h-8 break-words">
               {refugio.descripcion}
             </p>
             <button
@@ -149,13 +156,12 @@ const RefugioCard = ({ refugio, currentUser, onDelete }: RefugioCardProps) => {
 
           <div className="flex items-center gap-1 px-2 py-1 bg-violet-50 rounded-lg w-fit">
             <MapPin size={10} className="text-violet-500" />
-            <span className="text-[9px] font-black uppercase text-violet-600 tracking-tighter truncate max-w-[180px]">
+            <span className="text-[9px] font-black uppercase text-violet-600 tracking-tighter truncate max-w-45">
               {refugio.direccion}
             </span>
           </div>
         </div>
 
-        {/* MAPA DE REFERENCIA */}
         <div className="h-28 rounded-2xl overflow-hidden border border-slate-100 relative grayscale-[0.4] contrast-[0.9]">
           <MapContainer center={[refugio.lat || 0, refugio.lng || 0]} zoom={15} scrollWheelZoom={false} zoomControl={false} dragging={false} style={{ height: '100%', width: '100%' }}>
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
@@ -167,7 +173,6 @@ const RefugioCard = ({ refugio, currentUser, onDelete }: RefugioCardProps) => {
           </MapContainer>
         </div>
 
-        {/* ACCIONES */}
         <div className="space-y-2">
           <button
             onClick={handleCopyAlias}
@@ -178,10 +183,7 @@ const RefugioCard = ({ refugio, currentUser, onDelete }: RefugioCardProps) => {
           </button>
 
           <button
-            onClick={() => {
-              navigator.clipboard.writeText(refugio.redSocial);
-              showToast('Link copiado');
-            }}
+            onClick={() => handleCopy(refugio.redSocial, 'Link copiado')}
             className="w-full py-3 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase flex items-center justify-center gap-2 active:scale-95 transition-all shadow-xl shadow-slate-100"
           >
             <Globe size={14} /> Red Social / Web
@@ -189,10 +191,9 @@ const RefugioCard = ({ refugio, currentUser, onDelete }: RefugioCardProps) => {
         </div>
       </div>
 
-      {/* ZOOM MODAL */}
       {imgZoom && (
         <div
-          className="fixed inset-0 bg-slate-900/90 backdrop-blur-xl z-[200] flex items-center justify-center p-4 animate-in fade-in duration-300"
+          className="fixed inset-0 bg-slate-900/90 backdrop-blur-xl z-200 flex items-center justify-center p-4 animate-in fade-in duration-300"
           onClick={() => setImgZoom(null)}
         >
           <button className="absolute top-10 right-10 text-white/50 hover:text-white transition-colors">
@@ -206,9 +207,8 @@ const RefugioCard = ({ refugio, currentUser, onDelete }: RefugioCardProps) => {
         </div>
       )}
 
-      {/* MODAL DE DESCRIPCIÓN */}
       {showFullDesc && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[120] flex items-center justify-center p-6 animate-in fade-in zoom-in-95 duration-300">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-120 flex items-center justify-center p-6 animate-in fade-in zoom-in-95 duration-300">
           <div className="bg-white w-full max-w-sm rounded-[3rem] p-0 shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-300">
             <div className="absolute -top-24 -right-24 w-48 h-48 bg-violet-50 rounded-full blur-3xl opacity-60" />
             <button onClick={() => setShowFullDesc(false)} className="absolute top-6 right-6 p-2 bg-slate-50 text-slate-400 hover:text-violet-600 rounded-full transition-all z-10"><X size={20} /></button>
@@ -218,12 +218,12 @@ const RefugioCard = ({ refugio, currentUser, onDelete }: RefugioCardProps) => {
                 <Info size={28} strokeWidth={2.5} />
               </div>
               <p className="text-[9px] font-black text-violet-400 uppercase tracking-[0.25em] mb-1">Refugio Solidario</p>
-              <h3 className="font-black text-slate-800 text-xl tracking-tight text-center leading-tight mb-6 break-words w-full">
+              <h3 className="font-black text-slate-800 text-xl tracking-tight text-center leading-tight mb-6 wrap-break-word w-full">
                 Sobre {refugio.nombre}
               </h3>
-              <div className="w-full bg-slate-50 border border-slate-100 rounded-[2rem] overflow-hidden relative">
+              <div className="w-full bg-slate-50 border border-slate-100 rounded-4xl overflow-hidden relative">
                 <div className="p-6 max-h-[35vh] overflow-y-auto custom-scrollbar">
-                  <p className="text-sm font-bold text-slate-600 leading-relaxed text-left whitespace-pre-wrap break-words">
+                  <p className="text-sm font-bold text-slate-600 leading-relaxed text-left whitespace-pre-wrap wrap-break-word">
                     {refugio.descripcion}
                   </p>
                 </div>

@@ -1,39 +1,38 @@
-import React, { useState } from 'react';
-import { User, Edit2, Save, X, PlusCircle, Trash2 } from 'lucide-react';
-import { api } from '../../services/api';
-import type { MascotaDTO } from '../../types/api.types';
+import React, {useState} from 'react';
+import {Edit2, PlusCircle, Save, Trash2, User, X} from 'lucide-react';
+import {api} from '@/services/api.ts';
+import type {MascotaDTO} from '@/types/api.types.ts';
 import Swal from 'sweetalert2';
+import {useUIStore} from '@/stores/uiStore';
+import toast from 'react-hot-toast';
 
 interface PetProfilesProps {
   mascotas: MascotaDTO[];
   onUpdate: () => void;
-  onAddClick: () => void;
 }
 
-const PetProfiles = ({ mascotas, onUpdate, onAddClick }: PetProfilesProps) => {
+const PetProfiles = ({ mascotas, onUpdate }: PetProfilesProps) => {
+  const { togglePetModal, setZoomedPhoto } = useUIStore();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<MascotaDTO>>({});
-  const [zoomedPhoto, setZoomedPhoto] = useState<string | null>(null);
 
   const startEdit = (pet: MascotaDTO) => {
-    // ✅ Solución: Si el id no existe, pasamos null (limpia el error de SetStateAction)
     setEditingId(pet.id || null);
     setFormData({ ...pet });
   };
 
   const handleSave = async () => {
-    // ✅ Validación de seguridad: Si no hay ID, no podemos actualizar
     if (!formData.id) return;
     
     const pesoNum = Number(formData.peso);
 
     if (formData.peso && (pesoNum < 0.1 || pesoNum > 100 || String(formData.peso).length > 4)) {
-      Swal.fire({ title: 'Peso inválido', text: 'Rango: 0.1 - 100 kg.', icon: 'error', confirmButtonColor: '#f97316' });
+      void Swal.fire({ title: 'Peso inválido', text: 'Rango: 0.1 - 100 kg.', icon: 'error', confirmButtonColor: '#f97316' });
       return;
     }
 
     if (!formData.nombre?.trim()) {
-      Swal.fire({ title: 'Falta el nombre', icon: 'warning', confirmButtonColor: '#f97316' });
+      void Swal.fire({ title: 'Falta el nombre', icon: 'warning', confirmButtonColor: '#f97316' });
       return;
     }
 
@@ -41,7 +40,7 @@ const PetProfiles = ({ mascotas, onUpdate, onAddClick }: PetProfilesProps) => {
       const payload: MascotaDTO = {
         id: formData.id,
         nombre: formData.nombre || '',
-        especie: formData.especie || ('Perro' as any),
+        especie: formData.especie || 'Perro',
         fechaNacimiento: formData.fechaNacimiento || '',
         peso: pesoNum,
         condicion: formData.condicion?.trim() || "Sano",
@@ -49,18 +48,25 @@ const PetProfiles = ({ mascotas, onUpdate, onAddClick }: PetProfilesProps) => {
         edad: formData.edad || 0
       };
 
-      await api.actualizarMascota(formData.id, payload);
-      Swal.fire({ title: '¡Guardado!', icon: 'success', timer: 1500, showConfirmButton: false });
+      await toast.promise(
+        api.actualizarMascota(formData.id, payload),
+        {
+          loading: 'Guardando...',
+          success: <b>¡Guardado!</b>,
+          error: <b>No se pudo guardar.</b>,
+        }
+      );
+      
       setEditingId(null);
       onUpdate();
-    } catch (err: any) {
-      console.error("Error en [PetProfiles]:", err.message);
-      Swal.fire('Error', 'No se pudo actualizar.', 'error');
+    } catch (err) {
+      // El interceptor de Axios en api.ts se encargará de mostrar el error
+      console.error("Error en [PetProfiles]:", err);
     }
   };
 
   const handleBorrar = (id: string, nombre: string) => {
-    Swal.fire({
+    void Swal.fire({
       title: `¿Borrar a ${nombre}?`,
       text: "Acción irreversible.",
       icon: 'warning',
@@ -70,7 +76,14 @@ const PetProfiles = ({ mascotas, onUpdate, onAddClick }: PetProfilesProps) => {
       reverseButtons: true
     }).then((result) => {
       if (result.isConfirmed) {
-        api.borrarMascota(id).then(() => onUpdate()).catch(e => console.error("Error al borrar:", e.message));
+        void toast.promise(
+          api.borrarMascota(id),
+          {
+            loading: 'Borrando...',
+            success: <b>¡Borrado!</b>,
+            error: <b>No se pudo borrar.</b>,
+          }
+        ).then(() => onUpdate());
       }
     });
   };
@@ -80,9 +93,8 @@ const PetProfiles = ({ mascotas, onUpdate, onAddClick }: PetProfilesProps) => {
       <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Mis Mascotas</h2>
 
       <div className="grid gap-4">
-        {mascotas.map((pet) => (
-          // ✅ Usamos pet.id! porque sabemos que si viene del back, el ID existe
-          <div key={pet.id || Math.random().toString()} className="bg-white rounded-[2.5rem] p-6 shadow-sm border border-slate-100 relative overflow-hidden">
+        {mascotas.map((pet, index) => (
+          <div key={pet.id || index} className="bg-white rounded-[2.5rem] p-6 shadow-sm border border-slate-100 relative overflow-hidden">
             {editingId === pet.id ? (
               <div className="space-y-4">
                 <input
@@ -128,7 +140,6 @@ const PetProfiles = ({ mascotas, onUpdate, onAddClick }: PetProfilesProps) => {
                 </div>
                 <div className="flex flex-col gap-2">
                   <button onClick={() => startEdit(pet)} className="p-2 text-slate-300 hover:text-orange-500 transition-colors"><Edit2 size={18} /></button>
-                  {/* ✅ Usamos pet.id! para asegurar que no sea undefined al borrar */}
                   <button onClick={() => handleBorrar(pet.id!, pet.nombre)} className="p-2 text-slate-200 hover:text-red-500 transition-colors"><Trash2 size={18} /></button>
                 </div>
               </div>
@@ -138,17 +149,11 @@ const PetProfiles = ({ mascotas, onUpdate, onAddClick }: PetProfilesProps) => {
       </div>
 
       <button
-        onClick={onAddClick}
+        onClick={() => togglePetModal(true)}
         className="w-full py-5 border-4 border-dashed border-slate-200 rounded-[2.5rem] text-slate-300 font-black uppercase flex items-center justify-center gap-2 hover:border-orange-200 hover:text-orange-300 transition-all active:scale-[0.98]"
       >
         <PlusCircle size={24} /> Agregar Nueva Mascota
       </button>
-
-      {zoomedPhoto && (
-        <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[100] flex items-center justify-center p-4 cursor-zoom-out" onClick={() => setZoomedPhoto(null)}>
-          <img src={zoomedPhoto} className="max-w-full max-h-[85vh] rounded-[2.5rem] shadow-2xl border-4 border-white/10 object-contain" alt="Zoom" />
-        </div>
-      )}
     </div>
   );
 };

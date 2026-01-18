@@ -1,13 +1,13 @@
 import React from 'react';
-import { Camera as CameraIcon } from 'lucide-react';
-import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
-import { useCameraPermissions } from '../../hooks/useCameraPermissions';
+import {Camera as CameraIcon} from 'lucide-react';
+import {Camera, CameraResultType, CameraSource} from '@capacitor/camera';
+import {useCameraPermissions} from '@/hooks/useCameraPermissions.ts';
 
 interface Props {
   onImageReady: (base64: string) => void;
   label: string;
   className?: string;
-  disabled?: boolean; // ✅ Agregamos disabled por si se acaba la energía
+  disabled?: boolean;
 }
 
 const ImageScanner = ({ onImageReady, label, className, disabled }: Props) => {
@@ -16,7 +16,6 @@ const ImageScanner = ({ onImageReady, label, className, disabled }: Props) => {
   const handleCapture = async () => {
     if (disabled) return;
 
-    // 1. Validaciones de permisos nativos
     const camOk = await validarCamara();
     if (!camOk) return;
 
@@ -24,7 +23,6 @@ const ImageScanner = ({ onImageReady, label, className, disabled }: Props) => {
     if (!galOk) return;
 
     try {
-      // 2. Ejecución de la interfaz nativa
       const image = await Camera.getPhoto({
         quality: 90,
         allowEditing: false,
@@ -38,7 +36,7 @@ const ImageScanner = ({ onImageReady, label, className, disabled }: Props) => {
       if (image.base64String) {
         onImageReady(`data:image/jpeg;base64,${image.base64String}`);
       }
-    } catch (error) {
+    } catch {
       console.log("El usuario canceló la selección.");
     }
   };

@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertTriangle } from 'lucide-react';
+import {AlertTriangle} from 'lucide-react';
 
 const BrandWarningModal = ({ onClose }: { onClose: () => void }) => (
   <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[80] flex items-center justify-center p-6 animate-in fade-in duration-300">

@@ -1,4 +1,4 @@
-import { Camera } from '@capacitor/camera';
+import {Camera} from '@capacitor/camera';
 import Swal from 'sweetalert2';
 
 export const useCameraPermissions = () => {

@@ -1,35 +1,45 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, {useState} from 'react';
 import {
-  Loader2, User, ShieldPlus, ClipboardPlus,
-  X, Wallet, Sparkles, Image as ImageIcon,
-  Info, Camera as CameraIcon, Syringe
+    Camera as CameraIcon,
+    ClipboardPlus,
+    Image as ImageIcon,
+    Info,
+    Loader2,
+    Sparkles,
+    User,
+    Wallet,
+    X
 } from 'lucide-react';
-import { api } from '../../services/api';
-import { useAuth } from '../../context/AuthContext';
-import { Toast } from '../../utils/alerts';
-import type { RecordatorioSaludDTO } from '../../types/api.types';
+import {api} from '@/services/api';
+import {useAuth} from '@/context/AuthContext';
+import {Toast} from '@/utils/alerts';
+import type {MascotaDTO, RecordatorioSaludDTO} from '@/types/api.types';
 import Swal from 'sweetalert2';
-import SubscriptionCard from '../../services/SuscriptionCard';
+import SubscriptionCard from '@/services/SuscriptionCard';
+import {Camera, CameraResultType, CameraSource} from '@capacitor/camera';
+import {useCameraPermissions} from '@/hooks/useCameraPermissions';
+import {isAxiosError} from 'axios';
 
-import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
-import { useCameraPermissions } from '../../hooks/useCameraPermissions';
+interface SaludScannerProps {
+  mascotas: MascotaDTO[];
+  onScanComplete: () => void;
+}
 
-const SaludScanner = ({ mascotas, onScanComplete }: any) => {
+const SaludScanner = ({ mascotas, onScanComplete }: SaludScannerProps) => {
   const { user, refreshUser } = useAuth();
   const [selectedPet, setSelectedPet] = useState("");
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
-  const [editData, setEditData] = useState<any>(null);
+  const [editData, setEditData] = useState<Partial<RecordatorioSaludDTO> | null>(null);
 
   const { validarCamara, validarGaleria } = useCameraPermissions();
   const hoy = new Date().toISOString().split("T")[0];
 
-  // 🛡️ Lógica de créditos
   const tieneEnergia = user?.esColaborador || (10 - (user?.intentosIA || 0)) > 0;
 
   const mostrarModalLimite = () => {
-    Swal.fire({
+    void Swal.fire({
       title: '¡Límite alcanzado!',
       text: 'Usaste tus 10 escaneos del mes. Colaborá para tener acceso ilimitado y ayudarnos con los servidores.',
       icon: 'info',
@@ -46,24 +56,24 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
     const ok = await validarCamara();
     if (!ok) return;
     try {
-      const image = await Camera.getPhoto({ quality: 90, resultType: CameraResultType.Base64, source: CameraSource.Camera });
+      const image = await Camera.getPhoto({ resultType: CameraResultType.Base64, source: CameraSource.Camera });
       if (image.base64String) {
         setSelectedImage(`data:image/jpeg;base64,${image.base64String}`);
         setEditData(null);
       }
-    } catch (e) { console.log("Cámara cancelada"); }
+    } catch { console.log("Cámara cancelada"); }
   };
 
   const handleNativeGallery = async () => {
     const ok = await validarGaleria();
     if (!ok) return;
     try {
-      const image = await Camera.getPhoto({ quality: 90, resultType: CameraResultType.Base64, source: CameraSource.Photos });
+      const image = await Camera.getPhoto({ resultType: CameraResultType.Base64, source: CameraSource.Photos });
       if (image.base64String) {
         setSelectedImage(`data:image/jpeg;base64,${image.base64String}`);
         setEditData(null);
       }
-    } catch (e) { console.log("Galería cancelada"); }
+    } catch { console.log("Galería cancelada"); }
   };
 
   const handleAnalizarSalud = async () => {
@@ -72,7 +82,7 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
       return;
     }
     if (!selectedPet) {
-      Toast.fire({ icon: 'warning', title: '¡Identificá al Paciente!', text: 'Seleccioná una mascota antes de escanear.' });
+      void Toast.fire({ icon: 'warning', title: '¡Identificá al Paciente!', text: 'Seleccioná una mascota antes de escanear.' });
       return;
     }
     if (!selectedImage) return;
@@ -85,25 +95,25 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
 
       if (res.data.error) {
         const config = res.data.error === "ESPECIE_INCORRECTA"
-          ? { title: '⚠️ ADVERTENCIA', icon: 'warning', color: '#ef4444' }
-          : { title: 'No reconocido', icon: 'error', color: '#10b981' };
+          ? { title: '⚠️ ADVERTENCIA', icon: 'warning' as const, color: '#ef4444' }
+          : { title: 'No reconocido', icon: 'error' as const, color: '#10b981' };
 
-        Swal.fire({
+        void Swal.fire({
           title: config.title,
           text: 'Producto no válido para esta mascota.',
-          icon: config.icon as any,
+          icon: config.icon,
           confirmButtonColor: config.color
         });
         return;
       }
 
-      const cleanFecha = (f: any): string => {
-        if (!f || typeof f !== 'string') return "";
+      const cleanFecha = (f: string | undefined): string => {
+        if (!f) return "";
         return f.includes('T') ? f.split('T')[0] : f;
       };
 
       setEditData({
-        id: res.data.id || null,
+        id: res.data.id || undefined,
         nombre: res.data.nombre || "Nuevo Registro",
         tipo: res.data.tipo || "MEDICAMENTO",
         fechaAplicacion: cleanFecha(res.data.fechaAplicacion) || hoy,
@@ -114,26 +124,25 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
         mascotaId: petIdSeguro
       });
 
-    } catch (e: any) {
-      console.error("Error en IA:", e);
-      const serverMsg = e.response?.data?.error || "";
-      if (serverMsg.includes("LIMITE")) mostrarModalLimite();
-      else Swal.fire({ title: 'Error', text: 'No se pudo procesar la imagen.', icon: 'error' });
+    } catch (e) {
+      if (isAxiosError(e)) {
+        const serverMsg = (e.response?.data as { error: string })?.error || "";
+        if (serverMsg.includes("LIMITE")) mostrarModalLimite();
+        else void Swal.fire({ title: 'Error', text: 'No se pudo procesar la imagen.', icon: 'error' });
+      }
     } finally {
       setLoading(false);
     }
   };
 
   const handleGuardar = async () => {
-    // 1. Validaciones básicas
     if (!selectedPet) return Swal.fire({ text: 'Seleccioná una mascota primero.', icon: 'warning' });
-    if (!editData.nombre?.trim()) return Swal.fire({ text: 'El nombre es obligatorio.', icon: 'warning' });
+    if (!editData?.nombre?.trim()) return Swal.fire({ text: 'El nombre es obligatorio.', icon: 'warning' });
 
     const nombreFinal = editData.nombre.trim().substring(0, 50);
 
-    // 2. Validación Fecha de Aplicación
     const regexFecha = /^\d{4}-\d{2}-\d{2}$/;
-    if (!regexFecha.test(editData.fechaAplicacion)) {
+    if (!editData.fechaAplicacion || !regexFecha.test(editData.fechaAplicacion)) {
       return Swal.fire({ text: 'Fecha de aplicación inválida o incompleta.', icon: 'warning' });
     }
 
@@ -146,7 +155,6 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
       return Swal.fire({ text: 'La fecha de aplicación no puede ser futura.', icon: 'warning' });
     }
 
-    // 3. ✅ VALIDACIÓN ESTRICTA FECHA PRÓXIMO (REFUERZO)
     if (!editData.proximaFecha || editData.proximaFecha === "") {
       return Swal.fire({ text: 'Debes ingresar una fecha de próximo refuerzo.', icon: 'warning' });
     }
@@ -162,7 +170,6 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
       return Swal.fire({ text: 'La fecha de refuerzo ingresada no es válida.', icon: 'warning' });
     }
 
-    // Validación @Future (Backend Requerimiento)
     if (dProx <= dHoy) {
       return Swal.fire({
         text: 'La fecha de próximo refuerzo debe ser a partir de mañana.',
@@ -170,7 +177,6 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
       });
     }
 
-    // ✅ Validación solicitada: No puede ser menor a fecha de aplicación
     if (dProx < dApp) {
       return Swal.fire({
         text: 'La fecha de refuerzo no puede ser anterior a la fecha de aplicación.',
@@ -185,7 +191,7 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
         mascotaId: selectedPet,
         tipo: editData.tipo || "MEDICAMENTO",
         nombre: nombreFinal,
-        precio: parseFloat(editData.precio) || 0,
+        precio: parseFloat(String(editData.precio)) || 0,
         fechaAplicacion: editData.fechaAplicacion,
         proximaFecha: editData.proximaFecha, 
         notas: (editData.notas || "Sin notas").substring(0, 200),
@@ -194,16 +200,17 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
 
       await api.guardarEventoSalud(payload);
 
-      Swal.fire({ title: '¡Guardado!', text: 'Cartilla actualizada.', icon: 'success', timer: 1500, showConfirmButton: false });
+      void Swal.fire({ title: '¡Guardado!', text: 'Cartilla actualizada.', icon: 'success', timer: 1500, showConfirmButton: false });
 
       setEditData(null);
       setSelectedImage(null);
       if (onScanComplete) onScanComplete();
 
-    } catch (e: any) {
-      console.error("❌ ERROR 400:", e.response?.data);
-      const errorMsg = e.response?.data?.message || "Error de validación en el servidor.";
-      Swal.fire({ title: 'Error al Guardar', text: `El servidor rechazó los datos: ${errorMsg}`, icon: 'error' });
+    } catch (e) {
+      if (isAxiosError(e)) {
+        const errorMsg = (e.response?.data as { message: string })?.message || "Error de validación en el servidor.";
+        void Swal.fire({ title: 'Error al Guardar', text: `El servidor rechazó los datos: ${errorMsg}`, icon: 'error' });
+      }
     } finally {
       setLoading(false);
     }
@@ -223,7 +230,7 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
               className="w-full p-4 rounded-2xl border-2 border-emerald-50 bg-emerald-50/50 font-bold outline-none text-slate-700 focus:border-emerald-500 transition-all appearance-none"
             >
               <option value="">¿Para quién es?</option>
-              {mascotas.map((p: any) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+              {mascotas.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
             </select>
           </div>
 
@@ -260,7 +267,6 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
             {loading ? <Loader2 className="animate-spin" /> : <><Sparkles size={22} /> ANALIZAR CON IA</>}
           </button>
 
-          {/* CARTEL INFORMATIVO AL FINAL */}
           <div className="mt-10 bg-amber-50/80 border border-amber-200 p-6 rounded-[2.5rem] shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-700">
             <div className="flex items-center gap-3 mb-3 text-left">
               <div className="bg-amber-100 p-2 rounded-xl text-amber-600">
@@ -347,7 +353,7 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
 
             <div className="bg-blue-50/50 p-5 rounded-3xl border border-blue-100">
               <p className="text-[10px] font-black text-blue-500 uppercase mb-2 flex items-center gap-2 px-1"><Wallet size={12} /> Costo ($)</p>
-              <input type="number" className="w-full bg-transparent font-black text-lg text-slate-800 border-b border-slate-200 focus:border-blue-500 outline-none pb-1" value={editData.precio} onChange={(e) => setEditData({ ...editData, precio: e.target.value })} />
+              <input type="number" className="w-full bg-transparent font-black text-lg text-slate-800 border-b border-slate-200 focus:border-blue-500 outline-none pb-1" value={editData.precio} onChange={(e) => setEditData({ ...editData, precio: Number(e.target.value) })} />
             </div>
 
             <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100">
@@ -358,17 +364,16 @@ const SaludScanner = ({ mascotas, onScanComplete }: any) => {
 
           <div className="flex gap-3">
             <button onClick={() => setEditData(null)} className="flex-1 py-5 bg-slate-100 text-slate-400 rounded-[1.8rem] font-black uppercase text-xs active:scale-95 transition-all">Cancelar</button>
-            <button onClick={handleGuardar} disabled={loading} className="flex-[2] py-5 bg-emerald-600 text-white rounded-[1.8rem] font-black shadow-xl uppercase text-xs flex items-center justify-center gap-2 active:scale-95 transition-all disabled:bg-slate-300">
+            <button onClick={handleGuardar} disabled={loading} className="flex-2 py-5 bg-emerald-600 text-white rounded-[1.8rem] font-black shadow-xl uppercase text-xs flex items-center justify-center gap-2 active:scale-95 transition-all disabled:bg-slate-300">
               {loading ? <Loader2 className="animate-spin" /> : "CONFIRMAR REGISTRO"}
             </button>
           </div>
         </div>
       )}
 
-      {/* MODAL DE SUSCRIPCIÓN */}
       {showSubscriptionModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[150] p-4">
-          <div className="bg-white rounded-[2rem] p-6 max-w-sm w-full relative">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-150 p-4">
+          <div className="bg-white rounded-4xl p-6 max-w-sm w-full relative">
             <button
               onClick={() => setShowSubscriptionModal(false)}
               className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"

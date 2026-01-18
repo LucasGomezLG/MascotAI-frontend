@@ -3,7 +3,7 @@ export interface UserDTO {
   id: string;
   nombre: string;
   email: string;
-  foto: string;
+  foto?: string | null;
   intentosIA: number;
   intentosRestantes: number;
   esColaborador: boolean;
@@ -91,6 +91,7 @@ export interface ItemComunidad {
   lat: number;
   lng: number;
   tipo: 'perdido' | 'adopcion' | 'refugio';
+  mascota?: MascotaPerdidaDTO;
 }
 
 // --- MÓDULO: COMUNIDAD (REFUGIOS) ---
@@ -140,6 +141,7 @@ export interface MascotaPerdidaDTO {
   fechaReporte: string;
   encontrada: boolean;
   mapsLink?: string;
+  especie?: string;
 }
 
 // --- MÓDULO: SISTEMA Y ALERTAS ---

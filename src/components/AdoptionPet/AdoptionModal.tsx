@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
-import { X, Camera as CameraIcon, Image as ImageIcon, Heart, Loader2, Trash2, Info, MapPin } from 'lucide-react';
-import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
-import { api } from '../../services/api';
+import React, {useState} from 'react';
+import {Camera as CameraIcon, Heart, Image as ImageIcon, Loader2, MapPin, Trash2, X} from 'lucide-react';
+import {MapContainer, Marker, TileLayer, useMap} from 'react-leaflet';
+import {api} from '@/services/api.ts';
 import Swal from 'sweetalert2';
 import 'leaflet/dist/leaflet.css';
-import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
-import { useCameraPermissions } from '../../hooks/useCameraPermissions';
+import {Camera, CameraResultType, CameraSource} from '@capacitor/camera';
+import {useCameraPermissions} from '@/hooks/useCameraPermissions.ts';
+import {isAxiosError} from 'axios';
 
 function ChangeView({ center }: { center: [number, number] }) {
   const map = useMap();
@@ -29,7 +30,7 @@ const AdoptionModal = ({ onClose }: { onClose: () => void }) => {
 
   const handleBuscarDireccion = async () => {
     if (data.direccion.trim().length < 5) {
-      Swal.fire({ text: 'Ingresá un barrio o dirección específica.', icon: 'info', confirmButtonColor: '#10b981' });
+      void Swal.fire({ text: 'Ingresá un barrio o dirección específica.', icon: 'info', confirmButtonColor: '#10b981' });
       return;
     }
     setBuscando(true);
@@ -41,9 +42,9 @@ const AdoptionModal = ({ onClose }: { onClose: () => void }) => {
         setUbicacionConfirmada(true);
       } else {
         setUbicacionConfirmada(false);
-        Swal.fire({ title: 'Sin resultados', text: 'No pudimos localizar ese barrio.', icon: 'question', confirmButtonColor: '#10b981' });
+        void Swal.fire({ title: 'Sin resultados', text: 'No pudimos localizar ese barrio.', icon: 'question', confirmButtonColor: '#10b981' });
       }
-    } catch (e) { console.error("Error Mapas:", e); } finally { setBuscando(false); }
+    } catch { console.error("Error Mapas:"); } finally { setBuscando(false); }
   };
 
   const handleImageCapture = async (source: CameraSource) => {
@@ -51,20 +52,25 @@ const AdoptionModal = ({ onClose }: { onClose: () => void }) => {
     const ok = source === CameraSource.Camera ? await validarCamara() : await validarGaleria();
     if (!ok) return;
     try {
-      const image = await Camera.getPhoto({ quality: 90, resultType: CameraResultType.Uri, source });
+      const image = await Camera.getPhoto({
+        quality: 90,
+        resultType: CameraResultType.Uri,
+        source,
+        width: 1024,
+        allowEditing: false
+      });
       if (image.webPath) {
         setPreviews(prev => [...prev, image.webPath!]);
         const response = await fetch(image.webPath);
         const file = new File([await response.blob()], `adoption_${Date.now()}.jpg`, { type: 'image/jpeg' });
         setArchivos(prev => [...prev, file]);
       }
-    } catch (e) { /* Cancelado */ }
+    } catch { /* Cancelado */ }
   };
 
   const handlePublicar = async () => {
     const { nombre, especie, edad, descripcion, contacto, direccion } = data;
 
-    // 🛡️ VALIDACIONES ESTRICTAS
     if (archivos.length === 0) return alertErr('Falta foto', 'Subí al menos una foto.');
     if (!nombre.trim()) return alertErr('Nombre', 'El nombre es obligatorio.');
     if (!edad.trim()) return alertErr('Edad', 'La edad es obligatoria.');
@@ -75,23 +81,19 @@ const AdoptionModal = ({ onClose }: { onClose: () => void }) => {
     setLoading(true);
     const formData = new FormData();
 
-    // ✅ AJUSTE TÉCNICO: El backend espera un String en @RequestParam("datos")
     const payload = {
       nombre: nombre.trim(),
-      especie: especie, // "Gato" o "Perro"
+      especie: especie,
       edad: edad.trim(),
       descripcion: descripcion.trim(),
       contacto: contacto.trim(),
       direccion: direccion.trim(),
       lat: data.lat,
       lng: data.lng,
-      etiquetas: [] // Opcional según tu DTO
+      etiquetas: []
     };
 
-    // Enviamos como string puro, no como Blob
     formData.append('datos', JSON.stringify(payload));
-
-    // Las fotos van en la parte "files"
     archivos.forEach(file => formData.append('files', file));
 
     try {
@@ -104,16 +106,18 @@ const AdoptionModal = ({ onClose }: { onClose: () => void }) => {
         showConfirmButton: false
       });
       onClose();
-    } catch (e: any) {
-      console.error("Error Adopción:", e.message);
-      Swal.fire({ title: 'Error', text: 'No pudimos procesar la publicación.', icon: 'error' });
+    } catch (e) {
+      if (isAxiosError(e)) {
+        console.error("Error Adopción:", e.message);
+      }
+      void Swal.fire({ title: 'Error', text: 'No pudimos procesar la publicación.', icon: 'error' });
     } finally {
       setLoading(false);
     }
   };
 
   const alertErr = (title: string, text: string) => {
-    Swal.fire({ title, text, icon: 'warning', confirmButtonColor: '#10b981', customClass: { popup: 'rounded-[2.5rem]' } });
+    void Swal.fire({ title, text, icon: 'warning', confirmButtonColor: '#10b981', customClass: { popup: 'rounded-[2.5rem]' } });
   };
 
   return (
@@ -128,7 +132,6 @@ const AdoptionModal = ({ onClose }: { onClose: () => void }) => {
         </h3>
 
         <div className="space-y-4 text-left">
-          {/* SECCIÓN FOTOS */}
           <div className="grid grid-cols-4 gap-2">
             {previews.map((p, i) => (
               <div key={i} className="relative h-20">

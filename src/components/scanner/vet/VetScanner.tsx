@@ -1,34 +1,26 @@
-import React, { useState, useEffect } from 'react';
-import { Activity, Receipt, AlertCircle, AlertTriangle, Info } from 'lucide-react';
+import React, {useState} from 'react';
+import {Activity, AlertTriangle, Info, Receipt} from 'lucide-react';
 import SymptomScanner from './SymptomScanner';
 import ConsultationScanner from './ConsultationScanner';
+import type {ConsultaVetDTO, MascotaDTO, TriajeIADTO} from '@/types/api.types';
 
 interface VetScannerProps {
-  mascotas: any[];
+  mascotas: MascotaDTO[];
   onScanComplete: () => void;
-  initialData?: any;
-  onReset: () => void;
-  handleSuscripcion: () => void; // 🛡️ Prop añadida para el flujo de créditos
+  initialData?: ConsultaVetDTO | TriajeIADTO;
 }
 
-const VetScanner = ({ mascotas, onScanComplete, initialData, onReset, handleSuscripcion }: VetScannerProps) => {
-  const [activeTab, setActiveTab] = useState<'triaje' | 'consultas'>('triaje');
-
-  useEffect(() => {
-    if (initialData) {
-      // 🛡️ Priorizamos la bandera que pusimos en ReportsManager
-      if (initialData.esDocumentoMedico === true || initialData.diagnostico) {
-        setActiveTab('consultas');
-      } else {
-        setActiveTab('triaje');
-      }
+const VetScanner = ({ mascotas, onScanComplete, initialData }: VetScannerProps) => {
+  const [activeTab, setActiveTab] = useState<'triaje' | 'consultas'>(() => {
+    if (initialData && (initialData as ConsultaVetDTO).diagnostico) {
+      return 'consultas';
     }
-  }, [initialData]);
+    return 'triaje';
+  });
 
   return (
     <div className="space-y-6 pb-20 w-full animate-in fade-in duration-500">
-      {/* 🛡️ Cartel de Advertencia Amigable */}
-      <div className="bg-red-50/80 border border-red-200 p-5 rounded-[2rem] flex items-start gap-4 mb-6 shadow-sm">
+      <div className="bg-red-50/80 border border-red-200 p-5 rounded-4xl flex items-start gap-4 mb-6 shadow-sm">
         <div className="bg-red-100 p-2.5 rounded-xl text-red-600 shrink-0 shadow-sm">
           <AlertTriangle size={20} />
         </div>
@@ -44,7 +36,6 @@ const VetScanner = ({ mascotas, onScanComplete, initialData, onReset, handleSusc
         </div>
       </div>
 
-      {/* Selector de Pestañas */}
       <div className="flex bg-white p-1.5 rounded-2xl shadow-sm border border-slate-100 w-full">
         <button
           onClick={() => setActiveTab('triaje')}
@@ -65,22 +56,17 @@ const VetScanner = ({ mascotas, onScanComplete, initialData, onReset, handleSusc
           <SymptomScanner
             mascotas={mascotas}
             onScanComplete={onScanComplete}
-            initialData={initialData}
-            onReset={onReset}
-            handleSuscripcion={handleSuscripcion} // 🛡️ Pasamos la función de suscripción
+            initialData={initialData as TriajeIADTO}
           />
         ) : (
           <ConsultationScanner
             mascotas={mascotas}
             onScanComplete={onScanComplete}
-            initialData={initialData}
-            onReset={onReset}
-            handleSuscripcion={handleSuscripcion} // 🛡️ Pasamos la función de suscripción
+            initialData={initialData as ConsultaVetDTO}
           />
         )}
       </div>
 
-      {/* CARTEL INFORMATIVO AL FINAL DE VETE */}
       <div className="mt-10 bg-amber-50/80 border border-amber-200 p-6 rounded-[2.5rem] shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-700">
         <div className="flex items-center gap-3 mb-3 text-left">
           <div className="bg-amber-100 p-2 rounded-xl text-amber-600">

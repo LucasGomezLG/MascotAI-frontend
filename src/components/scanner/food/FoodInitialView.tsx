@@ -1,6 +1,6 @@
 import React from 'react';
-import { User, Camera as CameraIcon, ImageIcon, Loader2, Sparkles, X, Info } from 'lucide-react';
-import type { MascotaDTO } from '../../../types/api.types';
+import {Camera as CameraIcon, ImageIcon, Info, Loader2, Sparkles, User, X} from 'lucide-react';
+import type {MascotaDTO} from '@/types/api.types.ts';
 
 interface Props {
   mascotas: MascotaDTO[];

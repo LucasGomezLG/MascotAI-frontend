@@ -1,9 +1,17 @@
-import React, { useState, useEffect } from 'react';
-import { Package, Calendar, AlertCircle, ShoppingCart } from 'lucide-react';
-import { api } from '../../services/api';
+import React, {useEffect, useState} from 'react';
+import {AlertCircle, Calendar, Package, ShoppingCart} from 'lucide-react';
+import {api} from '@/services/api.ts';
+
+interface StockStatus {
+  status: string;
+  porcentaje: number;
+  marca: string;
+  diasRestantes: number;
+  fechaAgotamiento?: string;
+}
 
 const StockCard = ({ mascotaId }: { mascotaId: string }) => {
-  const [stock, setStock] = useState<any>(null);
+  const [stock, setStock] = useState<StockStatus | null>(null);
 
   useEffect(() => {
     api.getStockStatus(mascotaId).then(res => setStock(res.data));

@@ -1,15 +1,27 @@
-import React, { useState } from 'react';
+import React, {useState} from 'react';
 import {
-  Heart, ChevronLeft, ChevronRight, Trash2, MapPin,
-  X, Maximize2, MessageCircle, Copy, Check, ShieldAlert, Eye, Info
+    Check,
+    ChevronLeft,
+    ChevronRight,
+    Copy,
+    Eye,
+    Heart,
+    Info,
+    MapPin,
+    Maximize2,
+    MessageCircle,
+    ShieldAlert,
+    Trash2,
+    X
 } from 'lucide-react';
-import { MapContainer, TileLayer, Circle } from 'react-leaflet';
+import {Circle, MapContainer, TileLayer} from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import Swal from 'sweetalert2';
-import type { MascotaAdopcionDTO, UserDTO } from '../../types/api.types';
+import type {MascotaAdopcionDTO, UserDTO} from '@/types/api.types.ts';
+import toast from 'react-hot-toast';
 
 interface AdoptionCardProps {
-  mascota: MascotaAdopcionDTO; // ✅ Cambiado a DTO específico
+  mascota: MascotaAdopcionDTO;
   currentUser: UserDTO | null;
   onDelete: (id: string) => void;
 }
@@ -24,7 +36,6 @@ const AdoptionCard = ({ mascota, currentUser, onDelete }: AdoptionCardProps) => 
   const fotos = mascota.fotos || [];
   const tieneMasFotos = fotos.length > 1;
 
-  // ✅ Lógica de propiedad nivelada
   const esMia = String(mascota.userId) === String(currentUser?.id);
 
   const nextFoto = (e: React.MouseEvent) => {
@@ -39,20 +50,18 @@ const AdoptionCard = ({ mascota, currentUser, onDelete }: AdoptionCardProps) => 
 
   const handleCopy = () => {
     if (!mascota.contacto) return;
-    navigator.clipboard.writeText(mascota.contacto);
-    setCopied(true);
-    Swal.mixin({
-      toast: true,
-      position: 'top',
-      showConfirmButton: false,
-      timer: 2000,
-    }).fire({ icon: 'success', title: '¡Contacto copiado!' });
-    setTimeout(() => setCopied(false), 2000);
+    navigator.clipboard.writeText(mascota.contacto)
+      .then(() => {
+        toast.success('¡Contacto copiado!');
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      })
+      .catch(() => toast.error('Error al copiar'));
   };
 
   return (
     <>
-      <div className="relative min-w-[280px] max-w-[280px] bg-white rounded-[2.5rem] p-5 shadow-sm border border-slate-100 flex flex-col gap-4 animate-in fade-in slide-in-from-right-4">
+      <div className="relative min-w-70 max-w-70 bg-white rounded-[2.5rem] p-5 shadow-sm border border-slate-100 flex flex-col gap-4 animate-in fade-in slide-in-from-right-4">
 
         {esMia && (
           <button
@@ -65,9 +74,8 @@ const AdoptionCard = ({ mascota, currentUser, onDelete }: AdoptionCardProps) => 
                 showCancelButton: true,
                 confirmButtonColor: '#10b981',
                 confirmButtonText: 'Sí, borrar',
-                customClass: { popup: 'rounded-[2rem]' }
+                customClass: { popup: 'rounded-4xl' }
               }).then(res => {
-                // ✅ Doble validación: Confirmación de usuario + Existencia de ID
                 if (res.isConfirmed && mascota.id) {
                   onDelete(mascota.id);
                 }
@@ -79,7 +87,6 @@ const AdoptionCard = ({ mascota, currentUser, onDelete }: AdoptionCardProps) => 
           </button>
         )}
 
-        {/* CAROUSEL DE FOTO ÚNICA (Mejor impacto visual) */}
         <div
           className="relative h-40 bg-slate-100 rounded-2xl overflow-hidden group/img cursor-zoom-in"
           onClick={() => setImgZoom(fotos[currentFoto])}
@@ -102,7 +109,6 @@ const AdoptionCard = ({ mascota, currentUser, onDelete }: AdoptionCardProps) => 
           )}
         </div>
 
-        {/* INFORMACIÓN */}
         <div className="space-y-2 text-left">
           <div className="flex justify-between items-start pr-1">
             <h4 className="font-black text-slate-800 text-base leading-none truncate flex-1">{mascota.nombre}</h4>
@@ -110,7 +116,7 @@ const AdoptionCard = ({ mascota, currentUser, onDelete }: AdoptionCardProps) => 
           </div>
 
           <div className="flex justify-between items-start gap-2">
-            <p className="text-[11px] font-bold text-slate-500 leading-snug line-clamp-2 flex-1 min-h-[32px] break-words">
+            <p className="text-[11px] font-bold text-slate-500 leading-snug line-clamp-2 flex-1 min-h-8 wrap-break-word">
               {mascota.descripcion}
             </p>
             <button
@@ -123,13 +129,12 @@ const AdoptionCard = ({ mascota, currentUser, onDelete }: AdoptionCardProps) => 
 
           <div className="flex items-center gap-1 px-2 py-1 bg-emerald-50 rounded-lg w-fit">
             <MapPin size={10} className="text-emerald-500" />
-            <span className="text-[9px] font-black uppercase text-emerald-600 tracking-tighter truncate max-w-[180px]">
+            <span className="text-[9px] font-black uppercase text-emerald-600 tracking-tighter truncate max-w-45">
               {mascota.direccion}
             </span>
           </div>
         </div>
 
-        {/* MAPA */}
         <div className="h-24 rounded-2xl overflow-hidden border border-slate-100 relative grayscale-[0.4] contrast-[0.9]">
           <MapContainer center={[mascota.lat || 0, mascota.lng || 0]} zoom={15} scrollWheelZoom={false} zoomControl={false} dragging={false} style={{ height: '100%', width: '100%' }}>
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
@@ -149,17 +154,15 @@ const AdoptionCard = ({ mascota, currentUser, onDelete }: AdoptionCardProps) => 
         </button>
       </div>
 
-      {/* ✅ ZOOM MODAL (Nivelado) */}
       {imgZoom && (
-        <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-xl z-[200] flex items-center justify-center p-4" onClick={() => setImgZoom(null)}>
+        <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-xl z-200 flex items-center justify-center p-4" onClick={() => setImgZoom(null)}>
           <button className="absolute top-10 right-10 text-white/50 hover:text-white"><X size={40} /></button>
           <img src={imgZoom} className="max-w-full max-h-[85vh] rounded-[2.5rem] shadow-2xl animate-in zoom-in-95 duration-300 object-contain" alt="Zoom" />
         </div>
       )}
 
-      {/* ✅ MODAL DESCRIPCIÓN (Zona Segura + Break Words) */}
       {showFullDesc && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[120] flex items-center justify-center p-6 animate-in fade-in zoom-in-95 duration-300">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-120 flex items-center justify-center p-6 animate-in fade-in zoom-in-95 duration-300">
           <div className="bg-white w-full max-w-sm rounded-[3rem] p-0 shadow-2xl relative overflow-hidden">
             <div className="absolute -top-24 -right-24 w-48 h-48 bg-emerald-50 rounded-full blur-3xl opacity-60" />
             <button onClick={() => setShowFullDesc(false)} className="absolute top-6 right-6 p-2 bg-slate-50 text-slate-400 hover:text-emerald-600 rounded-full transition-all z-10"><X size={20} /></button>
@@ -168,10 +171,10 @@ const AdoptionCard = ({ mascota, currentUser, onDelete }: AdoptionCardProps) => 
                 <Info size={28} strokeWidth={2.5} />
               </div>
               <p className="text-[9px] font-black text-emerald-400 uppercase tracking-[0.25em] mb-1">Detalles Adopción</p>
-              <h3 className="font-black text-slate-800 text-xl tracking-tight text-center leading-tight mb-6 break-words w-full">Sobre {mascota.nombre}</h3>
-              <div className="w-full bg-slate-50 border border-slate-100 rounded-[2rem] overflow-hidden">
+              <h3 className="font-black text-slate-800 text-xl tracking-tight text-center leading-tight mb-6 wrap-break-word w-full">Sobre {mascota.nombre}</h3>
+              <div className="w-full bg-slate-50 border border-slate-100 rounded-4xl overflow-hidden">
                 <div className="p-6 max-h-[35vh] overflow-y-auto">
-                  <p className="text-sm font-bold text-slate-600 leading-relaxed text-left whitespace-pre-wrap break-words">
+                  <p className="text-sm font-bold text-slate-600 leading-relaxed text-left whitespace-pre-wrap wrap-break-word">
                     {mascota.descripcion}
                   </p>
                 </div>
@@ -182,9 +185,8 @@ const AdoptionCard = ({ mascota, currentUser, onDelete }: AdoptionCardProps) => 
         </div>
       )}
 
-      {/* ✅ MODAL CONTACTO */}
       {showContact && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[110] flex items-center justify-center p-6 animate-in fade-in duration-300">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-110 flex items-center justify-center p-6 animate-in fade-in duration-300">
           <div className="bg-white w-full max-w-xs rounded-[2.5rem] p-8 shadow-2xl relative text-center">
             <button onClick={() => setShowContact(false)} className="absolute top-6 right-6 text-slate-400"><X size={20} /></button>
             <div className="bg-emerald-100 w-16 h-16 rounded-3xl flex items-center justify-center mx-auto mb-4 text-emerald-600"><MessageCircle size={32} /></div>

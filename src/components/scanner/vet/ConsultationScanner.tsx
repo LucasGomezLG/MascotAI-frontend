@@ -1,33 +1,37 @@
-import React, { useState, useEffect } from 'react';
-import { Camera as CameraIcon, Loader2, User, RefreshCw, Sparkles, X, FileText, ClipboardList, Image as ImageIcon } from 'lucide-react';
-import { api } from '../../../services/api';
-import { useAuth } from '../../../context/AuthContext'; // 🛡️ Importamos el contexto
-import { Toast } from '../../../utils/alerts';
+import React, {useEffect, useState} from 'react';
+import {ClipboardList, FileText, Image as ImageIcon, Loader2, Sparkles, User, X} from 'lucide-react';
+import {api} from '@/services/api';
+import {useAuth} from '@/context/AuthContext';
+import {Toast} from '@/utils/alerts';
 import Swal from 'sweetalert2';
-import SubscriptionCard from '../../../services/SuscriptionCard';
+import SubscriptionCard from '@/services/SuscriptionCard';
+import {Camera, CameraResultType, CameraSource} from '@capacitor/camera';
+import {useCameraPermissions} from '@/hooks/useCameraPermissions';
+import type {ConsultaVetDTO, MascotaDTO} from '@/types/api.types';
+import {isAxiosError} from 'axios';
 
-// 🛡️ IMPORTACIONES NATIVAS
-import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
-import { useCameraPermissions } from '../../../hooks/useCameraPermissions';
+interface ConsultationScannerProps {
+  mascotas: MascotaDTO[];
+  onScanComplete: () => void;
+  initialData?: ConsultaVetDTO;
+}
 
-const ConsultationScanner = ({ mascotas, onScanComplete, initialData }: any) => {
-  const { user, refreshUser } = useAuth(); // 🛡️ Obtenemos datos y función de refresco
+const ConsultationScanner = ({ mascotas, onScanComplete, initialData }: ConsultationScannerProps) => {
+  const { user, refreshUser } = useAuth();
   const [selectedPet, setSelectedPet] = useState("");
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
-  const [editData, setEditData] = useState<any>(null);
+  const [editData, setEditData] = useState<Partial<ConsultaVetDTO> | null>(null);
 
   const { validarCamara, validarGaleria } = useCameraPermissions();
   const hoy = new Date().toISOString().split("T")[0];
 
-  // 🛡️ Cálculo de energía
   const restantes = Math.max(0, 10 - (user?.intentosIA || 0));
   const tieneEnergia = user?.esColaborador || restantes > 0;
 
-  // 🛡️ MODAL DE LÍMITE AGOTADO
   const mostrarModalLimite = () => {
-    Swal.fire({
+    void Swal.fire({
       title: '¡Límite alcanzado!',
       text: 'Usaste tus 10 escaneos del mes. Colaborá para tener acceso ilimitado y ayudarnos con los servidores.',
       icon: 'info',
@@ -47,13 +51,14 @@ const ConsultationScanner = ({ mascotas, onScanComplete, initialData }: any) => 
     if (!ok) return;
     try {
       const image = await Camera.getPhoto({
-        quality: 90, allowEditing: false, resultType: CameraResultType.Base64, source: CameraSource.Camera
+        resultType: CameraResultType.Base64,
+        source: CameraSource.Camera
       });
       if (image.base64String) {
         setSelectedImage(`data:image/jpeg;base64,${image.base64String}`);
         setEditData(null);
       }
-    } catch (error) { console.log("Cámara cancelada"); }
+    } catch { console.log("Cámara cancelada"); }
   };
 
   const handleNativeGallery = async () => {
@@ -61,24 +66,24 @@ const ConsultationScanner = ({ mascotas, onScanComplete, initialData }: any) => 
     if (!ok) return;
     try {
       const image = await Camera.getPhoto({
-        quality: 90, allowEditing: false, resultType: CameraResultType.Base64, source: CameraSource.Photos
+        resultType: CameraResultType.Base64,
+        source: CameraSource.Photos
       });
       if (image.base64String) {
         setSelectedImage(`data:image/jpeg;base64,${image.base64String}`);
         setEditData(null);
       }
-    } catch (error) { console.log("Galería cancelada"); }
+    } catch { console.log("Galería cancelada"); }
   };
 
   const handleScanDoc = async () => {
-    // 🛡️ VALIDACIÓN DE CRÉDITOS AL TOCAR EL BOTÓN
     if (!tieneEnergia) {
       mostrarModalLimite();
       return;
     }
 
     if (!selectedPet) {
-      Toast.fire({ 
+      void Toast.fire({ 
         icon: 'warning', 
         title: '¡Identificá al Paciente!', 
         text: 'Por favor, seleccioná una mascota antes de escanear el documento.' 
@@ -91,90 +96,90 @@ const ConsultationScanner = ({ mascotas, onScanComplete, initialData }: any) => 
     setLoading(true);
     try {
       const res = await api.analizarVet(selectedImage, selectedPet);
-      await refreshUser(); // ✅ ACTUALIZACIÓN DE CRÉDITOS
+      await refreshUser();
 
-      const infoIA: any = res.data || {};
-      const rawFecha = infoIA.fecha || infoIA.date || hoy;
-      const cleanFecha = typeof rawFecha === 'string' ? rawFecha.split('T')[0] : hoy;
+      const infoIA: Partial<ConsultaVetDTO> = res.data || {};
+      const rawFecha = infoIA.fecha || hoy;
+      const cleanFecha = rawFecha.split('T')[0];
 
       setEditData({
-        doctor: infoIA.veterinario || infoIA.doctor || "",
-        clinica: infoIA.clinica || infoIA.hospital || "",
+        veterinario: infoIA.veterinario || "",
+        clinica: infoIA.clinica || "",
         fecha: cleanFecha,
-        diagnostico: infoIA.diagnostico || infoIA.motivo || infoIA.conclusion || "",
-        medicamentos: [], 
+        diagnostico: infoIA.diagnostico || "",
         precio: 0, 
         mascotaId: selectedPet, 
-        consultaId: infoIA.id || ""
+        id: infoIA.id || ""
       });
-    } catch (e: any) {
-      const errorMsg = e.response?.data?.error || "";
-      if (e.response?.status === 403 || errorMsg.includes("LIMITE")) {
-        mostrarModalLimite();
-      } else if (errorMsg === "NO_ES_RECETA") {
-        Swal.fire({
-          title: 'Documento no reconocido',
-          text: 'Intentá que se vea el sello o la firma del veterinario con más luz.',
-          icon: 'error',
-          confirmButtonColor: '#2563eb'
-        });
-        setSelectedImage(null);
-      } else {
-        Toast.fire({ icon: 'error', title: 'Error al leer el documento' });
+    } catch (e) {
+      if (isAxiosError(e)) {
+        const errorMsg = (e.response?.data as { error: string })?.error || "";
+        if (e.response?.status === 403 || errorMsg.includes("LIMITE")) {
+          mostrarModalLimite();
+        } else if (errorMsg === "NO_ES_RECETA") {
+          void Swal.fire({
+            title: 'Documento no reconocido',
+            text: 'Intentá que se vea el sello o la firma del veterinario con más luz.',
+            icon: 'error',
+            confirmButtonColor: '#2563eb'
+          });
+          setSelectedImage(null);
+        } else {
+          void Toast.fire({ icon: 'error', title: 'Error al leer el documento' });
+        }
       }
     } finally { setLoading(false); }
   };
 
   const handleGuardarConsulta = async () => {
-    // 🛡️ VALIDACIONES DE CAMPOS OBLIGATORIOS
-    if (!editData.doctor?.trim()) {
-      Swal.fire({ title: 'Faltan datos', text: 'El nombre del profesional es obligatorio.', icon: 'warning' });
+    if (!editData?.veterinario?.trim()) {
+      void Swal.fire({ title: 'Faltan datos', text: 'El nombre del profesional es obligatorio.', icon: 'warning' });
       return;
     }
     if (!editData.clinica?.trim()) {
-      Swal.fire({ title: 'Faltan datos', text: 'El nombre de la clínica es obligatorio.', icon: 'warning' });
+      void Swal.fire({ title: 'Faltan datos', text: 'El nombre de la clínica es obligatorio.', icon: 'warning' });
       return;
     }
     if (!editData.fecha || editData.fecha === "") {
-      Swal.fire({ title: 'Faltan datos', text: 'La fecha de la consulta es obligatoria.', icon: 'warning' });
+      void Swal.fire({ title: 'Faltan datos', text: 'La fecha de la consulta es obligatoria.', icon: 'warning' });
       return;
     }
     if (isNaN(new Date(editData.fecha).getTime())) {
-      Swal.fire({ title: 'Fecha inválida', text: 'Ingresá una fecha válida para la consulta.', icon: 'warning' });
+      void Swal.fire({ title: 'Fecha inválida', text: 'Ingresá una fecha válida para la consulta.', icon: 'warning' });
       return;
     }
     if (!editData.diagnostico?.trim()) {
-      Swal.fire({ title: 'Faltan datos', text: 'El diagnóstico o motivo es obligatorio.', icon: 'warning' });
+      void Swal.fire({ title: 'Faltan datos', text: 'El diagnóstico o motivo es obligatorio.', icon: 'warning' });
       return;
     }
-    const precioNum = parseFloat(editData.precio);
+    const precioNum = parseFloat(String(editData.precio));
     if (isNaN(precioNum) || precioNum < 0) {
-      Swal.fire({ title: 'Dato inválido', text: 'Ingresá un costo válido (puede ser 0).', icon: 'warning' });
+      void Swal.fire({ title: 'Dato inválido', text: 'Ingresá un costo válido (puede ser 0).', icon: 'warning' });
       return;
     }
     setLoading(true);
     try {
-      const dataParaEnviar = {
-        id: editData.consultaId, mascotaId: editData.mascotaId, tipo: "CONSULTA",
-        veterinario: editData.doctor, clinica: editData.clinica, diagnostico: editData.diagnostico,
+      const dataParaEnviar: Partial<ConsultaVetDTO> = {
+        id: editData.id, mascotaId: editData.mascotaId, tipo: "CONSULTA",
+        veterinario: editData.veterinario, clinica: editData.clinica, diagnostico: editData.diagnostico,
         nombre: editData.diagnostico.length > 40 ? editData.diagnostico.substring(0, 37) + "..." : editData.diagnostico,
         precio: editData.precio || 0, fecha: editData.fecha.includes('T') ? editData.fecha : `${editData.fecha}T00:00:00`
       };
-      await api.guardarConsultaVet(dataParaEnviar);
-      Swal.fire({ title: '¡Consulta Guardada!', icon: 'success', timer: 2000, showConfirmButton: false });
+      await api.guardarConsultaVet(dataParaEnviar as ConsultaVetDTO);
+      void Swal.fire({ title: '¡Consulta Guardada!', icon: 'success', timer: 2000, showConfirmButton: false });
       setEditData(null); setSelectedImage(null);
       if (onScanComplete) onScanComplete();
-    } catch (e) { Swal.fire({ title: 'Error', text: 'No pudimos registrar la consulta.', icon: 'error' });
+    } catch { void Swal.fire({ title: 'Error', text: 'No pudimos registrar la consulta.', icon: 'error' });
     } finally { setLoading(false); }
   };
   
   useEffect(() => {
-    if (initialData && (initialData.esDocumentoMedico || initialData.diagnostico)) {
+    if (initialData && initialData.diagnostico) {
       setEditData({
-        doctor: initialData.veterinario || "", clinica: initialData.clinica || "",
+        veterinario: initialData.veterinario || "", clinica: initialData.clinica || "",
         fecha: initialData.fecha ? initialData.fecha.split('T')[0] : hoy,
         diagnostico: initialData.diagnostico || "", precio: initialData.precio || 0,
-        mascotaId: initialData.mascotaId || "", consultaId: initialData.id
+        mascotaId: initialData.mascotaId || "", id: initialData.id
       });
       if (initialData.mascotaId) setSelectedPet(initialData.mascotaId);
     }
@@ -194,7 +199,7 @@ const ConsultationScanner = ({ mascotas, onScanComplete, initialData }: any) => 
               className="w-full p-4 rounded-2xl border-2 border-slate-50 bg-slate-50/50 font-bold outline-none text-slate-700 focus:border-blue-500 transition-all"
             >
               <option value="">¿De quién es el documento?</option>
-              {mascotas.map((p: any) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+              {mascotas.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
             </select>
           </div>
 
@@ -228,7 +233,7 @@ const ConsultationScanner = ({ mascotas, onScanComplete, initialData }: any) => 
           <button
             onClick={handleScanDoc}
             disabled={loading || !selectedImage}
-            className={`w-full flex items-center justify-center gap-3 py-6 rounded-[2rem] font-black text-xl shadow-xl transition-all active:scale-95 ${
+            className={`w-full flex items-center justify-center gap-3 py-6 rounded-4xl font-black text-xl shadow-xl transition-all active:scale-95 ${
               loading || !selectedImage 
                 ? 'bg-blue-50 text-blue-200 cursor-not-allowed shadow-none' 
                 : 'bg-blue-600 text-white shadow-blue-200 hover:bg-blue-700'
@@ -238,9 +243,7 @@ const ConsultationScanner = ({ mascotas, onScanComplete, initialData }: any) => 
           </button>
         </div>
       ) : (
-        /* VISTA DE EDICIÓN - SIN CAMBIOS */
         <div className="space-y-6 w-full animate-in zoom-in-95 duration-500">
-           {/* ... Resto del código de edición que ya tenías ... */}
            <div className="bg-white rounded-[2.5rem] shadow-2xl p-8 border-2 border-blue-50 text-left relative overflow-hidden">
             <div className="flex items-center gap-4 mb-8">
               <div className="bg-blue-100 p-4 rounded-3xl text-blue-600"><ClipboardList size={28} /></div>
@@ -253,7 +256,7 @@ const ConsultationScanner = ({ mascotas, onScanComplete, initialData }: any) => 
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-slate-50 p-4 rounded-3xl border border-slate-100">
                   <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Veterinario</p>
-                  <input type="text" className="w-full bg-transparent text-xs font-black text-slate-700 outline-none" value={editData.doctor} onChange={(e) => setEditData({ ...editData, doctor: e.target.value })} />
+                  <input type="text" className="w-full bg-transparent text-xs font-black text-slate-700 outline-none" value={editData.veterinario} onChange={(e) => setEditData({ ...editData, veterinario: e.target.value })} />
                 </div>
                 <div className="bg-slate-50 p-4 rounded-3xl border border-slate-100">
                   <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Clínica</p>
@@ -267,17 +270,17 @@ const ConsultationScanner = ({ mascotas, onScanComplete, initialData }: any) => 
                 </div>
                 <div className="bg-emerald-50/50 p-4 rounded-3xl border border-emerald-100">
                   <p className="text-[9px] font-black text-emerald-600 uppercase mb-1">Costo ($)</p>
-                  <input type="number" className="w-full bg-transparent text-xs font-black text-emerald-700 outline-none" value={editData.precio} onChange={(e) => e.target.value.length <= 6 && setEditData({ ...editData, precio: parseFloat(e.target.value) || 0 })} />
+                  <input type="number" className="w-full bg-transparent text-xs font-black text-emerald-700 outline-none" value={editData.precio || ''} onChange={(e) => e.target.value.length <= 6 && setEditData({ ...editData, precio: parseFloat(e.target.value) || 0 })} />
                 </div>
               </div>
-              <div className="bg-slate-50 p-5 rounded-[2rem] border border-slate-100">
+              <div className="bg-slate-50 p-5 rounded-4xl border border-slate-100">
                 <p className="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Diagnóstico</p>
                 <textarea className="w-full bg-transparent text-sm font-bold text-slate-600 italic outline-none resize-none" rows={3} value={editData.diagnostico} onChange={(e) => setEditData({ ...editData, diagnostico: e.target.value })} />
               </div>
             </div>
             <div className="flex gap-2 mt-8">
-              <button onClick={() => { setEditData(null); setSelectedImage(null); }} className="flex-1 py-5 bg-slate-100 text-slate-400 rounded-[2rem] font-black uppercase text-xs active:scale-95 transition-all">Descartar</button>
-              <button onClick={handleGuardarConsulta} disabled={loading} className="flex-[2] py-5 bg-blue-600 text-white rounded-[2rem] font-black uppercase text-xs tracking-widest shadow-xl flex items-center justify-center gap-2 active:scale-95 transition-all">
+              <button onClick={() => { setEditData(null); setSelectedImage(null); }} className="flex-1 py-5 bg-slate-100 text-slate-400 rounded-4xl font-black uppercase text-xs active:scale-95 transition-all">Descartar</button>
+              <button onClick={handleGuardarConsulta} disabled={loading} className="flex-2 py-5 bg-blue-600 text-white rounded-4xl font-black uppercase text-xs tracking-widest shadow-xl flex items-center justify-center gap-2 active:scale-95 transition-all">
                 {loading ? <Loader2 className="animate-spin" /> : "REGISTRAR"}
               </button>
             </div>
@@ -285,10 +288,9 @@ const ConsultationScanner = ({ mascotas, onScanComplete, initialData }: any) => 
         </div>
       )}
 
-      {/* MODAL DE SUSCRIPCIÓN */}
       {showSubscriptionModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[150] p-4">
-          <div className="bg-white rounded-[2rem] p-6 max-w-sm w-full relative">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-150 p-4">
+          <div className="bg-white rounded-4xl p-6 max-w-sm w-full relative">
             <button
               onClick={() => setShowSubscriptionModal(false)}
               className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"

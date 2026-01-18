@@ -1,23 +1,56 @@
-import js from '@eslint/js'
-import globals from 'globals'
-import reactHooks from 'eslint-plugin-react-hooks'
-import reactRefresh from 'eslint-plugin-react-refresh'
-import tseslint from 'typescript-eslint'
-import { defineConfig, globalIgnores } from 'eslint/config'
+import js from '@eslint/js';
+import globals from 'globals';
+import reactHooks from 'eslint-plugin-react-hooks';
+import reactRefresh from 'eslint-plugin-react-refresh';
+import tseslint from 'typescript-eslint';
 
-export default defineConfig([
-  globalIgnores(['dist']),
+export default [
+  // 1. Global ignores
   {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      js.configs.recommended,
-      tseslint.configs.recommended,
-      reactHooks.configs.flat.recommended,
-      reactRefresh.configs.vite,
+    ignores: [
+      'dist/',
+      'android/',
+      'node_modules/',
     ],
+  },
+
+  // 2. Apply recommended configs globally
+  js.configs.recommended,
+  ...tseslint.configs.recommended,
+
+  // 3. Specific config for your React/TypeScript files
+  {
+    files: ['src/**/*.{ts,tsx}'], // Lint only files in the src directory
     languageOptions: {
-      ecmaVersion: 2020,
-      globals: globals.browser,
+      parserOptions: {
+        ecmaFeatures: {
+          jsx: true, // Enable JSX parsing
+        },
+      },
+      globals: {
+        ...globals.browser,
+        ...globals.es2020,
+      },
+    },
+    plugins: {
+      'react-hooks': reactHooks,
+      'react-refresh': reactRefresh,
+    },
+    rules: {
+      // Get all the recommended rules from the hooks plugin
+      ...reactHooks.configs.recommended.rules,
+      // Add the required rule for Vite + React Refresh
+      'react-refresh/only-export-components': 'warn',
     },
   },
-])
+
+  // 4. Specific config for the Service Worker file
+  {
+    files: ['public/sw.js'],
+    languageOptions: {
+      globals: {
+        ...globals.serviceworker,
+      },
+    },
+  },
+];

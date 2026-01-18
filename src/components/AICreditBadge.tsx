@@ -1,12 +1,12 @@
 import React from 'react';
-import { Zap, Sparkles } from 'lucide-react';
+import {Sparkles, Zap} from 'lucide-react';
+import type {UserDTO} from '@/types/api.types';
 
 interface Props {
-  user: any;
+  user: UserDTO | null;
 }
 
 const AICreditBadge = ({ user }: Props) => {
-  // Caso: Usuario Colaborador (Ilimitado)
   if (user?.esColaborador) {
     return (
       <div className="flex items-center gap-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 px-3 py-1.5 rounded-2xl shadow-sm border border-emerald-400/20 animate-in fade-in zoom-in">
@@ -18,7 +18,6 @@ const AICreditBadge = ({ user }: Props) => {
     );
   }
 
-  // Caso: Usuario Gratuito (10 intentos)
   const restantes = Math.max(0, 10 - (user?.intentosIA || 0));
   const esBajo = restantes <= 2;
 

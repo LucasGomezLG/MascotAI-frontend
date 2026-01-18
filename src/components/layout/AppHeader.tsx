@@ -1,34 +1,33 @@
 import React from 'react';
-import { Dog, Bell, User as UserIcon, PawPrint, Heart } from 'lucide-react';
+import {Bell, Dog, Heart, PawPrint, User as UserIcon} from 'lucide-react';
 import NotificationsCenter from '../ui/NotificationsCenter';
-import { useAuth } from '../../context/AuthContext'; // 🛡️ Importante
+import {useAuth} from '../../context/AuthContext';
+import type {AlertaDTO, UserDTO} from '@/types/api.types';
+import {useUIStore} from '@/stores/uiStore';
+
+type TabType = 'home' | 'scanner' | 'stats' | 'vet' | 'health' | 'pets';
 
 interface AppHeaderProps {
-  user: any;
-  setActiveTab: (tab: any) => void;
-  alertas: any[];
-  showAlerts: boolean;
-  setShowAlerts: (show: boolean) => void;
+  user: UserDTO | null;
+  setActiveTab: (tab: TabType) => void;
+  alertas: AlertaDTO[];
   onMarkRead: (id: string) => Promise<void>;
-  setShowLogoutModal: (show: boolean) => void;
   activeTab: string;
 }
 
 export default function AppHeader({
-  user, setActiveTab, alertas, showAlerts,
-  setShowAlerts, onMarkRead, setShowLogoutModal, activeTab
+  user, setActiveTab, alertas, onMarkRead, activeTab
 }: AppHeaderProps) {
+  const { refreshUser } = useAuth();
+  const { isAlertsOpen, toggleAlerts, toggleLogoutModal } = useUIStore();
 
-  const { refreshUser } = useAuth(); // 🔄 Consumimos refreshUser
-
-  const nombreRaw = user?.nombre || user?.name || user?.displayName || 'Usuario';
+  const nombreRaw = user?.nombre || 'Usuario';
   const firstName = nombreRaw.split(' ')[0];
-  const profileImage = user?.picture || user?.foto || null;
+  const profileImage = user?.foto || null;
 
-  // 🚀 Función para actualizar y abrir el panel de perfil
   const handleAvatarClick = () => {
-    refreshUser(); // Dispara el nuevo endpoint en segundo plano
-    setShowLogoutModal(true); // Abre el modal
+    void refreshUser();
+    toggleLogoutModal(true);
   };
 
   return (
@@ -49,7 +48,7 @@ export default function AppHeader({
       <div className="flex items-center gap-2">
         <div className="relative">
           <button
-            onClick={() => setShowAlerts(!showAlerts)}
+            onClick={() => toggleAlerts(!isAlertsOpen)}
             className={`p-2.5 rounded-xl transition-all ${alertas.length > 0 ? 'bg-orange-50 text-orange-600' : 'bg-slate-50 text-slate-400'}`}
           >
             <Bell size={20} />
@@ -57,8 +56,8 @@ export default function AppHeader({
               <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 border-2 border-white rounded-full"></span>
             )}
           </button>
-          {showAlerts && (
-            <NotificationsCenter alertas={alertas} onMarkRead={onMarkRead} onClose={() => setShowAlerts(false)} />
+          {isAlertsOpen && (
+            <NotificationsCenter alertas={alertas} onMarkRead={onMarkRead} onClose={() => toggleAlerts(false)} />
           )}
         </div>
 
@@ -69,7 +68,6 @@ export default function AppHeader({
           <PawPrint size={20} />
         </button>
 
-        {/* 📸 BOTÓN DE AVATAR ACTUALIZADO */}
         <button
           onClick={handleAvatarClick}
           className="relative w-10 h-10 rounded-xl overflow-hidden border-2 border-orange-100 bg-slate-100 flex items-center justify-center shadow-sm active:scale-90 transition-transform ml-1"

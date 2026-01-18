@@ -1,33 +1,38 @@
-import React, { useState, useEffect } from 'react';
-import { Camera as CameraIcon, Loader2, User, RefreshCw, Sparkles, X, Image as ImageIcon, Activity } from 'lucide-react';
-import { api } from '../../../services/api';
-import { useAuth } from '../../../context/AuthContext'; // 🛡️ Importamos el contexto
-import { Toast } from '../../../utils/alerts';
+import React, {useEffect, useState} from 'react';
+import {Activity, Image as ImageIcon, Loader2, Sparkles, User, X} from 'lucide-react';
+import {api} from '@/services/api.ts';
+import {useAuth} from '@/context/AuthContext.tsx';
+import {Toast} from '@/utils/alerts.ts';
 import MedicalReport from './MedicalReport';
 import Swal from 'sweetalert2';
 import SubscriptionCard from '../../../services/SuscriptionCard';
+import {Camera, CameraResultType, CameraSource} from '@capacitor/camera';
+import {useCameraPermissions} from '@/hooks/useCameraPermissions.ts';
+import type {MascotaDTO, TriajeIADTO} from '@/types/api.types.ts';
+import {isAxiosError} from 'axios';
 
-// 🛡️ IMPORTACIONES NATIVAS
-import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
-import { useCameraPermissions } from '../../../hooks/useCameraPermissions';
+interface SymptomScannerProps {
+  mascotas: MascotaDTO[];
+  initialData?: TriajeIADTO;
+  onScanComplete: () => void;
+}
 
-const SymptomScanner = ({ mascotas, initialData, onScanComplete }: any) => {
-  const { user, refreshUser } = useAuth(); // 🛡️ Obtenemos datos y función de refresco
+const SymptomScanner = ({ mascotas, initialData, onScanComplete }: SymptomScannerProps) => {
+  const { user, refreshUser } = useAuth();
   const [selectedPet, setSelectedPet] = useState("");
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<TriajeIADTO | null>(null);
   const [activeTab, setActiveTab] = useState("MATERIA FECAL");
 
   const { validarCamara, validarGaleria } = useCameraPermissions();
   
-  // 🛡️ Cálculo de energía
   const restantes = Math.max(0, 10 - (user?.intentosIA || 0));
   const tieneEnergia = user?.esColaborador || restantes > 0;
 
   useEffect(() => {
-    if (initialData && !initialData.esDocumentoMedico) {
+    if (initialData) {
       setResult(initialData);
       if (initialData.mascotaId) {
         setSelectedPet(initialData.mascotaId);
@@ -35,9 +40,8 @@ const SymptomScanner = ({ mascotas, initialData, onScanComplete }: any) => {
     }
   }, [initialData]);
 
-  // 🛡️ MODAL DE LÍMITE AGOTADO
   const mostrarModalLimite = () => {
-    Swal.fire({
+    void Swal.fire({
       title: '¡Límite alcanzado!',
       text: 'Usaste tus 10 escaneos del mes. Colaborá para tener acceso ilimitado y ayudarnos con los servidores.',
       icon: 'info',
@@ -57,13 +61,14 @@ const SymptomScanner = ({ mascotas, initialData, onScanComplete }: any) => {
     if (!ok) return;
     try {
       const image = await Camera.getPhoto({
-        quality: 90, allowEditing: false, resultType: CameraResultType.Base64, source: CameraSource.Camera
+        resultType: CameraResultType.Base64,
+        source: CameraSource.Camera
       });
       if (image.base64String) {
         setSelectedImage(`data:image/jpeg;base64,${image.base64String}`);
         setResult(null);
       }
-    } catch (error) { console.log("Captura cancelada"); }
+    } catch { console.log("Captura cancelada"); }
   };
 
   const handleNativeGallery = async () => {
@@ -71,17 +76,17 @@ const SymptomScanner = ({ mascotas, initialData, onScanComplete }: any) => {
     if (!ok) return;
     try {
       const image = await Camera.getPhoto({
-        quality: 90, allowEditing: false, resultType: CameraResultType.Base64, source: CameraSource.Photos
+        resultType: CameraResultType.Base64,
+        source: CameraSource.Photos
       });
       if (image.base64String) {
         setSelectedImage(`data:image/jpeg;base64,${image.base64String}`);
         setResult(null);
       }
-    } catch (error) { console.log("Selección cancelada"); }
+    } catch { console.log("Selección cancelada"); }
   };
 
   const handleAnalizar = async () => {
-    // 🛡️ VALIDACIÓN DE CRÉDITOS AL TOCAR EL BOTÓN
     if (!tieneEnergia) {
       mostrarModalLimite();
       return;
@@ -93,12 +98,11 @@ const SymptomScanner = ({ mascotas, initialData, onScanComplete }: any) => {
     try {
       const res = await api.analizarTriaje(selectedImage, activeTab, selectedPet || "GENERIC");
 
-      // ✅ ACTUALIZACIÓN DE CRÉDITOS EN EL HEADER
       await refreshUser();
 
-      const dataIA: any = res.data;
+      const dataIA: TriajeIADTO = res.data;
       if (dataIA?.error === "NO_DETECTADO") {
-        Swal.fire({
+        void Swal.fire({
           title: 'Imagen no reconocida',
           text: `MascotAI no detectó evidencia de "${activeTab}"...`,
           icon: 'warning',
@@ -109,12 +113,14 @@ const SymptomScanner = ({ mascotas, initialData, onScanComplete }: any) => {
       }
       setResult(dataIA);
       if (onScanComplete) onScanComplete();
-    } catch (e: any) {
-      const errorMsg = e.response?.data?.error || "";
-      if (e.response?.status === 403 || errorMsg.includes("LIMITE")) {
-        mostrarModalLimite();
-      } else {
-        Toast.fire({ icon: 'error', title: 'Error en el análisis' });
+    } catch (e) {
+      if (isAxiosError(e)) {
+        const errorMsg = (e.response?.data as { error: string })?.error || "";
+        if (e.response?.status === 403 || errorMsg.includes("LIMITE")) {
+          mostrarModalLimite();
+        } else {
+          void Toast.fire({ icon: 'error', title: 'Error en el análisis' });
+        }
       }
     } finally {
       setLoading(false);
@@ -135,7 +141,7 @@ const SymptomScanner = ({ mascotas, initialData, onScanComplete }: any) => {
               className="w-full p-4 rounded-2xl border-2 border-slate-50 bg-slate-50/50 font-bold outline-none text-slate-700 focus:border-red-500 transition-all"
             >
               <option value="">No sé quién fue (Análisis Genérico)</option>
-              {mascotas.map((p: any) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+              {mascotas.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
             </select>
           </div>
 
@@ -207,7 +213,6 @@ const SymptomScanner = ({ mascotas, initialData, onScanComplete }: any) => {
         </div>
       )}
 
-      {/* MODAL DE SUSCRIPCIÓN */}
       {showSubscriptionModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[150] p-4">
           <div className="bg-white rounded-[2rem] p-6 max-w-sm w-full relative">

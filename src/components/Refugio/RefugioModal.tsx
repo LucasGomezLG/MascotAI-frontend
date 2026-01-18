@@ -1,13 +1,13 @@
-import React, { useState } from 'react';
-import { X, Camera as CameraIcon, Image as ImageIcon, MapPin, Loader2, Trash2, Globe, Wallet, Info } from 'lucide-react';
-import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
-import { api } from '../../services/api';
+import React, {useState} from 'react';
+import {Camera as CameraIcon, Globe, Image as ImageIcon, Info, Loader2, MapPin, Trash2, Wallet, X} from 'lucide-react';
+import {MapContainer, Marker, TileLayer, useMap} from 'react-leaflet';
+import {api} from '@/services/api.ts';
 import Swal from 'sweetalert2';
 import 'leaflet/dist/leaflet.css';
-import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
-import { useCameraPermissions } from '../../hooks/useCameraPermissions';
+import {Camera, CameraResultType, CameraSource} from '@capacitor/camera';
+import {useCameraPermissions} from '@/hooks/useCameraPermissions.ts';
+import {isAxiosError} from 'axios';
 
-// Helper para mover el mapa a la ubicación encontrada
 function ChangeView({ center }: { center: [number, number] }) {
   const map = useMap();
   map.setView(center);
@@ -15,7 +15,6 @@ function ChangeView({ center }: { center: [number, number] }) {
 }
 
 const RefugioModal = ({ onClose }: { onClose: () => void }) => {
-  // --- ESTADOS ---
   const [loading, setLoading] = useState(false);
   const [buscando, setBuscando] = useState(false);
   const [ubicacionConfirmada, setUbicacionConfirmada] = useState(false);
@@ -31,11 +30,10 @@ const RefugioModal = ({ onClose }: { onClose: () => void }) => {
   });
 
   const [previews, setPreviews] = useState<string[]>([]);
-  const [archivos, setArchivos] = useState<File[]>([]); // ✅ Estado recuperado para Cloudinary
+  const [archivos, setArchivos] = useState<File[]>([]);
 
   const { validarCamara, validarGaleria } = useCameraPermissions();
 
-  // --- LÓGICA DE UBICACIÓN (NOMINATIM) ---
   const handleBuscarDireccion = async () => {
     if (data.direccion.trim().length < 5) {
       return alertVal('Dirección corta', 'Ingresá un barrio o dirección más específica.');
@@ -49,30 +47,32 @@ const RefugioModal = ({ onClose }: { onClose: () => void }) => {
         setUbicacionConfirmada(true);
       } else {
         setUbicacionConfirmada(false);
-        Swal.fire({ title: 'No encontrado', text: 'No pudimos localizar esa dirección.', icon: 'question' });
+        void Swal.fire({ title: 'No encontrado', text: 'No pudimos localizar esa dirección.', icon: 'question' });
       }
     } catch (e) { console.error(e); } finally { setBuscando(false); }
   };
 
-  // --- CAPTURA DE MEDIOS NATIVOS ---
   const handleMedia = async (source: CameraSource) => {
     if (archivos.length >= 3) return;
     const ok = source === CameraSource.Camera ? await validarCamara() : await validarGaleria();
     if (!ok) return;
 
     try {
-      const image = await Camera.getPhoto({ quality: 80, resultType: CameraResultType.Uri, source });
+      const image = await Camera.getPhoto({
+        quality: 90,
+        resultType: CameraResultType.Uri,
+        source,
+        width: 1024,
+        allowEditing: false
+      });
       if (image.webPath) {
-        // 1. Guardar previsualización
         setPreviews(prev => [...prev, image.webPath!]);
-
-        // 2. Convertir a File binario para el envío real
         const res = await fetch(image.webPath);
         const blob = await res.blob();
         const file = new File([blob], `refu_${Date.now()}.jpg`, { type: 'image/jpeg' });
         setArchivos(prev => [...prev, file]);
       }
-    } catch (e) { /* Cancelado */ }
+    } catch { /* Cancelado */ }
   };
 
   const removePhoto = (index: number) => {
@@ -80,11 +80,9 @@ const RefugioModal = ({ onClose }: { onClose: () => void }) => {
     setArchivos(prev => prev.filter((_, i) => i !== index));
   };
 
-  // --- ENVÍO AL BACKEND (MULTIPART/FORM-DATA) ---
   const handlePublicar = async () => {
     const { nombre, descripcion, redSocial, aliasDonacion, direccion } = data;
 
-    // 🛡️ VALIDACIONES FRONTEND
     if (archivos.length === 0) return alertVal('Falta Identidad', 'Subí al menos una foto del refugio.');
     if (nombre.trim().length < 3) return alertVal('Nombre inválido', 'El nombre es demasiado corto.');
     if (descripcion.trim().length < 20) return alertVal('Descripción breve', 'Contanos más sobre el refugio (mín. 20 carac.).');
@@ -104,8 +102,6 @@ const RefugioModal = ({ onClose }: { onClose: () => void }) => {
       lat: Number(data.lat),
       lng: Number(data.lng),
       verificado: false,
-      // 🚩 SOLUCIÓN AL 400: Enviamos un string temporal para pasar el @NotEmpty del Back.
-      // El Service de Java luego reemplazará esto con las URLs reales de Cloudinary.
       fotos: ["pendiente_de_subida"]
     };
 
@@ -114,7 +110,7 @@ const RefugioModal = ({ onClose }: { onClose: () => void }) => {
 
     try {
       await api.registrarRefugio(formData);
-      Swal.fire({
+      void Swal.fire({
         title: '¡Registrado!',
         text: 'El refugio y sus fotos se guardaron exitosamente.',
         icon: 'success',
@@ -122,23 +118,22 @@ const RefugioModal = ({ onClose }: { onClose: () => void }) => {
         showConfirmButton: false
       });
       onClose();
-    } catch (e: any) {
-      // 🔍 Log detallado para depuración
-      console.error("❌ Error registro detalle:", e.response?.data);
-      const msg = e.response?.data?.error || "Verifica los datos ingresados.";
-      Swal.fire({ title: 'Error', text: msg, icon: 'error' });
+    } catch (e) {
+      if (isAxiosError(e)) {
+        const msg = (e.response?.data as { error: string })?.error || "Verifica los datos ingresados.";
+        void Swal.fire({ title: 'Error', text: msg, icon: 'error' });
+      }
     } finally { setLoading(false); }
   };
 
   const alertVal = (title: string, text: string) => {
-    Swal.fire({ title, text, icon: 'warning', confirmButtonColor: '#7c3aed', customClass: { popup: 'rounded-[2.5rem]' } });
+    void Swal.fire({ title, text, icon: 'warning', confirmButtonColor: '#7c3aed', customClass: { popup: 'rounded-[2.5rem]' } });
   };
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-6 shadow-2xl relative max-h-[95vh] overflow-y-auto animate-in zoom-in-95">
 
-        {/* BOTÓN CERRAR */}
         <button
           onClick={onClose}
           className="absolute top-6 right-6 text-slate-300 hover:text-violet-600 p-2 bg-slate-50 rounded-full transition-colors z-10"
@@ -152,7 +147,6 @@ const RefugioModal = ({ onClose }: { onClose: () => void }) => {
         </h3>
 
         <div className="space-y-4 text-left">
-          {/* FOTOS */}
           <div className="grid grid-cols-3 gap-2">
             {previews.map((p, i) => (
               <div key={i} className="relative h-20">
@@ -217,7 +211,6 @@ const RefugioModal = ({ onClose }: { onClose: () => void }) => {
             </div>
           </div>
 
-          {/* UBICACIÓN CON BÚSQUEDA */}
           <div className="space-y-2">
             <div className="relative">
               <MapPin size={18} className="absolute left-4 top-4 text-violet-500" />
@@ -249,7 +242,6 @@ const RefugioModal = ({ onClose }: { onClose: () => void }) => {
             </div>
           </div>
 
-          {/* INFO SEGURIDAD */}
           <div className="flex items-center gap-2 px-4 py-3 bg-violet-50 rounded-xl border border-violet-100">
             <Info size={14} className="text-violet-600" />
             <p className="text-[9px] font-bold text-violet-700 leading-tight">

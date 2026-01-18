@@ -1,19 +1,18 @@
 import React from 'react';
-import { 
-  Camera as CameraIcon, 
-  Loader2, 
-  Utensils, 
-  Wallet, 
-  Search, 
-  Package, 
-  Sparkles, 
-  MessageCircle, 
-  CheckCircle2,
-  ThumbsUp,
-  ThumbsDown,
-  X
+import {
+    Camera as CameraIcon,
+    CheckCircle2,
+    Loader2,
+    MessageCircle,
+    Package,
+    Search,
+    Sparkles,
+    ThumbsDown,
+    ThumbsUp,
+    Utensils,
+    Wallet
 } from 'lucide-react';
-import type { AlimentoDTO, MascotaDTO } from '../../../types/api.types';
+import type {AlimentoDTO, MascotaDTO} from '@/types/api.types.ts';
 
 const getGamaColor = (calidad: string = "") => {
   const c = calidad.toLowerCase();
@@ -24,8 +23,8 @@ const getGamaColor = (calidad: string = "") => {
 };
 
 interface FoodResultViewProps {
-  result: any;
-  setResult: (val: any) => void;
+  result: { alimento: AlimentoDTO, error?: string } | null;
+  setResult: (val: { alimento: AlimentoDTO } | null) => void;
   petData?: MascotaDTO;
   porcion: number | null;
   precioInput: string;
@@ -51,10 +50,8 @@ const FoodResultView = ({
   loadingResenas, resenasIA, loadingBusqueda, onReset
 }: FoodResultViewProps) => {
 
-  // ✅ NORMALIZACIÓN: Extraemos el DTO para evitar errores de 'marca' undefined
-  const alimento: AlimentoDTO = result?.alimento || result;
+  const alimento = result?.alimento;
 
-  // Manejo de error si la IA no detectó alimento
   if (result?.error === "NO_ES_ALIMENTO" || !alimento) {
     return (
       <div className="bg-white rounded-[2.5rem] shadow-2xl p-8 border-2 border-red-50 text-center animate-in zoom-in-95">
@@ -71,13 +68,11 @@ const FoodResultView = ({
   return (
     <div className="bg-white rounded-[2.5rem] shadow-2xl p-8 border border-slate-100 text-left animate-in zoom-in-95">
       
-      {/* 🏷️ IDENTIFICACIÓN DE MARCA */}
       <div className="mb-6 relative px-1">
         <label className="text-[10px] font-black text-slate-400 uppercase mb-1 block tracking-widest">Marca Identificada</label>
         <input 
           className="text-2xl font-black bg-transparent border-b-2 outline-none w-full border-slate-100 focus:border-orange-500 transition-all pb-2" 
           value={alimento?.marca || ""} 
-          // ✅ Aseguramos que la actualización de marca no rompa la estructura del objeto
           onChange={(e) => setResult({ 
             ...result, 
             alimento: { ...alimento, marca: e.target.value } 
@@ -86,7 +81,6 @@ const FoodResultView = ({
       </div>
 
       <div className="space-y-4 mb-8">
-        {/* 🥗 TARJETA DE RACIÓN */}
         <div className="bg-emerald-600 text-white p-6 rounded-[2rem] flex items-center justify-between shadow-lg relative overflow-hidden">
           <div className="relative z-10 w-full">
             <p className="text-[10px] font-black uppercase opacity-80 tracking-widest mb-1">Ración Diaria Sugerida</p>
@@ -102,7 +96,6 @@ const FoodResultView = ({
           <Utensils size={80} className="opacity-10 absolute -right-4 -bottom-2 rotate-12" />
         </div>
 
-        {/* 💰 FINANCE & STOCK */}
         <div className="bg-blue-50 p-6 rounded-[2rem] border border-blue-100 space-y-4">
           <div className="flex items-center gap-2 text-blue-900 font-black text-[10px] uppercase tracking-widest px-1"><Wallet size={14} /> Seguimiento de Gasto</div>
           <div className="flex gap-2">
@@ -138,8 +131,7 @@ const FoodResultView = ({
         </div>
       </div>
 
-      {/* ⭐ CALIDAD E INGREDIENTES */}
-      <div className={`inline-block px-4 py-2 rounded-xl text-[10px] font-black mb-4 uppercase border ${getGamaColor(alimento?.calidad)}`}>
+      <div className={`inline-block px-4 py-2 rounded-xl text-[10px] font-black mb-4 uppercase border ${getGamaColor(alimento?.calidad || '')}`}>
         CALIDAD: {alimento?.calidad || "PENDIENTE"}
       </div>
 
@@ -158,7 +150,6 @@ const FoodResultView = ({
         </div>
       </div>
 
-      {/* --- 🤖 SECCIÓN DE RESEÑAS CON IA (TARJETAS SEPARADAS) --- */}
       <div className="space-y-4 mb-10 border-t border-slate-100 pt-8">
         {resenasIA && (
           <div className="space-y-3 animate-in fade-in slide-in-from-top-4">
@@ -210,7 +201,6 @@ const FoodResultView = ({
         </button>
       </div>
 
-      {/* 🏁 BOTÓN FINALIZAR (LIMPIA TODO) */}
       <button 
         onClick={onReset} 
         className="w-full py-6 bg-slate-900 text-white font-black text-xs uppercase tracking-[0.3em] rounded-[2rem] active:scale-95 transition-all shadow-2xl shadow-slate-200"

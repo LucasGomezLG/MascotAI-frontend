@@ -1,12 +1,19 @@
-import React, { useState } from 'react';
+import React, {useState} from 'react';
 import {
-  X, Camera as CameraIcon, Image as ImageIcon, PawPrint,
-  Weight, HeartPulse, Calendar, Loader2
+    Calendar,
+    Camera as CameraIcon,
+    HeartPulse,
+    Image as ImageIcon,
+    Loader2,
+    PawPrint,
+    Weight,
+    X
 } from 'lucide-react';
-import { api } from '../../services/api';
+import {api} from '@/services/api.ts';
 import Swal from 'sweetalert2';
-import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
-import { useCameraPermissions } from '../../hooks/useCameraPermissions';
+import {Camera, CameraResultType, CameraSource} from '@capacitor/camera';
+import {useCameraPermissions} from '@/hooks/useCameraPermissions.ts';
+import {isAxiosError} from 'axios';
 
 interface PetModalProps { onClose: () => void; }
 
@@ -33,55 +40,33 @@ const PetModal = ({ onClose }: PetModalProps) => {
     const ok = source === CameraSource.Camera ? await validarCamara() : await validarGaleria();
     if (!ok) return;
     try {
-      const image = await Camera.getPhoto({ quality: 90, resultType: CameraResultType.Uri, source });
+      const image = await Camera.getPhoto({
+        quality: 90,
+        resultType: CameraResultType.Uri,
+        source,
+        width: 1024,
+        allowEditing: false
+      });
       if (image.webPath) {
         setNuevaMascota(prev => ({ ...prev, foto: image.webPath! }));
         const response = await fetch(image.webPath);
         const file = new File([await response.blob()], `pet_${Date.now()}.jpg`, { type: 'image/jpeg' });
         setSelectedFile(file);
       }
-    } catch (e) { /* Cancelado por usuario */ }
+    } catch { /* Cancelado por usuario */ }
   };
 
   const guardar = async () => {
     const { nombre, fechaNacimiento, peso, condicion, especie } = nuevaMascota;
     const pesoNum = parseFloat(peso);
 
-    // --- 🛡️ VALIDACIONES ESTRICTAS ---
-    if (!selectedFile) {
-      alertValidacion('¡Falta la foto!', 'Es necesario identificar a tu mascota con una imagen.');
-      return;
-    }
-
-    if (!nombre.trim()) {
-      alertValidacion('Nombre requerido', 'Tu mascota necesita un nombre para su perfil.');
-      return;
-    }
-
-    if (nombre.length > 20) {
-      alertValidacion('Nombre muy largo', 'El nombre no puede superar los 20 caracteres.');
-      return;
-    }
-
-    if (!fechaNacimiento) {
-      alertValidacion('Fecha requerida', 'Indica cuándo nació tu mascota.');
-      return;
-    }
-
-    if (fechaNacimiento > hoy) {
-      alertValidacion('Fecha inválida', 'La fecha de nacimiento no puede ser una fecha futura.');
-      return;
-    }
-
-    if (!peso || isNaN(pesoNum)) {
-      alertValidacion('Peso requerido', 'Ingresa el peso aproximado de tu mascota.');
-      return;
-    }
-
-    if (pesoNum < 0.1 || pesoNum > 100) {
-      alertValidacion('Peso fuera de rango', 'El peso debe estar entre 0.1 y 100 kg.');
-      return;
-    }
+    if (!selectedFile) return alertValidacion('¡Falta la foto!', 'Es necesario identificar a tu mascota con una imagen.');
+    if (!nombre.trim()) return alertValidacion('Nombre requerido', 'Tu mascota necesita un nombre para su perfil.');
+    if (nombre.length > 20) return alertValidacion('Nombre muy largo', 'El nombre no puede superar los 20 caracteres.');
+    if (!fechaNacimiento) return alertValidacion('Fecha requerida', 'Indica cuándo nació tu mascota.');
+    if (fechaNacimiento > hoy) return alertValidacion('Fecha inválida', 'La fecha de nacimiento no puede ser una fecha futura.');
+    if (!peso || isNaN(pesoNum)) return alertValidacion('Peso requerido', 'Ingresa el peso aproximado de tu mascota.');
+    if (pesoNum < 0.1 || pesoNum > 100) return alertValidacion('Peso fuera de rango', 'El peso debe estar entre 0.1 y 100 kg.');
 
     const formData = new FormData();
     formData.append('file', selectedFile);
@@ -94,18 +79,20 @@ const PetModal = ({ onClose }: PetModalProps) => {
     setLoading(true);
     try {
       await api.registrarConFoto(formData);
-      Swal.fire({ title: '¡Registrada!', text: `${nombre} ya es parte de MascotAI`, icon: 'success', timer: 2000, showConfirmButton: false, customClass: { popup: 'rounded-[2rem]' } });
+      void Swal.fire({ title: '¡Registrada!', text: `${nombre} ya es parte de MascotAI`, icon: 'success', timer: 2000, showConfirmButton: false, customClass: { popup: 'rounded-[2rem]' } });
       onClose();
-    } catch (e: any) {
-      console.error("Error al registrar mascota:", e.message);
-      Swal.fire({ title: 'Error', text: 'No pudimos guardar los datos en el servidor.', icon: 'error', customClass: { popup: 'rounded-[2rem]' } });
+    } catch (e) {
+      if (isAxiosError(e)) {
+        console.error("Error al registrar mascota:", e.message);
+      }
+      void Swal.fire({ title: 'Error', text: 'No pudimos guardar los datos en el servidor.', icon: 'error', customClass: { popup: 'rounded-[2rem]' } });
     } finally {
       setLoading(false);
     }
   };
 
   const alertValidacion = (title: string, text: string) => {
-    Swal.fire({ title, text, icon: 'warning', confirmButtonColor: '#f97316', customClass: { popup: 'rounded-[2rem]' } });
+    void Swal.fire({ title, text, icon: 'warning', confirmButtonColor: '#f97316', customClass: { popup: 'rounded-[2rem]' } });
   };
 
   return (
@@ -195,25 +182,22 @@ const PetModal = ({ onClose }: PetModalProps) => {
               </div>
             </div>
 
-            {/* --- SECCIÓN ESTADO DE SALUD --- */}
-            <div className="space-y-2"> {/* Contenedor padre para separar input de leyenda */}
+            <div className="space-y-2">
               <div className="relative group">
                 <input
                   type="text"
-                  maxLength={20} // 🛡️ Límite físico
+                  maxLength={20}
                   placeholder="Estado de salud (Opcional)"
                   className="w-full p-5 pl-12 bg-slate-50 rounded-2xl font-bold border-2 border-transparent focus:border-orange-500 focus:bg-white outline-none text-sm transition-all"
                   value={nuevaMascota.condicion}
                   onChange={e => setNuevaMascota({ ...nuevaMascota, condicion: e.target.value })}
                 />
-                {/* Ahora el top-1/2 funciona perfecto porque solo mide el input */}
                 <HeartPulse
                   className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-orange-500 transition-colors"
                   size={20}
                 />
               </div>
 
-              {/* ✅ LEYENDA INFORMATIVA: Fuera del relative para no afectar el centrado */}
               <p className="text-[9px] font-bold text-slate-400 ml-2 leading-tight">
                 * Ej: Alergias, Dieta, Medicación. Si queda vacío, se guardará como
                 <span className="text-orange-500 ml-1 uppercase">"Sano"</span>.

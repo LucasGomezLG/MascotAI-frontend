@@ -1,5 +1,5 @@
-import { useAuth } from '../../context/AuthContext';
-import { PawPrint } from 'lucide-react';
+import {useAuth} from '../../context/AuthContext';
+import {PawPrint} from 'lucide-react';
 
 const LoginView = () => {
   const { login } = useAuth();
@@ -22,3 +22,5 @@ const LoginView = () => {
     </div>
   );
 };
+
+export default LoginView;

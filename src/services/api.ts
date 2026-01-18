@@ -1,9 +1,17 @@
-import axios from 'axios';
+import axios, {AxiosError} from 'axios';
+import toast from 'react-hot-toast';
 import type {
-  UserDTO, MascotaDTO, AlertaDTO, ItemComunidad,
-  RefugioDTO, OfertaPrecioDTO, MascotaAdopcionDTO,
-  MascotaPerdidaDTO, AlimentoDTO, RecordatorioSaludDTO,
-  ConsultaVetDTO, TriajeIADTO // 🩺 Nuevo DTO para clínica
+    AlertaDTO,
+    AlimentoDTO,
+    ConsultaVetDTO,
+    MascotaAdopcionDTO,
+    MascotaDTO,
+    MascotaPerdidaDTO,
+    OfertaPrecioDTO,
+    RecordatorioSaludDTO,
+    RefugioDTO,
+    TriajeIADTO,
+    UserDTO
 } from '../types/api.types';
 
 export const SERVER_URL = import.meta.env.DEV
@@ -14,7 +22,6 @@ export const API_BASE = `${SERVER_URL}/api`;
 
 axios.defaults.withCredentials = true;
 
-// Helper function to read cookies
 function getCookie(name: string): string | null {
   const nameEQ = name + "=";
   const ca = document.cookie.split(';');
@@ -28,12 +35,10 @@ function getCookie(name: string): string | null {
 
 export const apiClient = axios.create({
   baseURL: API_BASE,
-  withCredentials: true // ✅ Esto permite que el navegador guarde la sesión (JSESSIONID)
+  withCredentials: true
 });
 
-// Add a request interceptor to attach the X-XSRF-TOKEN header
 apiClient.interceptors.request.use(config => {
-  // Only add the header for methods that modify data
   const methodsToProtect = ['post', 'put', 'delete', 'patch'];
   if (config.method && methodsToProtect.includes(config.method.toLowerCase())) {
     const xsrfToken = getCookie('XSRF-TOKEN');
@@ -45,6 +50,27 @@ apiClient.interceptors.request.use(config => {
 }, error => {
   return Promise.reject(error);
 });
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error: AxiosError) => {
+    let errorMessage = 'Ocurrió un error inesperado.';
+    if (error.response) {
+      const responseData = error.response.data as { message?: string; error?: string };
+      errorMessage = responseData.message || responseData.error || `Error ${error.response.status}`;
+    } else if (error.request) {
+      errorMessage = 'No se pudo conectar con el servidor. Revisa tu conexión a internet.';
+    }
+    toast.error(errorMessage, {
+      style: {
+        borderRadius: '10px',
+        background: '#333',
+        color: '#fff',
+      },
+    });
+    return Promise.reject(error);
+  }
+);
 
 export const api = {
   // --- 👤 MÓDULO: USUARIO Y PERFIL ---
@@ -59,7 +85,7 @@ export const api = {
   // --- 💳 MÓDULO: PAGOS Y SUSCRIPCIONES ---
   crearSuscripcion: (monto: number) => apiClient.get<{ url: string }>('/mascotas/usuarios/suscribirme', { params: { monto } }),
   getHistorialPagos: () => apiClient.get<string>('/pagos/mis-pagos'),
-  webhookSuscripciones: (payload: any) => apiClient.post('/mascotas/public/webhook-mp', payload),
+  webhookSuscripciones: (payload: unknown) => apiClient.post('/mascotas/public/webhook-mp', payload),
 
   // --- 🐾 MÓDULO: MASCOTAS PROPIAS ---
   getMascotas: () => apiClient.get<MascotaDTO[]>('/mascotas'),
@@ -95,19 +121,12 @@ export const api = {
     apiClient.delete(`/veterinaria/triaje/${id}`),
 
   // --- 🩺 ✅ MÓDULO: IA VETERINARIA Y CLÍNICA (Sincronizado con VeterinariaController.java) ---
-  // Endpoint: POST /api/veterinaria/analizar
   analizarVet: (image: string, mascotaId: string) =>
     apiClient.post<ConsultaVetDTO>('/veterinaria/analizar', { image, mascotaId }),
-
-  // Endpoint: POST /api/veterinaria (Guardar consulta/receta definitiva)
   guardarConsultaVet: (data: ConsultaVetDTO) =>
     apiClient.post<ConsultaVetDTO>('/veterinaria', data),
-
-  // Endpoint: GET /api/veterinaria/historial (Historial clínico del usuario)
   getHistorialClinico: () =>
     apiClient.get<ConsultaVetDTO[]>('/veterinaria/historial'),
-
-  // Endpoint: DELETE /api/veterinaria/{id}
   eliminarConsultaVet: (id: string) =>
     apiClient.delete(`/veterinaria/${id}`),
 
@@ -133,7 +152,7 @@ export const api = {
 
   // --- 🔔 MÓDULO: ALERTAS ---
   getAlertasSistema: () => apiClient.get<AlertaDTO[]>('/mascotas/alertas-sistema'),
-  crearAlertaPersonalizada: (alerta: any) => apiClient.post('/mascotas/alertas', alerta),
+  crearAlertaPersonalizada: (alerta: Partial<AlertaDTO>) => apiClient.post('/mascotas/alertas', alerta),
   getMisAlertas: () => apiClient.get<AlertaDTO[]>('/alertas'),
   marcarAlertaLeida: (id: string) => apiClient.patch(`/alertas/${id}/leida`),
 };

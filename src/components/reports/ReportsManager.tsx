@@ -1,28 +1,42 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
-  Utensils, Stethoscope, Clock, Calendar, Trash2, Swords,
-  CheckSquare, Square, X, Sparkles, Scale, Package, AlertCircle,
-  ShieldPlus, Wallet, BarChart3, Activity, Receipt, User, ChevronRight,
-  MapPin
+    Activity,
+    AlertCircle,
+    CheckSquare,
+    Clock,
+    Package,
+    Receipt,
+    Scale,
+    ShieldPlus,
+    Sparkles,
+    Square,
+    Stethoscope,
+    Swords,
+    Trash2,
+    User,
+    Utensils,
+    Wallet,
+    X
 } from 'lucide-react';
-import { api } from '../../services/api';
+import {api} from '@/services/api.ts';
 import Dashboard from '../../Dashboard';
-import HealthHistory from './HealthHistory'; // Ajustada la ruta si es necesario
+import HealthHistory from './HealthHistory';
 import PetBudget from './PetBudget';
-import type { 
-  AlimentoDTO, 
-  ConsultaVetDTO, 
-  TriajeIADTO, 
-  MascotaDTO 
-} from '../../types/api.types';
+import type {AlimentoDTO, ConsultaVetDTO, MascotaDTO, TriajeIADTO} from '@/types/api.types.ts';
+import toast from 'react-hot-toast';
 
-// --- SUB-COMPONENTE DE STOCK OPTIMIZADO ---
+interface StockStatus {
+  status: string;
+  porcentaje: number;
+  marca: string;
+  diasRestantes: number;
+}
+
 const StockCard = ({ mascota, refreshKey }: { mascota: MascotaDTO, refreshKey: number }) => {
-  const [stock, setStock] = useState<any>(null);
+  const [stock, setStock] = useState<StockStatus | null>(null);
 
   useEffect(() => {
     if (mascota.id) {
-      // ✅ Endpoint: api.getStockStatus (Sincronizado)
       api.getStockStatus(mascota.id).then(res => setStock(res.data));
     }
   }, [mascota.id, refreshKey]);
@@ -37,7 +51,7 @@ const StockCard = ({ mascota, refreshKey }: { mascota: MascotaDTO, refreshKey: n
   };
 
   return (
-    <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100 mb-4 animate-in zoom-in-95">
+    <div className="bg-white p-5 rounded-4xl shadow-sm border border-slate-100 mb-4 animate-in zoom-in-95">
       <div className="flex justify-between items-start mb-3">
         <div className="flex items-center gap-3">
           <div className={`p-2.5 rounded-xl text-white ${getColor(percentage)} shadow-lg shadow-current/20`}>
@@ -63,9 +77,10 @@ const StockCard = ({ mascota, refreshKey }: { mascota: MascotaDTO, refreshKey: n
   );
 };
 
-// --- COMPONENTE PRINCIPAL ---
-const ReportsManager = ({ onVerDetalle }: { onVerDetalle: (item: any, tipo: 'food' | 'vet' | 'health') => void }) => {
-  const [subTab, setSubTab] = useState<'food' | 'vet' | 'health' | 'finance'>('food');
+type SubTabType = 'food' | 'vet' | 'health' | 'finance';
+
+const ReportsManager = ({ onVerDetalle }: { onVerDetalle: (item: AlimentoDTO | ConsultaVetDTO | TriajeIADTO, tipo: 'food' | 'vet' | 'health') => void }) => {
+  const [subTab, setSubTab] = useState<SubTabType>('food');
   const [vetSubTab, setVetSubTab] = useState<'triaje' | 'consultas'>('triaje');
   const [historial, setHistorial] = useState<AlimentoDTO[]>([]);
   const [historialVet, setHistorialVet] = useState<ConsultaVetDTO[]>([]);
@@ -74,7 +89,7 @@ const ReportsManager = ({ onVerDetalle }: { onVerDetalle: (item: any, tipo: 'foo
 
   const [comparisonMode, setComparisonMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [dueloResult, setDueloResult] = useState<any>(null);
+  const [dueloResult, setDueloResult] = useState<{ foods: AlimentoDTO[], veredicto: { ganador: string, diferencia: string, conclusion: string } } | null>(null);
   const [historialTriaje, setHistorialTriaje] = useState<TriajeIADTO[]>([]);
 
   const [refreshKey, setRefreshKey] = useState(0);
@@ -97,14 +112,13 @@ const ReportsManager = ({ onVerDetalle }: { onVerDetalle: (item: any, tipo: 'foo
     }));
   }, [historial, mascotas]);
 
-  const cargar = async () => {
+  const cargar = useCallback(async () => {
     try {
-      // ✅ Endpoints actualizados según api.ts
       const [resF, resV, resP, resT] = await Promise.all([
-        api.getHistorialAlimentos(), // Antes getHistorial
-        api.getHistorialClinico(),   // Antes getHistorialVet
+        api.getHistorialAlimentos(),
+        api.getHistorialClinico(),
         api.getMascotas(),
-        api.obtenerTriajes()     // Sincronizado con TriajeIADTO
+        api.obtenerTriajes()
       ]);
 
       setHistorial(resF.data || []);
@@ -112,7 +126,6 @@ const ReportsManager = ({ onVerDetalle }: { onVerDetalle: (item: any, tipo: 'foo
       
       const pets = resP.data || [];
       setMascotas(pets);
-      // ✅ Selección automática de la primera mascota para el historial de salud
       if (pets.length > 0 && !selectedPetId) {
         setSelectedPetId(pets[0].id!);
       }
@@ -120,9 +133,9 @@ const ReportsManager = ({ onVerDetalle }: { onVerDetalle: (item: any, tipo: 'foo
 
       setRefreshKey(prev => prev + 1);
     } catch (e) { console.error("Error cargando", e); }
-  };
+  }, [selectedPetId]);
 
-  useEffect(() => { cargar(); }, []);
+  useEffect(() => { void cargar(); }, [cargar]);
 
   const getGamaTextColor = (c: string | null = "") => {
     const q = (c || "").toLowerCase();
@@ -136,7 +149,10 @@ const ReportsManager = ({ onVerDetalle }: { onVerDetalle: (item: any, tipo: 'foo
       const res = await api.compararAlimentos(selectedIds);
       const rawText = res.data.resultado || "";
 
-      if (!rawText.includes('|')) throw new Error("Formato de respuesta inválido");
+      if (!rawText.includes('|')) {
+        toast.error("Formato de respuesta inválido");
+        return;
+      }
 
       const parts = rawText.split('|').map((s: string) => {
         const splitPart = s.split(':');
@@ -152,13 +168,13 @@ const ReportsManager = ({ onVerDetalle }: { onVerDetalle: (item: any, tipo: 'foo
         }
       });
     } catch (e) {
+      toast.error("Error al realizar el análisis");
       console.error("Error en el duelo:", e);
     }
   };
 
   return (
     <div className="space-y-6 pb-20 text-left">
-      {/* Selector de Tabs Principal */}
       <div className="flex bg-white p-1.5 rounded-2xl shadow-sm border border-slate-100 overflow-x-auto no-scrollbar">
         {[
           { id: 'food', label: 'Alimentos', icon: Utensils, color: 'bg-orange-600' },
@@ -168,7 +184,7 @@ const ReportsManager = ({ onVerDetalle }: { onVerDetalle: (item: any, tipo: 'foo
         ].map((tab) => (
           <button
             key={tab.id}
-            onClick={() => setSubTab(tab.id as any)}
+            onClick={() => setSubTab(tab.id as SubTabType)}
             className={`flex-1 py-3 px-4 rounded-xl font-black text-[9px] uppercase flex items-center justify-center gap-2 transition-all whitespace-nowrap ${subTab === tab.id ? `${tab.color} text-white shadow-md` : 'text-slate-400'}`}
           >
             <tab.icon size={14} /> {tab.label}
@@ -176,14 +192,12 @@ const ReportsManager = ({ onVerDetalle }: { onVerDetalle: (item: any, tipo: 'foo
         ))}
       </div>
 
-      {/* TABS DE FINANZAS */}
       {subTab === 'finance' && (
         <div className="animate-in fade-in slide-in-from-bottom-4">
           <PetBudget />
         </div>
       )}
 
-      {/* TABS DE ALIMENTOS */}
       {subTab === 'food' && (
         <>
           <div className="animate-in slide-in-from-top-4">
@@ -210,16 +224,13 @@ const ReportsManager = ({ onVerDetalle }: { onVerDetalle: (item: any, tipo: 'foo
                 className={`bg-white p-5 rounded-[2.5rem] border flex flex-col transition-all active:scale-[0.98] cursor-pointer shadow-sm relative overflow-hidden ${selectedIds.includes(i.id!) ? 'border-orange-500 ring-2 ring-orange-500/20 bg-orange-50/30' : 'border-slate-100'}`}
                 onClick={() => {
                   if (comparisonMode && i.id) {
-                    selectedIds.includes(i.id)
-                      ? setSelectedIds(selectedIds.filter(id => id !== i.id))
-                      : selectedIds.length < 2 && setSelectedIds([...selectedIds, i.id]);
+                    if (selectedIds.includes(i.id)) {
+                      setSelectedIds(selectedIds.filter(id => id !== i.id));
+                    } else if (selectedIds.length < 2) {
+                      setSelectedIds([...selectedIds, i.id]);
+                    }
                   } else {
-                    onVerDetalle({
-                      ...i,
-                      calidad: i.calidad || "---",
-                      veredicto: i.veredicto || "No hay veredicto disponible.",
-                      ingredientes: Array.isArray(i.ingredientes) ? i.ingredientes : []
-                    }, 'food');
+                    onVerDetalle(i, 'food');
                   }
                 }}>
 
@@ -231,7 +242,7 @@ const ReportsManager = ({ onVerDetalle }: { onVerDetalle: (item: any, tipo: 'foo
                       <p className={`text-[10px] font-black uppercase tracking-tighter ${getGamaTextColor(i.calidad)}`}>{i.calidad || "GAMA DESCONOCIDA"}</p>
                     </div>
                   </div>
-                  {!comparisonMode && <button onClick={(e) => { e.stopPropagation(); i.id && api.borrarAlimentoHistorial(i.id).then(cargar); }} className="p-2 text-slate-200 hover:text-red-500 transition-colors"><Trash2 size={16} /></button>}
+                  {!comparisonMode && <button onClick={(e) => { e.stopPropagation(); if (i.id) void api.borrarAlimentoHistorial(i.id).then(() => void cargar()); }} className="p-2 text-slate-200 hover:text-red-500 transition-colors"><Trash2 size={16} /></button>}
                 </div>
 
                 <div className={`p-4 rounded-3xl flex flex-col gap-2 ${i.pet ? 'bg-orange-50/50 border border-orange-100' : 'bg-slate-50 border border-slate-100 italic text-slate-400'}`}>
@@ -268,7 +279,6 @@ const ReportsManager = ({ onVerDetalle }: { onVerDetalle: (item: any, tipo: 'foo
         </>
       )}
 
-      {/* TABS DE SALUD */}
       {subTab === 'health' && (
         <div className="animate-in fade-in duration-500">
           <div className="flex gap-2 mb-6 overflow-x-auto pb-2 no-scrollbar">
@@ -286,7 +296,6 @@ const ReportsManager = ({ onVerDetalle }: { onVerDetalle: (item: any, tipo: 'foo
         </div>
       )}
 
-      {/* TABS DE VETE */}
       {subTab === 'vet' && (
         <div className="space-y-6 animate-in fade-in">
           <div className="flex gap-2 p-1.5 bg-slate-50 rounded-2xl border border-slate-100">
@@ -302,10 +311,10 @@ const ReportsManager = ({ onVerDetalle }: { onVerDetalle: (item: any, tipo: 'foo
             {vetSubTab === 'triaje' ? (
               historialTriaje.map(t => (
                 <div key={t.id} className="bg-white p-6 rounded-[2.5rem] border-l-8 border-l-red-500 shadow-sm border border-slate-100 text-left transition-all active:scale-[0.98] cursor-pointer"
-                  onClick={() => onVerDetalle({ ...t, analisis_detalle: t.analisisDetalle, nivel_urgencia: t.nivelUrgencia, urgencia_explicacion: t.urgenciaExplicacion, pasos_a_seguir: t.pasosASeguir, resumen_final: t.resumenFinal }, 'vet')}>
+                  onClick={() => onVerDetalle(t, 'vet')}>
                   <div className="flex justify-between items-start mb-3">
                     <span className="bg-red-500 text-white text-[8px] font-black px-2 py-1 rounded-md uppercase">{t.categoria}</span>
-                    <button onClick={(e) => { e.stopPropagation(); t.id && api.borrarTriaje(t.id).then(cargar); }} className="text-slate-200 hover:text-red-500"><Trash2 size={16} /></button>
+                    <button onClick={(e) => { e.stopPropagation(); if (t.id) void api.borrarTriaje(t.id).then(() => void cargar()); }} className="text-slate-200 hover:text-red-500"><Trash2 size={16} /></button>
                   </div>
                   <h4 className="font-black text-slate-800 text-sm mb-1 uppercase tracking-tight">{t.categoria}</h4>
                   <p className="text-xs text-slate-500 italic line-clamp-2">"{t.analisisDetalle}"</p>
@@ -314,10 +323,10 @@ const ReportsManager = ({ onVerDetalle }: { onVerDetalle: (item: any, tipo: 'foo
             ) : (
               historialVet.map(v => (
                 <div key={v.id} className="bg-white p-6 rounded-[2.5rem] border-l-8 border-l-slate-900 shadow-sm border border-slate-100 text-left transition-all active:scale-[0.98] cursor-pointer"
-                  onClick={() => onVerDetalle({ ...v, esDocumentoMedico: true, analisis_detalle: v.diagnostico || v.observaciones || "Sin detalles", nivel_urgencia: "BAJA", resumen_final: v.nombre }, 'vet')}>
+                  onClick={() => onVerDetalle(v, 'vet')}>
                   <div className="flex justify-between items-start mb-3">
                     <span className="bg-slate-900 text-white text-[8px] font-black px-2 py-1 rounded-md uppercase">{v.tipo}</span>
-                    <button onClick={(e) => { e.stopPropagation(); v.id && api.eliminarConsultaVet(v.id).then(cargar); }} className="text-slate-200 hover:text-red-500"><Trash2 size={16} /></button>
+                    <button onClick={(e) => { e.stopPropagation(); if (v.id) void api.eliminarConsultaVet(v.id).then(() => void cargar()); }} className="text-slate-200 hover:text-red-500"><Trash2 size={16} /></button>
                   </div>
                   <h4 className="font-black text-slate-800 text-sm mb-1 uppercase tracking-tight">{v.nombre}</h4>
                   {v.precio && v.precio > 0 && <span className="text-emerald-600 font-black text-xs block mb-1">${v.precio.toLocaleString()}</span>}
@@ -329,16 +338,14 @@ const ReportsManager = ({ onVerDetalle }: { onVerDetalle: (item: any, tipo: 'foo
         </div>
       )}
 
-      {/* MODAL DUELO FINAL (Sin cambios) */}
       {dueloResult && (
-        <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[110] flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-110 flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-lg rounded-[3rem] p-8 shadow-2xl relative text-left overflow-y-auto max-h-[90vh] animate-in zoom-in-95">
             <button onClick={() => setDueloResult(null)} className="absolute top-6 right-6 text-slate-300 hover:text-slate-900 transition-colors"><X size={24} /></button>
             <div className="flex items-center justify-center gap-3 mb-8 text-orange-600">
               <Swords size={32} />
               <h3 className="text-2xl font-black uppercase tracking-tighter">Duelo Final</h3>
             </div>
-            {/* ... resto del modal ... */}
             <div className="bg-orange-600 p-6 rounded-[2.5rem] text-white shadow-xl mb-4 relative overflow-hidden">
               <p className="text-[10px] font-black uppercase opacity-70 mb-1">🏆 Ganador del Análisis</p>
               <p className="text-2xl font-black">{dueloResult.veredicto.ganador}</p>
@@ -348,11 +355,11 @@ const ReportsManager = ({ onVerDetalle }: { onVerDetalle: (item: any, tipo: 'foo
                 <Scale size={24} className="text-orange-500 shrink-0" />
                 <p>{dueloResult.veredicto.diferencia}</p>
               </div>
-              <div className="bg-slate-900 p-6 rounded-[2rem] text-white text-center italic text-sm border-b-4 border-orange-500">
+              <div className="bg-slate-900 p-6 rounded-4xl text-white text-center italic text-sm border-b-4 border-orange-500">
                 "{dueloResult.veredicto.conclusion}"
               </div>
             </div>
-            <button onClick={() => setDueloResult(null)} className="w-full py-5 bg-slate-900 text-white rounded-[2rem] font-black mt-6">CERRAR ANÁLISIS</button>
+            <button onClick={() => setDueloResult(null)} className="w-full py-5 bg-slate-900 text-white rounded-4xl font-black mt-6">CERRAR ANÁLISIS</button>
           </div>
         </div>
       )}
