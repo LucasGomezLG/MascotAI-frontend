@@ -77,6 +77,8 @@ export const api = {
   getUserProfile: () => apiClient.get<UserDTO>('/user/me'),
   refreshProfileData: () => apiClient.get<UserDTO>('/user/me'),
   logout: () => apiClient.post('/logout'),
+  // NUEVO ENDPOINT PARA NOTIFICACIONES
+  registerDeviceToken: (token: string) => apiClient.post('/user/register-device', { token }),
 
   // --- 🔑 MÓDULO: PÚBLICO Y AUTH NATIVA ---
   checkHealth: () => apiClient.get<string>('/mascotas/public/health'),

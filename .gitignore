@@ -29,6 +29,12 @@ dist-ssr
 .env.local
 
 # Android / Mobile
-android/
-my-release-key.keystore
+# android/  <-- COMENTADO: La carpeta android/ SÍ debe subirse si usas Capacitor/React Native para que otros puedan compilar la app móvil.
+# Solo ignoramos los secretos dentro de android/
+android/app/google-services.json
 android/keystore.properties
+android/local.properties
+my-release-key.keystore
+
+# Firebase Service Worker (Opcional: descomentar si decides poner credenciales hardcodeadas aquí)
+# public/firebase-messaging-sw.js

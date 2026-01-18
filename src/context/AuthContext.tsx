@@ -4,6 +4,24 @@ import {api, apiClient} from '../services/api';
 import {Capacitor} from '@capacitor/core';
 import {GoogleAuth} from '@codetrix-studio/capacitor-google-auth';
 import type {UserDTO} from '@/types/api.types';
+import {getMessaging, getToken, onMessage} from "firebase/messaging";
+import {initializeApp} from "firebase/app";
+import toast from 'react-hot-toast';
+
+// Configuración de Firebase usando variables de entorno
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
+};
+
+// Inicializar Firebase
+const app = initializeApp(firebaseConfig);
+const messaging = getMessaging(app);
 
 type RawUserData = {
   id: string;
@@ -65,6 +83,56 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => apiClient.interceptors.response.eject(interceptor);
   }, []);
 
+  // Manejo de notificaciones en primer plano
+  useEffect(() => {
+    const unsubscribe = onMessage(messaging, (payload) => {
+      console.log('Notificación en primer plano:', payload);
+      if (payload.notification) {
+        toast(
+          (t) => (
+            <div onClick={() => toast.dismiss(t.id)}>
+              <p className="font-bold">{payload.notification?.title}</p>
+              <p className="text-sm">{payload.notification?.body}</p>
+            </div>
+          ),
+          {
+            icon: '🔔',
+            style: {
+              borderRadius: '12px',
+              background: '#fff',
+              color: '#333',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              border: '1px solid #f0f0f0',
+            },
+            duration: 5000,
+          }
+        );
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const registerFCMToken = useCallback(async () => {
+    try {
+      const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY;
+      if (!vapidKey || vapidKey === 'TU_VAPID_KEY_AQUI') {
+        console.warn('VITE_FIREBASE_VAPID_KEY no está configurada correctamente en .env');
+        return;
+      }
+
+      const currentToken = await getToken(messaging, { vapidKey });
+      if (currentToken) {
+        console.log('Token FCM obtenido:', currentToken);
+        await api.registerDeviceToken(currentToken);
+        console.log('Token FCM registrado en el backend con éxito.');
+      } else {
+        console.log('No se pudo obtener el token. El usuario necesita dar permisos.');
+      }
+    } catch (error) {
+      console.error('Error al registrar el token FCM:', error);
+    }
+  }, []);
+
   const initAuth = useCallback(async () => {
     const wasLoggedIn = localStorage.getItem('mascotai_logged_in') === 'true';
     if (!wasLoggedIn) {
@@ -75,6 +143,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const res = await api.getUserProfile();
       if (res && res.data) {
         setUser(formatUserData(res.data));
+        // Registrar token FCM al inicializar auth si el usuario está logueado
+        registerFCMToken();
       }
     } catch (error) {
       console.error("Fallo al inicializar autenticación:", error);
@@ -82,7 +152,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [registerFCMToken]);
 
   useEffect(() => {
     if (Capacitor.isNativePlatform()) {
@@ -113,6 +183,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (res && res.data) {
           setUser(formatUserData(res.data));
           localStorage.setItem('mascotai_logged_in', 'true');
+          // Registrar token FCM tras login nativo exitoso
+          registerFCMToken();
         }
       } catch (error) {
         console.error("Error en Login nativo:", error);

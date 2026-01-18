@@ -26,6 +26,7 @@
     "@sentry/react": "8.55.0",
     "axios": "^1.7.9",
     "chart.js": "^4.4.7",
+    "firebase": "^12.8.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.469.0",
     "react": "^19.2.3",

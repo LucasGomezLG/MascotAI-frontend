@@ -44,13 +44,22 @@ export default [
     },
   },
 
-  // 4. Specific config for the Service Worker file
+  // 4. Specific config for the Service Worker files
   {
-    files: ['public/sw.js'],
+    files: ['public/sw.js', 'public/firebase-messaging-sw.js'],
     languageOptions: {
       globals: {
         ...globals.serviceworker,
+        // Agregamos variables globales específicas de los scripts importados de Firebase
+        firebase: 'readonly',
+        importScripts: 'readonly',
+        console: 'readonly',
       },
     },
+    rules: {
+      // Desactivamos reglas de TypeScript que no aplican a JS plano en public/
+      '@typescript-eslint/no-unused-vars': 'off',
+      'no-undef': 'off' // Permitimos variables globales definidas en importScripts
+    }
   },
 ];

@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">MascotAI</string>
+    <string name="title_activity_main">MascotAI</string>
+    <string name="package_name">com.front.mascotai</string>
+    <string name="custom_url_scheme">com.front.mascotai</string>
+    <string name="server_client_id">
+        412244128184-507a1mt5t8lqtr0ce6sajpofb7akod2c.apps.googleusercontent.com</string>
+</resources>
