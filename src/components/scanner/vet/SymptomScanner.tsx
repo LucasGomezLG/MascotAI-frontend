@@ -17,6 +17,12 @@ interface SymptomScannerProps {
   onScanComplete: () => void;
 }
 
+type AnalizarTriajeResponse = TriajeIADTO | { error: string };
+
+function isTriajeError(data: AnalizarTriajeResponse): data is { error: string } {
+  return (data as { error: string }).error !== undefined;
+}
+
 const SymptomScanner = ({ mascotas, initialData, onScanComplete }: SymptomScannerProps) => {
   const { user, refreshUser } = useAuth();
   const [selectedPet, setSelectedPet] = useState("");
@@ -100,22 +106,24 @@ const SymptomScanner = ({ mascotas, initialData, onScanComplete }: SymptomScanne
 
       await refreshUser();
 
-      const dataIA: TriajeIADTO = res.data;
-      if (dataIA?.error === "NO_DETECTADO") {
-        void Swal.fire({
-          title: 'Imagen no reconocida',
-          text: `MascotAI no detectó evidencia de "${activeTab}"...`,
-          icon: 'warning',
-          confirmButtonColor: '#ef4444',
-          confirmButtonText: 'Reintentar'
-        });
+      const dataIA = res.data as AnalizarTriajeResponse;
+      if (isTriajeError(dataIA)) {
+        if (dataIA.error === "NO_DETECTADO") {
+          void Swal.fire({
+            title: 'Imagen no reconocida',
+            text: `MascotAI no detectó evidencia de "${activeTab}"...`,
+            icon: 'warning',
+            confirmButtonColor: '#ef4444',
+            confirmButtonText: 'Reintentar'
+          });
+        }
         return;
       }
       setResult(dataIA);
       if (onScanComplete) onScanComplete();
     } catch (e) {
-      if (isAxiosError(e)) {
-        const errorMsg = (e.response?.data as { error: string })?.error || "";
+      if (isAxiosError<{ error: string }>(e)) {
+        const errorMsg = e.response?.data?.error || "";
         if (e.response?.status === 403 || errorMsg.includes("LIMITE")) {
           mostrarModalLimite();
         } else {
@@ -192,7 +200,7 @@ const SymptomScanner = ({ mascotas, initialData, onScanComplete }: SymptomScanne
           <button 
             onClick={handleAnalizar} 
             disabled={loading || !selectedImage} 
-            className={`w-full flex items-center justify-center gap-3 py-6 rounded-[2rem] font-black text-xl shadow-xl transition-all active:scale-95 ${
+            className={`w-full flex items-center justify-center gap-3 py-6 rounded-4xl font-black text-xl shadow-xl transition-all active:scale-95 ${
               loading || !selectedImage 
                 ? 'bg-red-100 text-red-300 cursor-not-allowed shadow-none' 
                 : 'bg-red-600 text-white shadow-red-200 hover:bg-red-700'
@@ -206,7 +214,7 @@ const SymptomScanner = ({ mascotas, initialData, onScanComplete }: SymptomScanne
           <MedicalReport data={result} />
           <button
             onClick={() => { setResult(null); setSelectedImage(null) }}
-            className="w-full py-5 bg-slate-900 text-white rounded-[2rem] font-black uppercase text-xs tracking-widest shadow-xl transition-all active:scale-95"
+            className="w-full py-5 bg-slate-900 text-white rounded-4xl font-black uppercase text-xs tracking-widest shadow-xl transition-all active:scale-95"
           >
             NUEVA CONSULTA
           </button>
@@ -214,8 +222,8 @@ const SymptomScanner = ({ mascotas, initialData, onScanComplete }: SymptomScanne
       )}
 
       {showSubscriptionModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[150] p-4">
-          <div className="bg-white rounded-[2rem] p-6 max-w-sm w-full relative">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-150 p-4">
+          <div className="bg-white rounded-4xl p-6 max-w-sm w-full relative">
             <button
               onClick={() => setShowSubscriptionModal(false)}
               className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"

@@ -134,7 +134,7 @@ const PetProfiles = ({ mascotas, onUpdate }: PetProfilesProps) => {
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">{pet.especie} • {pet.edad || 0} años</p>
                     <div className="flex gap-2 mt-2">
                       <span className="px-3 py-1 bg-orange-50 text-orange-600 text-[8px] font-black rounded-lg border border-orange-100 uppercase">{pet.condicion || "Sano"}</span>
-                      {pet.peso > 0 && <span className="px-3 py-1 bg-slate-50 text-slate-500 text-[8px] font-black rounded-lg border border-slate-100 uppercase">{pet.peso} kg</span>}
+                      {pet.peso && pet.peso > 0 && <span className="px-3 py-1 bg-slate-50 text-slate-500 text-[8px] font-black rounded-lg border border-slate-100 uppercase">{pet.peso} kg</span>}
                     </div>
                   </div>
                 </div>

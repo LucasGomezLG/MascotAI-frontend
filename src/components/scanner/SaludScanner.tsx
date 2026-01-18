@@ -25,6 +25,15 @@ interface SaludScannerProps {
   onScanComplete: () => void;
 }
 
+// Define the response type from the API
+type AnalizarSaludResponse = RecordatorioSaludDTO | { error: string };
+
+// Type guard to check for the error response
+function isAnalizarSaludError(data: AnalizarSaludResponse): data is { error: string } {
+  return (data as { error: string }).error !== undefined;
+}
+
+
 const SaludScanner = ({ mascotas, onScanComplete }: SaludScannerProps) => {
   const { user, refreshUser } = useAuth();
   const [selectedPet, setSelectedPet] = useState("");
@@ -93,8 +102,10 @@ const SaludScanner = ({ mascotas, onScanComplete }: SaludScannerProps) => {
       const res = await api.analizarSalud(selectedImage, petIdSeguro);
       await refreshUser();
 
-      if (res.data.error) {
-        const config = res.data.error === "ESPECIE_INCORRECTA"
+      const responseData = res.data as AnalizarSaludResponse;
+
+      if (isAnalizarSaludError(responseData)) {
+        const config = responseData.error === "ESPECIE_INCORRECTA"
           ? { title: '⚠️ ADVERTENCIA', icon: 'warning' as const, color: '#ef4444' }
           : { title: 'No reconocido', icon: 'error' as const, color: '#10b981' };
 
@@ -113,20 +124,20 @@ const SaludScanner = ({ mascotas, onScanComplete }: SaludScannerProps) => {
       };
 
       setEditData({
-        id: res.data.id || undefined,
-        nombre: res.data.nombre || "Nuevo Registro",
-        tipo: res.data.tipo || "MEDICAMENTO",
-        fechaAplicacion: cleanFecha(res.data.fechaAplicacion) || hoy,
-        proximaFecha: cleanFecha(res.data.proximaFecha) || "",
-        precio: res.data.precio || 0,
-        notas: res.data.notas || "",
+        id: responseData.id || undefined,
+        nombre: responseData.nombre || "Nuevo Registro",
+        tipo: responseData.tipo || "MEDICAMENTO",
+        fechaAplicacion: cleanFecha(responseData.fechaAplicacion) || hoy,
+        proximaFecha: cleanFecha(responseData.proximaFecha) || "",
+        precio: responseData.precio || 0,
+        notas: responseData.notas || "",
         completado: true,
         mascotaId: petIdSeguro
       });
 
     } catch (e) {
-      if (isAxiosError(e)) {
-        const serverMsg = (e.response?.data as { error: string })?.error || "";
+      if (isAxiosError<{ error: string }>(e)) {
+        const serverMsg = e.response?.data?.error || "";
         if (serverMsg.includes("LIMITE")) mostrarModalLimite();
         else void Swal.fire({ title: 'Error', text: 'No se pudo procesar la imagen.', icon: 'error' });
       }
@@ -207,8 +218,8 @@ const SaludScanner = ({ mascotas, onScanComplete }: SaludScannerProps) => {
       if (onScanComplete) onScanComplete();
 
     } catch (e) {
-      if (isAxiosError(e)) {
-        const errorMsg = (e.response?.data as { message: string })?.message || "Error de validación en el servidor.";
+      if (isAxiosError<{ message: string }>(e)) {
+        const errorMsg = e.response?.data?.message || "Error de validación en el servidor.";
         void Swal.fire({ title: 'Error al Guardar', text: `El servidor rechazó los datos: ${errorMsg}`, icon: 'error' });
       }
     } finally {

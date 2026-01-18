@@ -1,15 +1,9 @@
 import React from 'react';
 import {Bell, Check, Package, ShieldPlus, X} from 'lucide-react';
-
-interface Alerta {
-  id: string;
-  mensaje: string;
-  tipo: string;
-  fecha: string;
-}
+import type { AlertaDTO } from '@/types/api.types';
 
 interface Props {
-  alertas: Alerta[];
+  alertas: AlertaDTO[];
   onMarkRead: (id: string) => void;
   onClose: () => void;
 }
@@ -65,7 +59,7 @@ const NotificationsCenter = ({ alertas, onMarkRead, onClose }: Props) => {
                 </div>
                 
                 <button 
-                  onClick={() => onMarkRead(a.id)} 
+                  onClick={() => a.id && onMarkRead(a.id)}
                   className="absolute top-3 right-3 p-1 text-slate-300 hover:text-slate-600 transition-colors"
                   title="Marcar como leída"
                 >

@@ -80,7 +80,9 @@ const RefugioCard = ({ refugio, currentUser, onDelete }: RefugioCardProps) => {
       customClass: { popup: 'rounded-[2.5rem]' }
     }).then((result) => {
       if (result.isConfirmed) {
-        handleCopy(refugio.aliasDonacion, 'Alias copiado');
+        if (refugio.aliasDonacion) {
+          handleCopy(refugio.aliasDonacion, 'Alias copiado');
+        }
       }
     });
   };
@@ -183,7 +185,7 @@ const RefugioCard = ({ refugio, currentUser, onDelete }: RefugioCardProps) => {
           </button>
 
           <button
-            onClick={() => handleCopy(refugio.redSocial, 'Link copiado')}
+            onClick={() => refugio.redSocial && handleCopy(refugio.redSocial, 'Link copiado')}
             className="w-full py-3 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase flex items-center justify-center gap-2 active:scale-95 transition-all shadow-xl shadow-slate-100"
           >
             <Globe size={14} /> Red Social / Web

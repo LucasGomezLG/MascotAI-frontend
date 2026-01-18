@@ -330,7 +330,7 @@ const ReportsManager = ({ onVerDetalle }: { onVerDetalle: (item: AlimentoDTO | C
                   </div>
                   <h4 className="font-black text-slate-800 text-sm mb-1 uppercase tracking-tight">{v.nombre}</h4>
                   {v.precio && v.precio > 0 && <span className="text-emerald-600 font-black text-xs block mb-1">${v.precio.toLocaleString()}</span>}
-                  <p className="text-xs text-slate-500 italic line-clamp-2">"{(v.diagnostico || v.observaciones || "Ver detalles")}"</p>
+                  <p className="text-xs text-slate-500 italic line-clamp-2">"{(v.diagnostico || "Ver detalles")}"</p>
                 </div>
               ))
             )}

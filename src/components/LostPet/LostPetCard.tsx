@@ -14,12 +14,12 @@ import {
     X
 } from 'lucide-react';
 import {Circle, MapContainer, TileLayer} from 'react-leaflet';
-import type {ItemComunidad, UserDTO} from '@/types/api.types';
+import type {ItemComunidad, MascotaPerdidaDTO, UserDTO} from '@/types/api.types';
 import 'leaflet/dist/leaflet.css';
 import Swal from 'sweetalert2';
 
 interface LostPetCardProps {
-  reporte: ItemComunidad;
+  reporte: ItemComunidad & MascotaPerdidaDTO;
   currentUser: UserDTO | null;
   onDelete: (id: string) => void;
 }
@@ -82,7 +82,7 @@ const LostPetCard = ({ reporte, currentUser, onDelete }: LostPetCardProps) => {
           />
 
           <div className="absolute top-2 left-2 px-2 py-1 bg-red-600 text-white text-[8px] font-black rounded-lg uppercase shadow-lg">
-            {reporte.mascota?.especie || 'Perdido'}
+            Perdido
           </div>
 
           <div className="absolute inset-0 bg-black/10 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center">

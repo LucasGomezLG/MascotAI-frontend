@@ -10,7 +10,7 @@ type RawUserData = {
   nombre?: string;
   name?: string;
   displayName?: string;
-  email: string;
+  email?: string;
   foto?: string | null;
   picture?: string;
   imageUrl?: string;
@@ -44,7 +44,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       id: data.id,
       nombre: data.nombre || data.name || data.displayName || 'Usuario',
       email: data.email,
-      foto: esFotoGenerica ? null : (data.foto || data.picture || data.imageUrl),
+      foto: esFotoGenerica ? undefined : (data.foto || data.picture || data.imageUrl) || undefined,
       intentosIA: data.intentosIA || 0,
       intentosRestantes: data.intentosRestantes || 0,
       esColaborador: data.esColaborador || false,
