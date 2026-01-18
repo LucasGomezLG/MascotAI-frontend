@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {Dog, Globe, Heart, MapPin, Plus, User as UserIcon, RefreshCw, LucideIcon} from 'lucide-react';
+import {Dog, Globe, Heart, MapPin, Plus, User as UserIcon, RefreshCw} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import LostPetCard from '../LostPet/LostPetCard';
 import AdoptionCard from '../AdoptionPet/AdoptionCard';
 import RefugioCard from '../Refugio/RefugioCard';
