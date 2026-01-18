@@ -4,6 +4,7 @@ import {api, apiClient} from '../services/api';
 import {Capacitor} from '@capacitor/core';
 import {GoogleAuth} from '@codetrix-studio/capacitor-google-auth';
 import type {UserDTO} from '@/types/api.types';
+import type {Messaging} from "firebase/messaging";
 import {getMessaging, getToken, onMessage} from "firebase/messaging";
 import {initializeApp} from "firebase/app";
 import toast from 'react-hot-toast';
@@ -20,8 +21,17 @@ const firebaseConfig = {
 };
 
 // Inicializar Firebase
-const app = initializeApp(firebaseConfig);
-const messaging = getMessaging(app);
+let messaging: Messaging | null = null;
+try {
+  if (firebaseConfig.apiKey && firebaseConfig.projectId) {
+    const app = initializeApp(firebaseConfig);
+    messaging = getMessaging(app);
+  } else {
+    console.warn("Firebase config is missing apiKey or projectId. Push notifications will not work.");
+  }
+} catch (e) {
+  console.error("Error initializing Firebase:", e);
+}
 
 type RawUserData = {
   id: string;
@@ -85,8 +95,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Manejo de notificaciones en primer plano
   useEffect(() => {
+    if (!messaging) return;
+    
     const unsubscribe = onMessage(messaging, (payload) => {
-      console.log('Notificación en primer plano:', payload);
+      // console.log('Notificación en primer plano:', payload);
       if (payload.notification) {
         toast(
           (t) => (
@@ -112,9 +124,39 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => unsubscribe();
   }, []);
 
+  const requestNotificationPermission = async () => {
+    if (!('Notification' in window)) {
+      console.log('Este navegador no soporta notificaciones de escritorio');
+      return false;
+    }
+
+    if (Notification.permission === 'granted') {
+      return true;
+    }
+
+    if (Notification.permission !== 'denied') {
+      const permission = await Notification.requestPermission();
+      return permission === 'granted';
+    }
+
+    return false;
+  };
+
   const registerFCMToken = useCallback(async () => {
+    if (!messaging) {
+      return;
+    }
+
     try {
-      const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY;
+      // Solicitar permiso explícitamente antes de intentar obtener el token
+      const hasPermission = await requestNotificationPermission();
+      if (!hasPermission) {
+        console.log('Permiso de notificaciones denegado o no concedido.');
+        return;
+      }
+
+      const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY?.trim();
+      
       if (!vapidKey || vapidKey === 'TU_VAPID_KEY_AQUI') {
         console.warn('VITE_FIREBASE_VAPID_KEY no está configurada correctamente en .env');
         return;
@@ -122,14 +164,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       const currentToken = await getToken(messaging, { vapidKey });
       if (currentToken) {
-        console.log('Token FCM obtenido:', currentToken);
+        // console.log('Token FCM obtenido:', currentToken);
         await api.registerDeviceToken(currentToken);
-        console.log('Token FCM registrado en el backend con éxito.');
+        // console.log('Token FCM registrado en el backend con éxito.');
       } else {
         console.log('No se pudo obtener el token. El usuario necesita dar permisos.');
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error al registrar el token FCM:', error);
+      // Verificamos si el error es un objeto y tiene la propiedad 'code'
+      if (typeof error === 'object' && error !== null && 'code' in error) {
+        const firebaseError = error as { code: string };
+        if (firebaseError.code === 'messaging/permission-blocked') {
+          toast.error('Las notificaciones están bloqueadas. Por favor, habilítalas en la configuración de tu navegador para recibir alertas.', {
+              duration: 6000,
+              style: {
+                  borderRadius: '10px',
+                  background: '#333',
+                  color: '#fff',
+              },
+          });
+        }
+      }
     }
   }, []);
 
